@@ -7,6 +7,7 @@ import serveStatic from "serve-static";
 import shopify from "./shopify.js";
 import productCreator from "./product-creator.js";
 import GDPRWebhookHandlers from "./gdpr.js";
+// import proxyRouter from "./product-builder/proxy.js";
 
 const PORT = parseInt(process.env.BACKEND_PORT || process.env.PORT, 10);
 
@@ -15,7 +16,11 @@ const STATIC_PATH =
     ? `${process.cwd()}/frontend/dist`
     : `${process.cwd()}/frontend/`;
 
+const PROXY_PATH = `${process.cwd()}/product-builder`;
+
 const app = express();
+
+console.log(process.cwd() + '/product-builder/builder.css');
 
 // Set up Shopify authentication and webhook handling
 app.get(shopify.config.auth.path, shopify.auth.begin());
@@ -33,23 +38,22 @@ app.post(
 // also add a proxy rule for them in web/frontend/vite.config.js
 
 app.get("/api/proxy", (req, res) => {
-  const file = `
-    <html>
-      <head>
-      </head>
-      <body>
-        <h1>{{ shop.name }}</h1>
+  res.setHeader('Content-Type', 'application/liquid');
 
-        <p>Pishov na obid</p>
-        <p>Cart items: <b>{{ cart.item_count }}</b></p>
-      </body>
-    </html>
-  `;
-
-  res.setHeader('Content-Type', 'application/liquid')
-
-  res.send(file);
+  res.sendFile(join(PROXY_PATH, 'builder.html'));
 });
+
+app.get('/api/proxy/:file', (req, res) => {
+  const { file } = req.params;
+
+  if (file.endsWith('.css')) {
+    res.set('Content-Type', 'text/css');
+  } else if (file.endsWith('.js')) {
+    res.set('Content-Type', 'application/javascript');
+  }
+
+  res.sendFile(join(PROXY_PATH, file));
+})
 
 app.use("/api/*", shopify.validateAuthenticatedSession());
 

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Builder</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/camanjs/4.1.2/caman.full.js" defer></script>
+  
+  <link rel="stylesheet" href="https://bf4f-109-68-43-50.eu.ngrok.io/api/proxy/builder.css">
+  <script src="https://bf4f-109-68-43-50.eu.ngrok.io/api/proxy/product-builder.js" defer></script>
+</head>
+  <body>
+    <product-builder class="product-builder">
+      <div class="product-builder__viewport" data-builder-viewport>
+        <div class="product-builder__item product-mockup" data-builder-mockup>
+          <canvas id="mockup-1" data-id="1"></canvas>
+        </div>
+      </div>
+      <button class="product-builder__add-button" data-product-builder-add-button></button>
+      <div class="unfocus-button" data-unfocus-button></div>
+    </product-builder>
+
+    <div class="builder__controls">
+      <div class="builder__tools" data-builder-tools>
+        <div class="builder__tool--toggler tool-frame" data-toggler="frame">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="sc-gVFfnG kEjilk"><path d="M29.5984 2.39844H30.9984C30.9984 1.62524 30.3716 0.998438 29.5984 0.998438V2.39844ZM29.5984 12.4937V13.8937C30.3716 13.8937 30.9984 13.2669 30.9984 12.4937H29.5984ZM2.39844 2.39844V0.998438C1.62524 0.998438 0.998438 1.62524 0.998438 2.39844L2.39844 2.39844ZM2.39844 12.4937H0.998438C0.998438 13.2669 1.62524 13.8937 2.39844 13.8937L2.39844 12.4937ZM2.40469 12.4937H3.80469C3.80469 11.7205 3.17789 11.0937 2.40469 11.0937V12.4937ZM2.40469 29.9624H1.00469C1.00469 30.7356 1.63149 31.3624 2.40469 31.3624V29.9624ZM12.5 29.9624V31.3624C13.2732 31.3624 13.9 30.7356 13.9 29.9624H12.5ZM12.5 12.4937V11.0937C11.7268 11.0937 11.1 11.7205 11.1 12.4937H12.5ZM28.1984 2.39844V12.4937H30.9984V2.39844H28.1984ZM12.5 3.79844H29.5984V0.998438H12.5V3.79844ZM2.39844 3.79844H12.5V0.998438H2.39844V3.79844ZM3.79844 12.4937V2.39844H0.998438V12.4937H3.79844ZM2.40469 11.0937H2.39844V13.8937H2.40469V11.0937ZM3.80469 29.9624V12.4937H1.00469V29.9624H3.80469ZM12.5 28.5624H2.40469V31.3624H12.5V28.5624ZM11.1 12.4937V29.9624H13.9V12.4937H11.1ZM29.5984 11.0937H12.5V13.8937H29.5984V11.0937Z" fill="currentColor"></path><path d="M12.7398 12.7368L3.26465 3.26172" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          <span>Frame</span>
+        </div>
+        <div class="builder__tool--toggler tool-effect" data-toggler="effect">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_16744_76898)"><path d="M8.80715 11.1695C9.26673 11.4395 9.62548 11.8743 9.82194 12.3996C10.7148 12.0697 11.5688 11.6268 12.3662 11.0802M8.5791 11.0598C8.8834 10.0893 9.29224 9.1612 9.79715 8.29467M12.3654 11.0802C13.7895 10.1043 15.0084 8.81451 15.943 7.2945L18.8537 2.55916C18.9652 2.37881 19.0155 2.16206 18.9961 1.94594C18.9766 1.72982 18.8886 1.52773 18.747 1.37419C18.6054 1.22064 18.4191 1.12516 18.2198 1.10405C18.0206 1.08294 17.8207 1.13752 17.6544 1.25845L13.2884 4.41616C11.8867 5.42947 10.6972 6.75119 9.79715 8.29549" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path><path d="M9.30301 12.892C9.03746 12.2403 8.55256 11.7007 7.93136 11.3658C7.31016 11.0309 6.59131 10.9214 5.89794 11.0561C5.20456 11.1908 4.57981 11.5614 4.13068 12.1042C3.68156 12.6471 3.43601 13.3285 3.43609 14.0318C3.43609 14.3431 3.37186 14.6512 3.24738 14.9368C3.12289 15.2224 2.94081 15.4795 2.71241 15.6922C2.48402 15.9049 2.21418 16.0686 1.91962 16.1732C1.62505 16.2778 1.31205 16.3211 1 16.3003C1.50188 17.1683 2.27756 17.847 3.20661 18.2311C4.13567 18.6153 5.16613 18.6833 6.13802 18.4248C7.10991 18.1662 7.96886 17.5954 8.58153 16.8011C9.1942 16.0067 9.52632 15.0333 9.52632 14.0318C9.52632 13.6286 9.44714 13.2436 9.30301 12.892Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></g><defs><clipPath id="clip0_16744_76898"><rect width="20" height="20" fill="white"></rect></clipPath></defs></svg>
+          <span>Effect</span>
+        </div>
+        <div class="builder__tool--toggler tool--mat" data-toggler="mat">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_13415_48732)"><path d="M18.7492 1.25H1.25073V18.75H18.7492V1.25Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path><path d="M4.62744 15.375V4.625H15.3853V15.375H4.62744Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></g><defs><clipPath id="clip0_13415_48732"><rect width="20" height="20" fill="white"></rect></clipPath></defs></svg>
+          <span>Mat</span>
+        </div>
+        <div class="builder__tool--toggler tool--crop hidden" data-tool-crop>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" data-acsb-hidden="true" data-acsb-force-hidden="true"><g clip-path="url(#clip0_13554_58072)"><path d="M5 1.25L5 15L18.75 15" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path><path d="M15 18.75L15 5L1.25 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></g><defs><clipPath id="clip0_13554_58072"><rect width="20" height="20" fill="white" transform="translate(20 20) rotate(-180)"></rect></clipPath></defs></svg>
+          <span>Crop</span>
+        </div>
+      </div>
+      <button class="builder__checkout-button">Checkout</button>
+
+      <div class="builder-tool" data-tool="frame">
+        <div class="builder-tool__header">
+          <span>Select Frame:</span>
+
+          <button data-toggler>Done</button>
+        </div>
+        <div class="builder-tool__options">
+          <div class="builder-tool__option" data-tool-option="black">Black</div>
+          <div class="builder-tool__option" data-tool-option="white">White</div>
+          <div class="builder-tool__option" data-tool-option="frameless">Frameless</div>
+        </div>
+      </div>
+      <div class="builder-tool" data-tool="effect">
+        <div class="builder-tool__header">
+          <span>Select Effect:</span>
+
+          <button data-toggler>Done</button>
+        </div>
+        <div class="builder-tool__options">
+          <div class="builder-tool__option" data-tool-option="original">Original</div>
+          <div class="builder-tool__option" data-tool-option="silver">Silver</div>
+          <div class="builder-tool__option" data-tool-option="noir">Noir</div>
+          <div class="builder-tool__option" data-tool-option="vivid">Vivid</div>
+          <div class="builder-tool__option" data-tool-option="dramatic">Dramatic</div>
+        </div>
+      </div>
+      </div>
+      <div class="builder-tool" data-tool="mat">
+        <div class="builder-tool__header">
+          <span>Select Mat:</span>
+
+          <button data-toggler>Done</button>
+        </div>
+        <div class="builder-tool__options">
+          <div class="builder-tool__option" data-tool-option="none">None</div>
+          <div class="builder-tool__option" data-tool-option="shallow">Shallow</div>
+          <div class="builder-tool__option" data-tool-option="medium">Medium</div>
+          <div class="builder-tool__option" data-tool-option="deep">Deep</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
