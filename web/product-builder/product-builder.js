@@ -4,17 +4,112 @@ class ImageCropper {
     this.container.id = mockup.getId();
     this.container.className = 'image-cropper';
 
+    this.mockup = mockup;
+
+    this.transform = {};
+
     this.cropButton = document.querySelector('[data-tool-crop]');
     this.cropButton.addEventListener('click', this.openCropPopup.bind(this));
+
+    this.createPopupContainer.apply(this);
+    this.createCloseAreaButton.apply(this);
 
     document.body.append(this.container);
   }
 
+  createPopupContainer() {
+    const popupHTML = `
+      <div class="popup-wrapper">
+        <div class="popup__header">
+          <span class="popup__title">Adjust Crop</span>
+          <span class="popup__info">Scroll to zoom, drag to move</span>
+        </div>
+        <div class="popup__image-wrapper">
+          <img class="popup__image" src="${this.mockup.image.src}">
+        </div>
+        <button>Done</button>
+      </div>
+    `;
+    const popup = document.createElement('div');
+    popup.classList.add('popup-wrapper');
+
+    
+    this.container.innerHTML = popupHTML;
+    this.initImage.apply(this);
+  }
+
+  initImage() {
+    this.image = this.container.querySelector('.popup__image');
+
+    let scale = 1;
+    this.image.style.transform = `scale(${scale})`;
+
+    const minScale = 1;
+    const maxScale = 4;
+
+    this.image.addEventListener('wheel', (event) => {
+      scale += event.deltaY * -0.01;
+      scale = Math.min(Math.max(minScale, scale), maxScale);
+
+      this.transform.scale = `scale(${scale})`;
+      this.changeImageTransform.apply(this);
+    });
+
+    let isDown = false;
+    this.x = window.offsetWidth;
+    this.y = window.offsetHeight;
+
+    this.image.ondragstart = (event) => {
+      event.preventDefault();
+    };
+
+    this.image.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+      isDown = true;
+    });
+
+    this.image.addEventListener('mouseup', (event) => {
+      event.preventDefault();
+      isDown = false;
+    });
+
+    this.image.addEventListener('mouseleave', (event) => {
+      isDown = false;
+    });
+
+    this.image.addEventListener('mousemove', (event) => {
+      if (!isDown) return;
+
+      console.log(this.x, event.offsetX, this.y, event.offsetY);
+      // this.transform.translate = `translate(${event.x - x}px, ${event.y - y}px)`;
+      // this.changeImageTransform();
+    })
+  }
+
+  changeImageTransform() {
+    this.image.style.transform = Object.keys(this.transform)
+    .reduce((trs, option) => {
+      trs += this.transform[option] + ' ';
+
+      return trs;
+    }, '');;
+  }
+
+  createCloseAreaButton() {
+    const button = document.createElement('div');
+    button.classList.add('image-cropper__close-toggler');
+    button.onclick = this.closeCropPopup.bind(this);
+
+    this.container.append(button);
+  }
+
   openCropPopup() {
+    document.body.style.overflow = 'hidden';
     this.container.classList.add('is-open');
   }
 
   closeCropPopup() {
+    document.body.style.overflow = null;
     this.container.classList.remove('is-open');
   }
 }

@@ -1,4 +1,5 @@
 // @ts-check
+import { LATEST_API_VERSION } from "@shopify/shopify-api";
 import { join } from "path";
 import { readFileSync } from "fs";
 import express from "express";
@@ -7,9 +8,9 @@ import serveStatic from "serve-static";
 import shopify from "./shopify.js";
 import productCreator from "./product-creator.js";
 import GDPRWebhookHandlers from "./gdpr.js";
-// import proxyRouter from "./product-builder/proxy.js";
+import ProductModel from "./models/Product.js";
 
-const PORT = parseInt(process.env.BACKEND_PORT || process.env.PORT, 10);
+const PORT = parseInt(process.env.BACKEND_PORT || process.env.PORT || '', 10);
 
 const STATIC_PATH =
   process.env.NODE_ENV === "production"
@@ -20,8 +21,6 @@ const PROXY_PATH = `${process.cwd()}/product-builder`;
 
 const app = express();
 
-console.log(process.cwd() + '/product-builder/builder.css');
-
 // Set up Shopify authentication and webhook handling
 app.get(shopify.config.auth.path, shopify.auth.begin());
 app.get(
@@ -31,6 +30,7 @@ app.get(
 );
 app.post(
   shopify.config.webhooks.path,
+  // @ts-ignore
   shopify.processWebhooks({ webhookHandlers: GDPRWebhookHandlers })
 );
 
@@ -43,21 +43,70 @@ app.get("/api/proxy", (req, res) => {
   res.sendFile(join(PROXY_PATH, 'builder.html'));
 });
 
-app.get('/api/proxy/:file', (req, res) => {
-  const { file } = req.params;
-
-  if (file.endsWith('.css')) {
-    res.set('Content-Type', 'text/css');
-  } else if (file.endsWith('.js')) {
-    res.set('Content-Type', 'application/javascript');
-  }
-
-  res.sendFile(join(PROXY_PATH, file));
-})
+app.use('/api/proxy/', express.static('product-builder'));
 
 app.use("/api/*", shopify.validateAuthenticatedSession());
 
 app.use(express.json());
+
+app.get('/api/shopify/products', async (req, res) => {
+  const { query } = req.query;
+
+  const client = new shopify.api.clients.Graphql({
+    session: res.locals.shopify.session,
+    apiVersion: LATEST_API_VERSION
+  }); 
+
+  const data = await client.query({
+    data: `{
+      products (first: 50, query: "title:${query}*") {
+        edges {
+          node {
+            id 
+            title
+            handle
+            image: featuredImage {
+              url
+              altText
+            }
+            createdAt
+          }
+        }
+      }
+    }`
+  });
+
+  // @ts-ignore
+  const products = data.body.data.products.edges
+    .map(item => item.node);
+    
+  res.status(200).send(products);
+});
+
+app.get('/api/products', async (req, res) => {
+  const products = await ProductModel.find({});
+
+  res.status(200).send(products);
+});
+
+app.post('/api/products', async (req, res) => {
+  const { id } = req.body;
+  const product = new ProductModel({ shopify_id: id });
+
+  const isExists = await ProductModel.exists({ shopify_id: id });
+  console.log(isExists);
+
+  if (!isExists) {
+    await product.save();
+
+    res.status(201).send(id);
+    return;
+  }
+
+  res.status(400).send(id); 
+  return;
+
+})
 
 app.get("/api/products/count", async (_req, res) => {
   const countData = await shopify.api.rest.Product.count({
@@ -77,7 +126,7 @@ app.get("/api/products/create", async (_req, res) => {
     status = 500;
     error = e.message;
   }
-  res.status(status).send({ success: status === 200, error });
+  res.status(status).send({ success: status === 200, error }); 
 });
 
 app.use(serveStatic(STATIC_PATH, { index: false }));
