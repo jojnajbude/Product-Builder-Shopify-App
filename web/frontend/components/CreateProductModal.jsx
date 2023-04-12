@@ -11,19 +11,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppQuery, useAuthenticatedFetch } from "../hooks";
 
 import '../assets/style.css';
+import { useNavigate } from "react-router-dom";
+import ProductSVG from "./ProductSVG";
 
 export function CreateProductModal({
   isOpen,
-  handleIsOpen
+  handleIsOpen,
+  products
 }) {
-  const [products, setProducts] = useState([]);
-
-  const {
-    data
-  } = useAppQuery({ url: 'api/products' });
-
+  const navigator = useNavigate();
   const timerRef = useRef();
-  const fetch = useAuthenticatedFetch();
+  const authFetch = useAuthenticatedFetch();
   const [isLoading, setIsLoading] = useState(false);
 
   const [productsList, setProductsList] = useState([]);
@@ -33,7 +31,7 @@ export function CreateProductModal({
   const getProducts = useCallback((value) => {
     setIsLoading(true);
 
-    fetch(`api/shopify/products?query=${value}`)
+    authFetch(`api/shopify/products?query=${value}`)
       .then(res => res.json())
       .then(data => {
         setProductsList(data
@@ -66,21 +64,16 @@ export function CreateProductModal({
   }, [inputValue, getProducts]);
 
   const createProduct = useCallback(async () => {
-    const data = await fetch('api/products', {
+    const data = await authFetch('api/products', {
       headers: {
         'Content-Type': 'application/json'
       },
       method: 'POST',
       body: JSON.stringify(selectedProduct)
-    })
+    }).then(res => res.json());
 
+    navigator(`/product?id=${selectedProduct.id}`, { state: data });
   }, [selectedProduct]);
-
-  useEffect(() => {
-    if (data) {
-      setProducts(data);
-    } 
-  }, [selectedProduct, isOpen]);
 
   return (
     <Modal
@@ -90,7 +83,6 @@ export function CreateProductModal({
       primaryAction={{
         content: 'Add Product',
         onAction: () => {
-          handleIsOpen();
           createProduct();
         },
         disabled: selectedProduct ? false : true
@@ -109,6 +101,28 @@ export function CreateProductModal({
             value={inputValue}
             onChange={(value) => setInputValue(value)}
           />
+
+        {selectedProduct && (
+          <>
+          <div className="related__selected-title">Selected product</div>
+          <div className="related__product related__product--is-selected">
+            {selectedProduct.image
+              ? (
+                <img
+                  src={selectedProduct.image.url + '&height=120'}
+                  alt={selectedProduct.handle}
+                  width='100px'
+                  height='100px'
+                />
+              )
+              : <ProductSVG width={100} height={100} />
+            }
+
+            <span>{selectedProduct.title}</span>
+          </div>
+          </>
+        )}
+
           <div className="related__products-wrapper">
             {!isLoading && productsList.map((product) => (
               <div
@@ -119,33 +133,27 @@ export function CreateProductModal({
                   setSelectedProduct(product);
                 }}
               >
-                <Thumbnail
-                  source={product.image ? product.image.url : 'https://picsum.photos/600'}
-                  alt={product.handle}
-                  size='large'
-                />
+                {product.image
+                  ? (
+                    <img
+                      src={product.image.url + '&height=60'}
+                      alt={product.handle}
+                      width='45px'
+                      height='45px'
+                    />
+                  )
+                  : <ProductSVG width={45} height={45} />
+                }
                 <span>{product.title}</span>
               </div>
             ))}
 
             {isLoading && (
-              <div className="related__product">
+              <div className="related__product is-loading">
                 <Spinner />
               </div>
             )}
           </div>
-
-          {selectedProduct && (
-            <div className="related__product related__product--is-selected">
-              <img
-                src={selectedProduct.image ? selectedProduct.image.url : 'https:/picsum.photos/600'}
-                alt={selectedProduct.handle}
-                width='100px'
-                height='100px'
-              />
-              <span>{selectedProduct.title}</span>
-            </div>
-          )}
         </div>
       </Modal.Section>
     </Modal>

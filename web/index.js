@@ -84,28 +84,56 @@ app.get('/api/shopify/products', async (req, res) => {
 });
 
 app.get('/api/products', async (req, res) => {
+  const { id } = req.query;
+
+  if (id) {
+    const product = await ProductModel.findOne({ shopify_id: id });
+
+    if (product) {
+      res.status(200).send(product);
+      return;
+    }
+
+    res.sendStatus(400);
+    return;
+  }
+
   const products = await ProductModel.find({});
 
   res.status(200).send(products);
 });
 
 app.post('/api/products', async (req, res) => {
-  const { id } = req.body;
-  const product = new ProductModel({ shopify_id: id });
+  const { id, title, image, handle } = req.body;
+  const product = new ProductModel({
+    shopify_id: id,
+    title,
+    imageUrl: image?.url,
+    handle
+  });
 
   const isExists = await ProductModel.exists({ shopify_id: id });
-  console.log(isExists);
 
   if (!isExists) {
     await product.save();
 
-    res.status(201).send(id);
+    res.status(201).send({ id, title, imageUrl: image?.url , handle});
     return;
   }
 
-  res.status(400).send(id); 
-  return;
+  res.sendStatus(400); 
+});
 
+app.get('/api/product/delete', async (req, res) => {
+  const { id } = req.query;
+
+  if (!id) {
+    res.sendStatus(400);
+  }
+
+  const deleted = await ProductModel.deleteOne({ shopify_id: id });
+
+  res.status(200).send(deleted);
 })
 
 app.get("/api/products/count", async (_req, res) => {
