@@ -1,20 +1,27 @@
-import { Spinner, IndexTable, Button, ButtonGroup } from "@shopify/polaris";
-import { useEffect, useState } from "react";
+import { Badge, IndexTable, Text, useIndexResourceState } from "@shopify/polaris";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAppQuery, useAuthenticatedFetch } from "../hooks";
+import { useAuthenticatedFetch } from "../hooks";
 
 import ProductSVG from './ProductSVG';
 
-export function ProductList({ products, refetch, isLoading }) {
-  const authFetch = useAuthenticatedFetch();
+export function ProductList({ products }) {
   const navigator = useNavigate();
 
-  const [isLoadingButtons, setIsLoadingButtons] = useState([]);
+  const resourceIDResolver = useCallback((products) => {
+    return products.shopify_id;
+  }, [products]);
+
+  const {selectedResources, allResourcesSelected, handleSelectionChange} = useIndexResourceState(products, { resourceIDResolver });
 
   const rowMarkup = products.map(product => (
     <IndexTable.Row
       id={product.shopify_id}
       key={product.shopify_id}
+      onClick={() => {
+        navigator(`/product?id=${product.shopify_id}`);
+      }}
+      selected={selectedResources.includes(product.shopify_id)}
     >
       <IndexTable.Cell>
         <div className="related__product in-table">
@@ -30,52 +37,48 @@ export function ProductList({ products, refetch, isLoading }) {
             : <ProductSVG width={30} height={30}/>
           }
           
-          <span>{product.title}</span>
+          <Text>{product.title}</Text>
         </div>
       </IndexTable.Cell>
 
       <IndexTable.Cell>
-        <ButtonGroup>
-          <Button
-            onClick={() => {
-              navigator(`/product?id=${product.shopify_id}`, { state: product });
-            }}
-            
-          >
-            Edit
-          </Button>
+        <Badge
+          status={product.status === 'active' ? 'success' : 'info'}
+        >
+          {product.status[0].toUpperCase() + product.status.slice(1)}
+        </Badge>
+      </IndexTable.Cell>
 
-          <Button
-            onClick={async () => {
-              setIsLoadingButtons((current) => [...current, product.shopify_id]);
-
-              await authFetch(`/api/product/delete?id=${product.shopify_id}`);
-
-              setIsLoadingButtons(current => current.filter(item => item !== product.shopify_id));
-              refetch();
-            }}
-            loading={isLoadingButtons.includes(product.shopify_id)
-            }
-            destructive
-          >
-            Delete
-          </Button>
-        </ButtonGroup>
+      <IndexTable.Cell>
+        <Text
+        >
+          {product.type ? product.type.title : 'None'}
+        </Text>
       </IndexTable.Cell>
     </IndexTable.Row>
   ));
 
-  return (<>
+  const resourceName = useMemo(() => ({
+    singular: 'product',
+    plural: 'products'
+  }), []);
+
+  return (
     <IndexTable
+      resourceName={resourceName}
       itemCount={products.length}
       headings={[
-        {title: 'Title'},
-        {title: 'Action'}
+        { title: 'Title' },
+        { title: 'Status' },
+        { title: 'Type' }
       ]}
-      selectable={false}
-      loading={isLoading}
+      selectable={true}
+      selectedItemsCount={
+        allResourcesSelected ? 'All' : selectedResources.length
+      }
+      onSelectionChange={handleSelectionChange}
     >
       {rowMarkup}
     </IndexTable>
-  </>);
+  );
 }

@@ -5,6 +5,22 @@ const ProductSchema = new mongoose.Schema({
   title: String,
   handle: String,
   imageUrl: String,
+  status: String,
+  type: {
+    id: String,
+    title: String
+  },
+  settings: {
+    hasLayout: Boolean,
+    selectedLayouts: [String],
+    hasText: Boolean,
+    hasFrame: Boolean,
+    hasCrop: Boolean,
+    hasBackground: Boolean,
+    hasRotate: Boolean,
+    hasFilter: Boolean
+  },
+  relatedProducts: [String]
 });
 
 const ProductModel = mongoose.model('Product', ProductSchema);

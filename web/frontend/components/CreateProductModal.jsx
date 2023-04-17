@@ -1,14 +1,10 @@
-import { authenticatedFetch } from "@shopify/app-bridge-utils";
 import {
   Modal,
-  TextContainer,
-  Autocomplete,
-  Thumbnail,
   TextField,
   Spinner
 } from "@shopify/polaris";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAppQuery, useAuthenticatedFetch } from "../hooks";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useAuthenticatedFetch } from "../hooks";
 
 import '../assets/style.css';
 import { useNavigate } from "react-router-dom";
@@ -100,28 +96,29 @@ export function CreateProductModal({
             label="Product name"
             value={inputValue}
             onChange={(value) => setInputValue(value)}
+            autoComplete="off"
           />
 
-        {selectedProduct && (
-          <>
-          <div className="related__selected-title">Selected product</div>
-          <div className="related__product related__product--is-selected">
-            {selectedProduct.image
-              ? (
-                <img
-                  src={selectedProduct.image.url + '&height=120'}
-                  alt={selectedProduct.handle}
-                  width='100px'
-                  height='100px'
-                />
-              )
-              : <ProductSVG width={100} height={100} />
-            }
+          {selectedProduct && (
+            <>
+              <div className="related__selected-title">Selected product</div>
+              <div className="related__product related__product--is-selected">
+                {selectedProduct.image
+                  ? (
+                    <img
+                      src={selectedProduct.image.url + '&height=120'}
+                      alt={selectedProduct.handle}
+                      width='100px'
+                      height='100px'
+                    />
+                  )
+                  : <ProductSVG width={100} height={100} />
+                }
 
-            <span>{selectedProduct.title}</span>
-          </div>
-          </>
-        )}
+                <span>{selectedProduct.title}</span>
+              </div>
+            </>
+          )}
 
           <div className="related__products-wrapper">
             {!isLoading && productsList.map((product) => (
