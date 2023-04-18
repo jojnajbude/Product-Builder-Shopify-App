@@ -1,3 +1,4 @@
+import { Schema } from "mongoose";
 import mongoose from "./../database/index.js";
 
 const ProductSchema = new mongoose.Schema({
@@ -20,7 +21,7 @@ const ProductSchema = new mongoose.Schema({
     hasRotate: Boolean,
     hasFilter: Boolean
   },
-  relatedProducts: [String]
+  relatedProducts: [Schema.Types.Mixed]
 });
 
 const ProductModel = mongoose.model('Product', ProductSchema);

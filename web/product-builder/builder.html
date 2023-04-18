@@ -7,81 +7,332 @@
   <title>Product Builder</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/camanjs/4.1.2/caman.full.js" defer></script>
   
-  <link rel="stylesheet" href="./builder.css">
-  <script src="./product-builder.js" defer></script>
+  <link rel="icon" type="image/png" href="//cdn.shopify.com/s/files/1/0684/8374/4010/files/cocun-01.png?crop=center&amp;height=32&amp;v=1674981316&amp;width=32">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Tomorrow:ital,wght@1,200&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="./product-builder/assets/main.css">
+  <script src="./product-builder/assets/global.js" defer></script>
 </head>
   <body>
-    <product-builder class="product-builder">
-      <div class="product-builder__viewport" data-builder-viewport>
-        <div class="product-builder__item product-mockup" data-builder-mockup>
-          <canvas id="mockup-1" data-id="1"></canvas>
-        </div>
-      </div>
-      <button class="product-builder__add-button" data-product-builder-add-button></button>
-      <div class="unfocus-button" data-unfocus-button></div>
+    <header class="header">
+      <button class="button">
+        <svg class="button__icon" width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M7.28796 3.75L2.25016 9L7.28796 14.25" stroke="#FF0079" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="1" y1="-1" x2="12.2998" y2="-1" transform="matrix(1 0 0 -1 2.45032 8.27344)" stroke="#FF0079" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+          
+        <span>Back</span>
+      </button>
+
+      <a href="/" class="header__logo">
+        <svg width="115" height="30" viewBox="0 0 115 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <g clip-path="url(#clip0_72_5479)">
+            <path d="M0.624023 10.7261C0.624023 4.81099 5.39009 0.0449219 11.2634 0.0449219C15.093 0.0449219 18.6262 2.08752 20.541 5.36406C21.137 6.38535 20.7536 7.66225 19.7753 8.2572C18.754 8.81027 17.4771 8.46984 16.8821 7.49149C15.733 5.49185 13.6056 4.25684 11.2644 4.25684C7.73231 4.25684 4.79621 7.14999 4.79621 10.7251C4.79621 14.3002 7.73231 17.1933 11.2644 17.1933C13.4778 17.1933 15.5204 16.0872 16.7114 14.2142C17.3493 13.2359 18.6691 12.9803 19.6475 13.5753C20.6258 14.2142 20.8814 15.533 20.2435 16.5114C18.2857 19.5753 14.9244 21.4052 11.2644 21.4052C5.39009 21.4074 0.624023 16.5984 0.624023 10.7261Z" fill="url(#paint0_linear_72_5479)"/>
+            <path d="M33.4368 7.4043C27.5646 7.4043 22.7556 12.1704 22.7556 18.0855C22.7556 24.0007 27.5646 28.7667 33.4368 28.7667C39.309 28.7667 44.1181 23.9577 44.1181 18.0855C44.1181 12.2133 39.352 7.4043 33.4368 7.4043ZM33.4368 24.5548C29.8618 24.5548 26.9686 21.6187 26.9686 18.0866C26.9686 14.5545 29.8628 11.6184 33.4368 11.6184C37.0108 11.6184 39.9051 14.5126 39.9051 18.0866C39.9051 21.6606 37.0119 24.5548 33.4368 24.5548Z" fill="url(#paint1_linear_72_5479)"/>
+            <path d="M56.4022 21.4074C60.0622 21.4074 63.4235 19.5774 65.3813 16.5135C66.0192 15.5352 65.7647 14.2153 64.7853 13.5774C63.8069 12.9814 62.4871 13.237 61.8492 14.2164C60.6571 16.0882 58.6145 17.1955 56.4022 17.1955C52.8701 17.1955 49.934 14.2593 49.934 10.7272C49.934 7.19509 52.8701 4.25899 56.4022 4.25899C58.7434 4.25899 60.8708 5.49293 62.0199 7.49364C62.6159 8.47198 63.8918 8.81242 64.9131 8.25935C65.8914 7.66332 66.2748 6.3875 65.6788 5.3662C63.765 2.08752 60.2318 0.0449219 56.4022 0.0449219C50.53 0.0449219 45.764 4.81099 45.764 10.7261C45.764 16.6413 50.53 21.4074 56.4022 21.4074Z" fill="url(#paint2_linear_72_5479)"/>
+            <path d="M103.703 0C97.8353 0.00644353 93.0316 4.77143 93.0316 10.6834V19.2361C93.0316 20.4292 93.9692 21.3646 95.1601 21.3646C96.3511 21.3646 97.2457 20.4292 97.2457 19.2361V10.6834C97.2457 7.11258 100.135 4.22051 103.704 4.21407C107.274 4.22051 110.163 7.11258 110.163 10.6834V19.2361C110.163 20.4292 111.098 21.3646 112.248 21.3646C113.399 21.3646 114.377 20.4292 114.377 19.2361V10.6834C114.376 4.77143 109.571 0.00644353 103.703 0Z" fill="url(#paint3_linear_72_5479)"/>
+            <path d="M79.4972 29.9994C85.3651 29.9929 90.1688 25.2279 90.1688 19.316V10.7633C90.1688 9.57015 89.2312 8.63477 88.0402 8.63477C86.8493 8.63477 85.9547 9.57015 85.9547 10.7633V19.316C85.9547 22.8868 83.0658 25.7788 79.4961 25.7853C75.9264 25.7788 73.0376 22.8868 73.0376 19.316V10.7633C73.0376 9.57015 72.1022 8.63477 70.952 8.63477C69.8018 8.63477 68.8235 9.57015 68.8235 10.7633V19.316C68.8235 25.2279 73.6271 29.9929 79.4951 29.9994H79.4972Z" fill="url(#paint4_linear_72_5479)"/>
+          </g>
+          <defs>
+            <linearGradient id="paint0_linear_72_5479" x1="2.5152" y1="10.7261" x2="78.5209" y2="10.7261" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#FF0079"/>
+              <stop offset="1" stop-color="#FF8714"/>
+            </linearGradient>
+            <linearGradient id="paint1_linear_72_5479" x1="0.625312" y1="18.0855" x2="78.5222" y2="18.0855" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#FF0079"/>
+              <stop offset="1" stop-color="#FF8714"/>
+            </linearGradient>
+            <linearGradient id="paint2_linear_72_5479" x1="2.51499" y1="0.000891943" x2="78.5207" y2="0.000891943" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#FF0079"/>
+              <stop offset="1" stop-color="#FF8714"/>
+            </linearGradient>
+            <linearGradient id="paint3_linear_72_5479" x1="0.623882" y1="10.6812" x2="78.5208" y2="10.6812" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#FF0079"/>
+              <stop offset="1" stop-color="#FF8714"/>
+            </linearGradient>
+            <linearGradient id="paint4_linear_72_5479" x1="2.51527" y1="19.3171" x2="78.521" y2="19.3171" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#FF0079"/>
+              <stop offset="1" stop-color="#FF8714"/>
+            </linearGradient>
+            <clipPath id="clip0_72_5479">
+              <rect width="113.752" height="30" fill="white" transform="translate(0.624023)"/>
+            </clipPath>
+          </defs>
+        </svg>          
+      </a>
+
+      <button class="header__checkout-button button button--primary-action">
+        <span>Checkout</span>
+
+        <svg class="button__icon" width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10.712 14.25L15.7498 9L10.712 3.75" stroke="#FF811A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="1" y1="-1" x2="12.2998" y2="-1" transform="matrix(-1 -8.74228e-08 -8.74228e-08 1 15.5497 9.72656)" stroke="#FF811A" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </header>
+
+    <product-builder class="main product-builder">
+      <customization-panel
+        class="product-builder__customization-panel customization-panel"
+        data-customization-panel
+      >
+        <product-info
+          class="customization-panel__product"
+          data-product
+        >
+          <div class="customization-panel__product-info">
+            <img
+              src="https://picsum.photos/200"
+              width="50"
+              height="50"
+              class="product-info__image"
+              alt="product image"
+              data-product-image
+            >
+
+            <div class="product-info__wrapper">
+              <div
+                class="product-info__title"
+                data-product-title
+              >
+                Cocun Tiles
+              </div>
+
+              <product-option-selector
+                class="product-info__option-selector option-selector"
+                data-product-option-selector
+                state="close"
+              > 
+                <div class="option-selector__selected" data-selected>
+                  <span data-setted-value="6">Set of 6</span>
+                
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="6" cy="6" r="6" fill="#FF8714"/>
+                    <path fill-rule="evenodd" clip-rule="evenodd" d="M6.45669 3.5C6.45669 3.22386 6.23284 3 5.95669 3C5.68055 3 5.45669 3.22386 5.45669 3.5V5.45696H3.5C3.22386 5.45696 3 5.68082 3 5.95696C3 6.2331 3.22386 6.45696 3.5 6.45696H5.45669V8.41379C5.45669 8.68994 5.68055 8.91379 5.95669 8.91379C6.23284 8.91379 6.45669 8.68994 6.45669 8.41379V6.45696H8.41379C8.68994 6.45696 8.91379 6.2331 8.91379 5.95696C8.91379 5.68082 8.68994 5.45696 8.41379 5.45696H6.45669V3.5Z" fill="white"/>
+                  </svg>  
+                </div>
+                
+                <div class="option-selector__options" data-options>
+                  <div class="option-selector__item" data-value="3">Set of 3</div>
+                  <div class="option-selector__item" data-value="6">Set of 6</div>
+                  <div class="option-selector__item" data-value="9">Set of 9</div>
+                  <div class="option-selector__item" data-value="12">Set of 12</div>
+                  <div class="option-selector__item" data-value="16">Set of 16</div>
+                </div>
+              </product-option-selector>
+            </div>
+          </div>
+
+          <div
+            class="customization-panel__product-quantity is-not-enough"
+            data-product-quantity
+          >
+            <span data-product-curr-quantity>2</span>
+            <span> out of </span>
+            <span data-product-req-quantity>
+              3
+            </span>
+          </div>
+        </product-info>
+
+        <customization-tools
+          class="customization-panel__tools tools"
+          data-customization-tools
+        >
+          <div class="tools__tabs" data-tabs>
+            <button class="tools__tab is-selected" data-tab="products">
+              Products
+            </button>
+
+            <button class="tools__tab" data-tab="images">
+              Images
+            </button>
+
+            <button class="tools__tab" data-tab="edit">
+              Edit
+            </button>
+
+            <div class="tools__tabs-pagination" data-tabs-pagination>
+              <span class="tools__tabs-runner" data-pagination-runner></span>
+            </div>
+          </div>
+
+          <div class="tools__page-wrapper" data-pages>
+            <div
+              class="tools__page page page--products is-selected"
+              data-page="products"
+              data-products-grid="grid"
+            >
+              <div class="page__header">
+                <label for="" class="page__search-bar">
+                  <svg class="icon--search" width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8.25 15C11.9779 15 15 11.9779 15 8.25C15 4.52208 11.9779 1.5 8.25 1.5C4.52208 1.5 1.5 4.52208 1.5 8.25C1.5 11.9779 4.52208 15 8.25 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M16.5 16.5L13.5 13.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                    
+                  <input
+                    type="text"
+                    name="query"
+                    id="query"
+                    data-search-query
+                    placeholder="Search"
+                  >
+                </label>
+
+                <custom-switch
+                  data-product-switch-grid
+                  class="page__product-grid-style switch"
+                  value="grid"
+                >
+                  <div class="switch__runner" data-runner></div>
+
+                  <div class="switch__item is-selected" data-value="grid">
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M10.4062 1.125H17.1562C17.6222 1.125 18 1.50275 18 1.96875V7.59375C18 8.05975 17.6222 8.4375 17.1562 8.4375H10.4062C9.94025 8.4375 9.5625 8.05975 9.5625 7.59375V1.96875C9.5625 1.50275 9.94025 1.125 10.4062 1.125ZM7.59375 1.125H0.84375C0.377754 1.125 0 1.50275 0 1.96875V7.59375C0 8.05975 0.377754 8.4375 0.84375 8.4375H7.59375C8.05975 8.4375 8.4375 8.05975 8.4375 7.59375V1.96875C8.4375 1.50275 8.05975 1.125 7.59375 1.125ZM0 10.4062V16.0312C0 16.4972 0.377754 16.875 0.84375 16.875H7.59375C8.05975 16.875 8.4375 16.4972 8.4375 16.0312V10.4062C8.4375 9.94025 8.05975 9.5625 7.59375 9.5625H0.84375C0.377754 9.5625 0 9.94025 0 10.4062ZM10.4062 16.875H17.1562C17.6222 16.875 18 16.4972 18 16.0312V10.4062C18 9.94025 17.6222 9.5625 17.1562 9.5625H10.4062C9.94025 9.5625 9.5625 9.94025 9.5625 10.4062V16.0312C9.5625 16.4972 9.94025 16.875 10.4062 16.875Z" fill="currentColor"/>
+                    </svg>
+                  </div>
+                  <div class="switch__item" data-value="line">
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M5.24999 7.59375V10.4062C5.24999 10.8722 4.87223 11.25 4.40624 11.25H0.84375C0.377754 11.25 0 10.8722 0 10.4062V7.59375C0 7.12775 0.377754 6.75 0.84375 6.75H4.40624C4.87223 6.75 5.24999 7.12775 5.24999 7.59375ZM0 13.2188V16.0312C0 16.4972 0.377754 16.875 0.84375 16.875H4.40624C4.87223 16.875 5.24999 16.4972 5.24999 16.0312V13.2188C5.24999 12.7528 4.87223 12.375 4.40624 12.375H0.84375C0.377754 12.375 0 12.7528 0 13.2188ZM4.40624 1.125H0.84375C0.377754 1.125 0 1.50275 0 1.96875V4.78125C0 5.24725 0.377754 5.625 0.84375 5.625H4.40624C4.87223 5.625 5.24999 5.24725 5.24999 4.78125V1.96875C5.24999 1.50275 4.87223 1.125 4.40624 1.125ZM7.21874 16.875H17.1562C17.6222 16.875 18 16.4972 18 16.0312V13.2188C18 12.7528 17.6222 12.375 17.1562 12.375H7.21874C6.75274 12.375 6.37499 12.7528 6.37499 13.2188V16.0312C6.37499 16.4972 6.75274 16.875 7.21874 16.875ZM6.37499 1.96875V4.78125C6.37499 5.24725 6.75274 5.625 7.21874 5.625H17.1562C17.6222 5.625 18 5.24725 18 4.78125V1.96875C18 1.50275 17.6222 1.125 17.1562 1.125H7.21874C6.75274 1.125 6.37499 1.50275 6.37499 1.96875ZM7.21874 11.25H17.1562C17.6222 11.25 18 10.8722 18 10.4062V7.59375C18 7.12775 17.6222 6.75 17.1562 6.75H7.21874C6.75274 6.75 6.37499 7.12775 6.37499 7.59375V10.4062C6.37499 10.8722 6.75274 11.25 7.21874 11.25Z" fill="currentColor"/>
+                    </svg>
+                  </div>
+                </custom-switch>
+              </div>
+
+              <div class="page__products" data-products-list>
+                <div class="page__product is-selected" data-product>
+                  <img
+                    src="https://picsum.photos/300"
+                    width="160"
+                    height="160"
+                    alt="product image"
+                    class="page__product-image"
+                  >
+
+                  <div class="page__product-title">Cocun Tiles</div>
+
+                  <div class="page__product-price">$10,90</div>
+                </div>
+
+                <div class="page__product" data-product>
+                  <img
+                    src="https://picsum.photos/300"
+                    width="160"
+                    height="160"
+                    alt="product image"
+                    class="page__product-image"
+                  >
+
+                  <div class="page__product-title">Cocun Tiles</div>
+
+                  <div class="page__product-price">$10,90</div>
+                </div>
+
+                <div class="page__product" data-product>
+                  <img
+                    src="https://picsum.photos/300"
+                    width="160"
+                    height="160"
+                    alt="product image"
+                    class="page__product-image"
+                  >
+
+                  <div class="page__product-title">Cocun Tiles</div>
+
+                  <div class="page__product-price">$10,90</div>
+                </div>
+
+                <div class="page__product" data-product>
+                  <img
+                    src="https://picsum.photos/300"
+                    width="160"
+                    height="160"
+                    alt="product image"
+                    class="page__product-image"
+                  >
+
+                  <div class="page__product-title">Cocun Tiles</div>
+
+                  <div class="page__product-price">$10,90</div>
+                </div>
+
+                <div class="page__product" data-product>
+                  <img
+                    src="https://picsum.photos/300"
+                    width="160"
+                    height="160"
+                    alt="product image"
+                    class="page__product-image"
+                  >
+
+                  <div class="page__product-title">Cocun Tiles</div>
+
+                  <div class="page__product-price">$10,90</div>
+                </div>
+
+                <div class="page__product" data-product>
+                  <img
+                    src="https://picsum.photos/300"
+                    width="160"
+                    height="160"
+                    alt="product image"
+                    class="page__product-image"
+                  >
+
+                  <div class="page__product-title">Cocun Tiles</div>
+
+                  <div class="page__product-price">$10,90</div>
+                </div>
+
+                <div class="page__product" data-product>
+                  <img
+                    src="https://picsum.photos/300"
+                    width="160"
+                    height="160"
+                    alt="product image"
+                    class="page__product-image"
+                  >
+
+                  <div class="page__product-title">Cocun Tiles</div>
+
+                  <div class="page__product-price">$10,90</div>
+                </div>
+
+                <div class="page__product" data-product>
+                  <img
+                    src="https://picsum.photos/300"
+                    width="160"
+                    height="160"
+                    alt="product image"
+                    class="page__product-image"
+                  >
+
+                  <div class="page__product-title">Cocun Tiles</div>
+
+                  <div class="page__product-price">$10,90</div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="tools__page page page--images"
+              data-page="images"
+            >
+              Images
+            </div>
+
+            <div
+              class="tools__page page page--edit"
+              data-page="edit"
+            >
+              Edit
+            </div>
+          </div>
+        </customization-tools>
+      </customization-panel>
     </product-builder>
-
-    <div class="builder__controls">
-      <div class="builder__tools" data-builder-tools>
-        <div class="builder__tool--toggler tool-frame" data-toggler="frame">
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="sc-gVFfnG kEjilk"><path d="M29.5984 2.39844H30.9984C30.9984 1.62524 30.3716 0.998438 29.5984 0.998438V2.39844ZM29.5984 12.4937V13.8937C30.3716 13.8937 30.9984 13.2669 30.9984 12.4937H29.5984ZM2.39844 2.39844V0.998438C1.62524 0.998438 0.998438 1.62524 0.998438 2.39844L2.39844 2.39844ZM2.39844 12.4937H0.998438C0.998438 13.2669 1.62524 13.8937 2.39844 13.8937L2.39844 12.4937ZM2.40469 12.4937H3.80469C3.80469 11.7205 3.17789 11.0937 2.40469 11.0937V12.4937ZM2.40469 29.9624H1.00469C1.00469 30.7356 1.63149 31.3624 2.40469 31.3624V29.9624ZM12.5 29.9624V31.3624C13.2732 31.3624 13.9 30.7356 13.9 29.9624H12.5ZM12.5 12.4937V11.0937C11.7268 11.0937 11.1 11.7205 11.1 12.4937H12.5ZM28.1984 2.39844V12.4937H30.9984V2.39844H28.1984ZM12.5 3.79844H29.5984V0.998438H12.5V3.79844ZM2.39844 3.79844H12.5V0.998438H2.39844V3.79844ZM3.79844 12.4937V2.39844H0.998438V12.4937H3.79844ZM2.40469 11.0937H2.39844V13.8937H2.40469V11.0937ZM3.80469 29.9624V12.4937H1.00469V29.9624H3.80469ZM12.5 28.5624H2.40469V31.3624H12.5V28.5624ZM11.1 12.4937V29.9624H13.9V12.4937H11.1ZM29.5984 11.0937H12.5V13.8937H29.5984V11.0937Z" fill="currentColor"></path><path d="M12.7398 12.7368L3.26465 3.26172" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-          <span>Frame</span>
-        </div>
-        <div class="builder__tool--toggler tool-effect" data-toggler="effect">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_16744_76898)"><path d="M8.80715 11.1695C9.26673 11.4395 9.62548 11.8743 9.82194 12.3996C10.7148 12.0697 11.5688 11.6268 12.3662 11.0802M8.5791 11.0598C8.8834 10.0893 9.29224 9.1612 9.79715 8.29467M12.3654 11.0802C13.7895 10.1043 15.0084 8.81451 15.943 7.2945L18.8537 2.55916C18.9652 2.37881 19.0155 2.16206 18.9961 1.94594C18.9766 1.72982 18.8886 1.52773 18.747 1.37419C18.6054 1.22064 18.4191 1.12516 18.2198 1.10405C18.0206 1.08294 17.8207 1.13752 17.6544 1.25845L13.2884 4.41616C11.8867 5.42947 10.6972 6.75119 9.79715 8.29549" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path><path d="M9.30301 12.892C9.03746 12.2403 8.55256 11.7007 7.93136 11.3658C7.31016 11.0309 6.59131 10.9214 5.89794 11.0561C5.20456 11.1908 4.57981 11.5614 4.13068 12.1042C3.68156 12.6471 3.43601 13.3285 3.43609 14.0318C3.43609 14.3431 3.37186 14.6512 3.24738 14.9368C3.12289 15.2224 2.94081 15.4795 2.71241 15.6922C2.48402 15.9049 2.21418 16.0686 1.91962 16.1732C1.62505 16.2778 1.31205 16.3211 1 16.3003C1.50188 17.1683 2.27756 17.847 3.20661 18.2311C4.13567 18.6153 5.16613 18.6833 6.13802 18.4248C7.10991 18.1662 7.96886 17.5954 8.58153 16.8011C9.1942 16.0067 9.52632 15.0333 9.52632 14.0318C9.52632 13.6286 9.44714 13.2436 9.30301 12.892Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></g><defs><clipPath id="clip0_16744_76898"><rect width="20" height="20" fill="white"></rect></clipPath></defs></svg>
-          <span>Effect</span>
-        </div>
-        <div class="builder__tool--toggler tool--mat" data-toggler="mat">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_13415_48732)"><path d="M18.7492 1.25H1.25073V18.75H18.7492V1.25Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path><path d="M4.62744 15.375V4.625H15.3853V15.375H4.62744Z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></g><defs><clipPath id="clip0_13415_48732"><rect width="20" height="20" fill="white"></rect></clipPath></defs></svg>
-          <span>Mat</span>
-        </div>
-        <div class="builder__tool--toggler tool--crop hidden" data-tool-crop>
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" data-acsb-hidden="true" data-acsb-force-hidden="true"><g clip-path="url(#clip0_13554_58072)"><path d="M5 1.25L5 15L18.75 15" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path><path d="M15 18.75L15 5L1.25 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></g><defs><clipPath id="clip0_13554_58072"><rect width="20" height="20" fill="white" transform="translate(20 20) rotate(-180)"></rect></clipPath></defs></svg>
-          <span>Crop</span>
-        </div>
-      </div>
-      <button class="builder__checkout-button">Checkout</button>
-
-      <div class="builder-tool" data-tool="frame">
-        <div class="builder-tool__header">
-          <span>Select Frame:</span>
-
-          <button data-toggler>Done</button>
-        </div>
-        <div class="builder-tool__options">
-          <div class="builder-tool__option" data-tool-option="black">Black</div>
-          <div class="builder-tool__option" data-tool-option="white">White</div>
-          <div class="builder-tool__option" data-tool-option="frameless">Frameless</div>
-        </div>
-      </div>
-      <div class="builder-tool" data-tool="effect">
-        <div class="builder-tool__header">
-          <span>Select Effect:</span>
-
-          <button data-toggler>Done</button>
-        </div>
-        <div class="builder-tool__options">
-          <div class="builder-tool__option" data-tool-option="original">Original</div>
-          <div class="builder-tool__option" data-tool-option="silver">Silver</div>
-          <div class="builder-tool__option" data-tool-option="noir">Noir</div>
-          <div class="builder-tool__option" data-tool-option="vivid">Vivid</div>
-          <div class="builder-tool__option" data-tool-option="dramatic">Dramatic</div>
-        </div>
-      </div>
-      </div>
-      <div class="builder-tool" data-tool="mat">
-        <div class="builder-tool__header">
-          <span>Select Mat:</span>
-
-          <button data-toggler>Done</button>
-        </div>
-        <div class="builder-tool__options">
-          <div class="builder-tool__option" data-tool-option="none">None</div>
-          <div class="builder-tool__option" data-tool-option="shallow">Shallow</div>
-          <div class="builder-tool__option" data-tool-option="medium">Medium</div>
-          <div class="builder-tool__option" data-tool-option="deep">Deep</div>
-        </div>
-      </div>
-    </div>
   </body>
 </html>

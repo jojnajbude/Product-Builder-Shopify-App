@@ -102,8 +102,6 @@ export default function Product() {
   const saveProduct = useCallback(async () => {
     setIsLoadingButtons(current => [...current, saveButtonId]);
 
-    console.log(relatedProducts);
-
     const response = await fetch(`api/products/update?id=${product.shopify_id}`, {
       method: 'POST',
       headers: {
@@ -140,6 +138,7 @@ export default function Product() {
     setSelectedStatus(initialState.status);
     setSelectedType(initialState.type);
     setSettings({ settings: initialState.settings });
+    setRelatedProducts(initialState.relatedProducts)
   }, [initialState]);
 
   useEffect(() => {
@@ -238,8 +237,6 @@ export default function Product() {
         && initialState.status === selectedStatus
         && JSON.stringify(relatedProducts) === JSON.stringify(initialState.relatedProducts);
 
-      console.log(JSON.stringify(relatedProducts), JSON.stringify(initialState.relatedProducts))
-
       if (notEdited) {
         setIsEdited(false);
       } else if (selectedType === 'none' && !notEdited) {
@@ -257,10 +254,6 @@ export default function Product() {
       hide();
     }
   }, [isEdited]);
-
-  useEffect(() => {
-    console.log(relatedProducts);
-  }, [relatedProducts])
 
   // Return states
 

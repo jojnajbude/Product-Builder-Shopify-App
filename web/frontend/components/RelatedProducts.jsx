@@ -85,6 +85,7 @@ export function RelatedProduct({ relatedProducts, setRelatedProducts }) {
                 height={70}
                 style={{ marginBottom: '20px' }}
                 src="https://cdn.shopify.com/shopifycloud/web/assets/v1/833d5270ee5c71c0.svg"
+                alt="empty state"
               />
               <span>
                 There are no related products.
@@ -119,7 +120,7 @@ export function RelatedProduct({ relatedProducts, setRelatedProducts }) {
                   onClick={() => {
                     setSelected(curr => curr.filter(item => item !== product.id));
                     setRelatedProducts(curr => 
-                      curr.filter(item => selected.includes(item.id) && item.id !== product.id)
+                      curr.filter(item => curr.includes(item) && item.id !== product.id)
                     );
                   }}
                 >
@@ -142,15 +143,15 @@ export function RelatedProduct({ relatedProducts, setRelatedProducts }) {
           content: 'Done',
           onAction: () => {
             setBrowseInput('');
-            setProducts([]);
             setBrowseProducts(false);
             setRelatedProducts(curr => [
               ...curr,
               ...products.filter(product => 
                 selected.includes(product.id)
-                  && !relatedProducts.map(item => item.id).includes(product.id))
+                && !relatedProducts.map(item => item.id).includes(product.id))
               ]
             );
+            setProducts([]);
           }
         }}
       >
