@@ -713,9 +713,11 @@ class Tools extends HTMLElement {
       images: {
         imageHide: '[data-image-hide]',
         makeMagic: '[data-make-magic]',
-        imagesList: '[data-images]',
+        imagesWrapper: '[data-images]',
         image: '[data-image]',
-        uploadImage: '[data-upload-image]'
+        uploadImage: '[data-upload-image]',
+        uploadSelector: '[data-upload-wrapper]',
+        importFromPC: '[data-import-from-pc]'
       }
     }
   }
@@ -838,6 +840,46 @@ class Tools extends HTMLElement {
   }
 
   initImagePage() {
+    const imagesWrapper = this.querySelector(Tools.selectors.pages.images.imagesWrapper);
+
+    const uploadButton = this.querySelector(Tools.selectors.pages.images.uploadImage);
+    const uploadSelector = this.querySelector(Tools.selectors.pages.images.uploadSelector);
+
+    uploadButton.addEventListener('click', () => {
+      uploadSelector.classList.toggle('is-open');
+
+      if (uploadSelector.classList.contains('is-open')) {
+        uploadSelector.style.height = uploadSelector.scrollHeight + 'px';
+      } else {
+        uploadSelector.style.height = null;
+      }
+    });
+
+    this.pages.images = {
+      uploadButton,
+      uploadSelector
+    }
+
+    const imagesFromLocal = [];
+
+    for (let i = 0; i < localStorage.length; i++) {
+      if (localStorage.key(i).startsWith('image-')) {
+        imagesFromLocal.push(localStorage.key(i));
+      }
+    }
+
+    imagesFromLocal.forEach(image => {
+      imagesWrapper.appendChild(this.imageTemplate(localStorage.getItem(image)))
+    })
+
+    const inputFromPC = this.querySelector(Tools.selectors.pages.images.importFromPC);
+    inputFromPC.addEventListener('change', (() => {
+      Object.keys(inputFromPC.files)
+        .forEach((file) => {
+          console.log(inputFromPC.files);
+          imagesWrapper.appendChild(this.imageTemplate(inputFromPC.files[file]))
+        })
+    }).bind(this))
   }
 
   imageTemplate(imageFile) {
@@ -846,7 +888,21 @@ class Tools extends HTMLElement {
     imageWrapper.dataset.image = '';
 
     const image = new Image();
-    image.src = imageFile;
+
+    if (typeof imageFile === 'string') {
+      image.src = imageFile;
+    } else {
+      const reader = new FileReader;
+      reader.onload = () => {
+        localStorage.setItem('image-' + imageFile.name.split('.')[0], reader.result);
+        image.src = reader.result;
+  
+        this.pages.images.uploadButton.dispatchEvent(new Event('click'));
+      };
+  
+      reader.readAsDataURL(imageFile);
+    }    
+
     image.classList.add('page__image');
     image.width = "100";
     image.height = "100";
@@ -916,14 +972,3 @@ customElements.define('product-builder', ProductBuilder);
 document.addEventListener('page:product:grid:changed', (event) => {
   console.log('grid changed: ' + event.detail.value );
 });
-
-
-const string = `
-<div class="tools__page page page--edit" data-page="edit">Edit</div>
-            `;
-
-const parser = new DOMParser();
-
-const dom2 = parser.parseFromString(string, 'text/html');
-
-console.log(dom2.querySelector('div').textContent);

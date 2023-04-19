@@ -69,6 +69,7 @@ button {
   overflow: hidden;
   justify-content: center;
   gap: 10px;
+  width: 100%;
 }
 
 .button.button--primary {
@@ -137,23 +138,6 @@ button {
   background-color: #fff;
   z-index: -1;
   border-radius: 22px;
-}
-
-.button .upload__wrapper {
-  pointer-events: none;
-  position: absolute;
-  top: 0;
-  z-index: -2;
-  left: 0;
-  right: 0;
-  transition: tranform .3s ease-out;
-}
-
-.button .upload__wrapper.is-open {
-  pointer-events: all;
-  transform: translateY(-100%);
-  box-shadow: -1px 0 5px var(--text-color);
-  
 }
 
 /* Main */
@@ -439,11 +423,13 @@ product-builder {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 15px;
+  max-height: 400px;
 }
 
 .page__images-container {
   padding: 0 10px;
   flex-grow: 1;
+  overflow-y: auto;
 }
 
 .page__image-wrapper {
@@ -463,6 +449,59 @@ product-builder {
   object-fit: cover;
 }
 
+.page--images .page__upload {
+  position: relative;
+  margin: 0 10px;
+}
+
+.page__upload .upload__wrapper {
+  pointer-events: none;
+  position: absolute;
+  bottom: 50%;
+  z-index: -2;
+  left: 0;
+  right: 0;
+  transition: height .3s;
+  border-top-left-radius: 20px;
+  padding-bottom: 30px;
+  border-top-right-radius: 20px;
+  height: 0;
+  overflow: hidden;
+}
+
+.page__upload .button {
+  z-index: 2;
+}
+
+.page__upload .upload__wrapper.is-open {
+  pointer-events: all;
+  background-color: #fff;
+  box-shadow: -1px 0 5px var(--text-color);
+  z-index: 1;
+}
+
+.upload__wrapper .upload__variant {
+  position: relative;
+  padding: 10px 20px;
+  color: var(--text-color);
+  transition: background-color .3s;
+}
+
+.upload__wrapper .upload__variant:hover {
+  cursor: pointer;
+  background-color: var(--action-background);
+}
+
+.upload__variant input {
+  position: absolute;
+  clip: rect(0, 0, 0, 0);
+}
+
+.upload__variant input + label {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
 
 
 /* switch */

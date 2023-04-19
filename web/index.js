@@ -180,12 +180,12 @@ app.post('/api/products/update', async (req, res) => {
 
   const currType = productTypes[state.type];
 
-  if (!currType) {
+  if (!currType) { 
     res.sendStatus(400);
     return;
   }
 
-  console.log(state.relatedProducts);
+  console.log(state.relatedProducts); 
 
   await ProductModel.findOneAndUpdate({ shopify_id: id }, {
     type: {
@@ -199,7 +199,7 @@ app.post('/api/products/update', async (req, res) => {
 
   const product = await ProductModel.findOne({ shopify_id: id });
 
-  res.status(200).send(product); 
+  res.status(200).send(product);
 })
 
 app.get('/api/product/delete', async (req, res) => {

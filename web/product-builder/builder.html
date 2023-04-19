@@ -159,8 +159,7 @@
           </div>
 
           <div class="tools__page-wrapper" data-pages>
-            <div
-              class="tools__page page page--products"
+            <div class="tools__page page page--products"
               data-page="products"
               data-products-grid="grid"
             >
@@ -277,8 +276,7 @@
               </div>
             </div>
 
-            <div
-              class="tools__page page page--images"
+            <div class="tools__page page page--images"
               data-page="images"
             >
               <div class="page__header">
@@ -293,6 +291,7 @@
                   <span>Hide used photos</span>
                 </custom-radio>
 
+                
                 <button
                   class="button button--primary-action"
                   data-make-magic
@@ -332,123 +331,44 @@
               </div>
 
               <div class="page__images-container" >
-                <div class="page__images" data-images>
-                  <div
-                    class="page__image-wrapper"
-                    data-image
-                  >
-                    <img
-                      src="https://picsum.photos/600"
-                      alt="image not uploaded" 
-                      class="page__image"
-                      width="100"
-                      height="100"
-                    >
-                  </div>
-
-                  <div
-                    class="page__image-wrapper"
-                    data-image
-                  >
-                    <img
-                      src="https://picsum.photos/600"
-                      alt="image not uploaded" 
-                      class="page__image"
-                      width="100"
-                      height="100"
-                    >
-                  </div>
-
-                  <div
-                    class="page__image-wrapper"
-                    data-image
-                  >
-                    <img
-                      src="https://picsum.photos/600"
-                      alt="image not uploaded" 
-                      class="page__image"
-                      width="100"
-                      height="100"
-                    >
-                  </div>
-
-                  <div
-                    class="page__image-wrapper"
-                    data-image
-                  >
-                    <img
-                      src="https://picsum.photos/600"
-                      alt="image not uploaded" 
-                      class="page__image"
-                      width="100"
-                      height="100"
-                    >
-                  </div>
-
-                  <div
-                    class="page__image-wrapper"
-                    data-image
-                  >
-                    <img
-                      src="https://picsum.photos/600"
-                      alt="image not uploaded" 
-                      class="page__image"
-                      width="100"
-                      height="100"
-                    >
-                  </div>
-
-                  <div
-                    class="page__image-wrapper"
-                    data-image
-                  >
-                    <img
-                      src="https://picsum.photos/600"
-                      alt="image not uploaded" 
-                      class="page__image"
-                      width="100"
-                      height="100"
-                    >
-                  </div>
-
-                  <div
-                    class="page__image-wrapper"
-                    data-image
-                  >
-                    <img
-                      src="https://picsum.photos/600"
-                      alt="image not uploaded" 
-                      class="page__image"
-                      width="100"
-                      height="100"
-                    >
-                  </div>
-                </div>
-                
+                <div class="page__images" data-images></div>
               </div>
 
-              <button
-                class="button button--primary"
-                data-upload-image
-              >
-                <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M13.0142 5.16797L9.30547 1.27213L5.59678 5.16797" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                  <line x1="1" y1="-1" x2="8.75" y2="-1" transform="matrix(0 1 1 0 10.0237 1.19531)" stroke="white" stroke-width="2" stroke-linecap="round"/>
-                  <path d="M3.03125 10V12.5C3.03125 15.2614 5.26983 17.5 8.03125 17.5H10.25C13.0114 17.5 15.25 15.2614 15.25 12.5V10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                  
-                <span>Upload Photos</span>
+              <div class="page__upload">
+                <button
+                  class="button button--primary"
+                  data-upload-image
+                >
+                  <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M13.0142 5.16797L9.30547 1.27213L5.59678 5.16797" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <line x1="1" y1="-1" x2="8.75" y2="-1" transform="matrix(0 1 1 0 10.0237 1.19531)" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M3.03125 10V12.5C3.03125 15.2614 5.26983 17.5 8.03125 17.5H10.25C13.0114 17.5 15.25 15.2614 15.25 12.5V10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                    
+                  <span>Upload Photos</span>
+                </button>
 
-                <div class="upload__wrapper">
-                  <div class="upload__variant">From PC</div>
-                  <div class="upload__variant">From instagram</div>
-                  <div class="upload__variant">From Facebook</div>
+                <div class="upload__wrapper" data-upload-wrapper>
+                  <div class="upload__variant">
+                    <input
+                      accept=".gif,,.jpg,.jpeg,.png"
+                      type="file"
+                      name="image"
+                      id="image-from-pc"
+                      multiple
+                      data-import-from-pc
+                    >
+                    <label for="image-from-pc">
+                      From PC
+                    </label>
+                  </div>
+                  <div class="upload__variant">From Instagram</div>
+                  <div class="upload__variant">From Google Photos</div>
                 </div>
-              </button>
+              </div>
             </div>
 
-            <div
-              class="tools__page page page--edit"
+            <div class="tools__page page page--edit"
               data-page="edit"
             >
               Edit
