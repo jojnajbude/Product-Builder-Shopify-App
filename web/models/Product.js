@@ -7,6 +7,7 @@ const ProductSchema = new mongoose.Schema({
   handle: String,
   imageUrl: String,
   status: String,
+  options: [Schema.Types.Mixed],
   type: {
     id: String,
     title: String

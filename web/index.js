@@ -44,6 +44,14 @@ app.post(
 app.get("/product-builder", (req, res) => {
   res.sendFile(join(PROXY_PATH, 'builder.html'));
 });
+
+app.get('/product-builder/product', async (req, res) => {
+  const { id } = req.query;
+
+  const product = await ProductModel.findOne({ shopify_id: `gid://shopify/Product/${id}` });
+
+  res.send(product);
+})
  
 app.use('/product-builder/', express.static('product-builder')); 
 
@@ -71,7 +79,11 @@ app.get('/api/shopify/products', async (req, res) => {
               url
               altText
             }
-            createdAt
+            options (first: 3) {
+              id,
+              name,
+              values
+            }
           }
         }
       }
@@ -116,19 +128,43 @@ app.get('/api/products', async (req, res) => {
 });
 
 app.post('/api/products', async (req, res) => {
-  const { id, title, image, handle } = req.body;
+  const client = new shopify.api.clients.Graphql({
+    session: res.locals.shopify.session,
+    apiVersion: LATEST_API_VERSION
+  }); 
+
+  const { id, title, image, handle, options } = req.body;
   const product = new ProductModel({
     shopify_id: id,
     title,
     imageUrl: image?.url,
     handle, 
-    status: 'active'
+    status: 'active',
+    options
   });
 
   const isExists = await ProductModel.exists({ shopify_id: id });
 
   if (!isExists) {
-    await product.save();
+    const CustomProduct = await product.save();
+
+    await client.query({
+      data: `
+      mutation {
+        metafieldsSet(metafields: {
+          ownerId: "${id}",
+          namespace: "custom",
+          key: "builder_id",
+          value: "${CustomProduct._id.valueOf()}",
+        }) {
+          metafields {
+            id
+            key
+            namespace
+          }
+        }
+      }`
+    });
 
     res.status(201).send({ id, title, imageUrl: image?.url , handle});
     return;
@@ -167,6 +203,11 @@ app.post('/api/products/update', async (req, res) => {
 })
 
 app.get('/api/product/delete', async (req, res) => {
+  const client = new shopify.api.clients.Graphql({
+    session: res.locals.shopify.session,
+    apiVersion: LATEST_API_VERSION
+  }); 
+
   const { id } = req.query;
 
   if (!id) {
@@ -175,6 +216,31 @@ app.get('/api/product/delete', async (req, res) => {
 
   const deleted = await ProductModel.deleteOne({ shopify_id: id });
 
+  const fieldToDelete = await client.query({
+    data: `
+    query {
+      product(id: "${id}") {
+        metafield(key: "builder_id", namespace: "custom") {
+          id
+          value
+        }
+      }
+    }`
+  }).then(res => res.body.data.product.metafield ? res.body.data.product.metafield.id : null);
+
+  if (fieldToDelete) {
+    await client.query({
+      data: `
+      mutation {
+        metafieldDelete(input: {
+          id: "${fieldToDelete}"
+        }) {
+          deletedId
+        }
+      }`
+    })
+  }
+ 
   res.status(200).send(deleted);
 })
 

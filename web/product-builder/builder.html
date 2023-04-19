@@ -119,8 +119,6 @@
                   <div class="option-selector__item" data-value="3">Set of 3</div>
                   <div class="option-selector__item" data-value="6">Set of 6</div>
                   <div class="option-selector__item" data-value="9">Set of 9</div>
-                  <div class="option-selector__item" data-value="12">Set of 12</div>
-                  <div class="option-selector__item" data-value="16">Set of 16</div>
                 </div>
               </product-option-selector>
             </div>
@@ -130,7 +128,7 @@
             class="customization-panel__product-quantity is-not-enough"
             data-product-quantity
           >
-            <span data-product-curr-quantity>2</span>
+            <span data-product-curr-quantity>0</span>
             <span> out of </span>
             <span data-product-req-quantity>
               3
@@ -143,11 +141,11 @@
           data-customization-tools
         >
           <div class="tools__tabs" data-tabs>
-            <button class="tools__tab is-selected" data-tab="products">
+            <button class="tools__tab" data-tab="products">
               Products
             </button>
 
-            <button class="tools__tab" data-tab="images">
+            <button class="tools__tab is-selected" data-tab="images">
               Images
             </button>
 
@@ -162,7 +160,7 @@
 
           <div class="tools__page-wrapper" data-pages>
             <div
-              class="tools__page page page--products is-selected"
+              class="tools__page page page--products"
               data-page="products"
               data-products-grid="grid"
             >
@@ -272,48 +270,10 @@
 
                   <div class="page__product-price">$10,90</div>
                 </div>
+              </div>
 
-                <div class="page__product" data-product>
-                  <img
-                    src="https://picsum.photos/300"
-                    width="160"
-                    height="160"
-                    alt="product image"
-                    class="page__product-image"
-                  >
-
-                  <div class="page__product-title">Cocun Tiles</div>
-
-                  <div class="page__product-price">$10,90</div>
-                </div>
-
-                <div class="page__product" data-product>
-                  <img
-                    src="https://picsum.photos/300"
-                    width="160"
-                    height="160"
-                    alt="product image"
-                    class="page__product-image"
-                  >
-
-                  <div class="page__product-title">Cocun Tiles</div>
-
-                  <div class="page__product-price">$10,90</div>
-                </div>
-
-                <div class="page__product" data-product>
-                  <img
-                    src="https://picsum.photos/300"
-                    width="160"
-                    height="160"
-                    alt="product image"
-                    class="page__product-image"
-                  >
-
-                  <div class="page__product-title">Cocun Tiles</div>
-
-                  <div class="page__product-price">$10,90</div>
-                </div>
+              <div class="button button--primary" data-product-button>
+                Open product
               </div>
             </div>
 
@@ -321,7 +281,170 @@
               class="tools__page page page--images"
               data-page="images"
             >
-              Images
+              <div class="page__header">
+                <custom-radio
+                  class="page__radio radio"
+                  value="false"
+                  values="[false, true]"
+                  data-image-hide
+                >
+                  <div class="radio__toggler" data-toggler></div>
+
+                  <span>Hide used photos</span>
+                </custom-radio>
+
+                <button
+                  class="button button--primary-action"
+                  data-make-magic
+                >
+                  <svg class="button__icon" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M11.7656 4.39428C11.8938 3.89278 12.6062 3.89278 12.7344 4.39427L12.8963 5.02728C13.4395 7.15164 15.0984 8.81046 17.2227 9.35371L17.8557 9.51559C18.3572 9.64383 18.3572 10.3562 17.8557 10.4844L17.2227 10.6463C15.0984 11.1895 13.4395 12.8484 12.8963 14.9727L12.7344 15.6057C12.6062 16.1072 11.8938 16.1072 11.7656 15.6057L11.6037 14.9727C11.0605 12.8484 9.40164 11.1895 7.27728 10.6463L6.64428 10.4844C6.14278 10.3562 6.14278 9.64383 6.64427 9.51559L7.27728 9.35371C9.40164 8.81046 11.0605 7.15164 11.6037 5.02728L11.7656 4.39428Z" stroke="url(#paint0_linear_753_5756)" stroke-width="2"/>
+                    <path d="M3.25 1.75V4.75" stroke="url(#paint1_linear_753_5756)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M4.75 3.25H1.75" stroke="url(#paint2_linear_753_5756)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M4 15.25V18.25" stroke="url(#paint3_linear_753_5756)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M5.5 16.75H2.5" stroke="url(#paint4_linear_753_5756)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <defs>
+                    <linearGradient id="paint0_linear_753_5756" x1="4.75" y1="2.46908" x2="19.75" y2="2.46908" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#FF0079"/>
+                    <stop offset="1" stop-color="#FF8714"/>
+                    </linearGradient>
+                    <linearGradient id="paint1_linear_753_5756" x1="3.25" y1="1.74382" x2="4.25" y2="1.74382" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#FF0079"/>
+                    <stop offset="1" stop-color="#FF8714"/>
+                    </linearGradient>
+                    <linearGradient id="paint2_linear_753_5756" x1="1.75" y1="3.24794" x2="4.75" y2="3.24794" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#FF0079"/>
+                    <stop offset="1" stop-color="#FF8714"/>
+                    </linearGradient>
+                    <linearGradient id="paint3_linear_753_5756" x1="4" y1="15.2438" x2="5" y2="15.2438" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#FF0079"/>
+                    <stop offset="1" stop-color="#FF8714"/>
+                    </linearGradient>
+                    <linearGradient id="paint4_linear_753_5756" x1="2.5" y1="16.7479" x2="5.5" y2="16.7479" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#FF0079"/>
+                    <stop offset="1" stop-color="#FF8714"/>
+                    </linearGradient>
+                    </defs>
+                  </svg>
+
+                  <span>Make magic!</span>
+                </button>
+              </div>
+
+              <div class="page__images-container" >
+                <div class="page__images" data-images>
+                  <div
+                    class="page__image-wrapper"
+                    data-image
+                  >
+                    <img
+                      src="https://picsum.photos/600"
+                      alt="image not uploaded" 
+                      class="page__image"
+                      width="100"
+                      height="100"
+                    >
+                  </div>
+
+                  <div
+                    class="page__image-wrapper"
+                    data-image
+                  >
+                    <img
+                      src="https://picsum.photos/600"
+                      alt="image not uploaded" 
+                      class="page__image"
+                      width="100"
+                      height="100"
+                    >
+                  </div>
+
+                  <div
+                    class="page__image-wrapper"
+                    data-image
+                  >
+                    <img
+                      src="https://picsum.photos/600"
+                      alt="image not uploaded" 
+                      class="page__image"
+                      width="100"
+                      height="100"
+                    >
+                  </div>
+
+                  <div
+                    class="page__image-wrapper"
+                    data-image
+                  >
+                    <img
+                      src="https://picsum.photos/600"
+                      alt="image not uploaded" 
+                      class="page__image"
+                      width="100"
+                      height="100"
+                    >
+                  </div>
+
+                  <div
+                    class="page__image-wrapper"
+                    data-image
+                  >
+                    <img
+                      src="https://picsum.photos/600"
+                      alt="image not uploaded" 
+                      class="page__image"
+                      width="100"
+                      height="100"
+                    >
+                  </div>
+
+                  <div
+                    class="page__image-wrapper"
+                    data-image
+                  >
+                    <img
+                      src="https://picsum.photos/600"
+                      alt="image not uploaded" 
+                      class="page__image"
+                      width="100"
+                      height="100"
+                    >
+                  </div>
+
+                  <div
+                    class="page__image-wrapper"
+                    data-image
+                  >
+                    <img
+                      src="https://picsum.photos/600"
+                      alt="image not uploaded" 
+                      class="page__image"
+                      width="100"
+                      height="100"
+                    >
+                  </div>
+                </div>
+                
+              </div>
+
+              <button
+                class="button button--primary"
+                data-upload-image
+              >
+                <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M13.0142 5.16797L9.30547 1.27213L5.59678 5.16797" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <line x1="1" y1="-1" x2="8.75" y2="-1" transform="matrix(0 1 1 0 10.0237 1.19531)" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M3.03125 10V12.5C3.03125 15.2614 5.26983 17.5 8.03125 17.5H10.25C13.0114 17.5 15.25 15.2614 15.25 12.5V10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                  
+                <span>Upload Photos</span>
+
+                <div class="upload__wrapper">
+                  <div class="upload__variant">From PC</div>
+                  <div class="upload__variant">From instagram</div>
+                  <div class="upload__variant">From Facebook</div>
+                </div>
+              </button>
             </div>
 
             <div
@@ -333,6 +456,12 @@
           </div>
         </customization-tools>
       </customization-panel>
+
+      <customization-playground
+        class="product-builder__playground playground"
+      >
+
+      </customization-playground>
     </product-builder>
   </body>
 </html>

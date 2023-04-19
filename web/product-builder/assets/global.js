@@ -454,6 +454,18 @@
 
 // customElements.define('product-builder', ProductBuilder);
 
+const sizes = {
+  ...Array
+    .from(Array(100), (_, idx) => idx + 1)
+    .reduce((obj, item) => {
+      obj['Set of ' + item] = item
+
+      return obj;
+    }, {})
+}
+
+const productParams = new URLSearchParams(location.search);
+
 const getElements = (selectors, container) => {
   return Object.keys(selectors)
     .reduce((obj, elem) => {
@@ -466,6 +478,43 @@ const getElements = (selectors, container) => {
       return obj;
     }, {});
 }
+
+class Radio extends HTMLElement {
+  constructor() {
+    super();
+
+    this.toggler = this.querySelector('[data-toggler]');
+    [this.option1, this.option2] = JSON.parse(this.getAttribute('values'));
+
+    this.addEventListener('click', this.toggle.bind(this));
+
+    this.init();
+  }
+
+  init() {
+    const currValue = JSON.parse(this.getAttribute('value'))
+
+    if (currValue === this.option1) {
+      this.classList.add('option-1')
+    } else {
+      this.classList.add('option-2');
+    }
+  }
+
+  toggle() {
+    const currValue = JSON.parse(this.getAttribute('value'));
+
+    if (currValue === this.option1) {
+      this.setAttribute('value', this.option2);
+      this.classList.replace('option-1', 'option-2')
+    } else {
+      this.setAttribute('value', this.option1);
+      this.classList.replace('option-2', 'option-1');
+    }
+
+  }
+}
+customElements.define('custom-radio', Radio);
 
 class Switch extends HTMLElement {
   constructor() {
@@ -572,6 +621,29 @@ class OptionSelector extends HTMLElement {
   getValue() {
     return this.elements.selected.dataset.settedValue;
   }
+
+  optionTemplate = (variant) => {
+    const option = document.createElement('div');
+    option.classList.add('option-selector__item');
+    option.dataset.value = sizes[variant];
+    option.textContent = variant;
+
+    option.addEventListener('click', this.select.bind(this));
+
+    this.elements.optionsWrapper.appendChild(option);
+
+    return option;
+  }
+
+  setData(option, selected) {
+    this.elements.selected.textContent = selected;
+    this.elements.selected.dataset.settedValue = sizes[selected];
+
+    this.elements.optionsWrapper.innerHTML = '';
+
+    this.elements.options = option.values
+      .map(variant => this.optionTemplate(variant));
+  }
 }
 
 customElements.define('product-option-selector', OptionSelector);
@@ -602,9 +674,23 @@ class ProductInfo extends HTMLElement {
       }
     };
 
-    this.elements.selector.addEventListener('product-option:changed', (event) => {
-      console.log('new value: ' + event.detail.value);
-    });
+    this.elements.selector.addEventListener('product-option:changed', this.setQuantity.bind(this));
+  }
+
+  setProduct(product) {
+    this.elements.image.src = product.imageUrl + '&height=100';
+    this.elements.title.textContent = product.title;
+
+    const sizeOptions = product.options.find(option => option.name === 'Size');
+
+    if (sizeOptions) {
+      this.elements.selector.setData(sizeOptions, productParams.get('size'));
+    }
+
+  }
+
+  setQuantity() {
+    this.elements.quantity.request.textContent = event.detail.value;
   }
 }
 customElements.define('product-info', ProductInfo);
@@ -623,6 +709,13 @@ class Tools extends HTMLElement {
       products: {
         product: '[data-product]',
         switch: '[data-product-switch-grid]'
+      },
+      images: {
+        imageHide: '[data-image-hide]',
+        makeMagic: '[data-make-magic]',
+        imagesList: '[data-images]',
+        image: '[data-image]',
+        uploadImage: '[data-upload-image]'
       }
     }
   }
@@ -663,7 +756,8 @@ class Tools extends HTMLElement {
   initPages() {
     const pages = [ ...this.querySelectorAll(Tools.selectors.pages.page) ];
 
-    const selectedPage = pages.find(page => page.classList.contains('is-selected'));
+    const selectedPage = pages.find(page => page.dataset.page === this.tabs.selected.dataset.tab);
+    selectedPage.classList.add('is-selected');
 
     this.pages = {
       list: pages,
@@ -671,6 +765,7 @@ class Tools extends HTMLElement {
     };
 
     this.initProductPage();
+    this.initImagePage();
   }
 
   initProductPage() {
@@ -692,20 +787,12 @@ class Tools extends HTMLElement {
     gridSwitch.addEventListener('page:product:grid:changed', (event) => {
       this.pages.products.grid.value = event.detail.value;
 
-      if (!this.classList.contains(/product-grid--*/i)) {
-        console.log('here');
-      }
-
       if (event.detail.value === 'line') {
-        this.classList.add('product-grid--line');
-        this.classList.remove('product-grid--grid');
+        this.classList.replace('product-grid--grid', 'product-grid--line');
       } else if (event.detail.value === 'grid') {
-        this.classList.add('product-grid--grid')
-        this.classList.remove('product-grid--line')
+        this.classList.replace('product-grid--line', 'product-grid--grid');
       }
-
-      console.log(this.pages.products.grid.value);
-    })
+    });
 
     const products = [...this.querySelectorAll(Tools.selectors.pages.products.product)]
       .map(item => {
@@ -750,6 +837,26 @@ class Tools extends HTMLElement {
     this.pages.selected.classList.add('is-selected');
   }
 
+  initImagePage() {
+  }
+
+  imageTemplate(imageFile) {
+    const imageWrapper = document.createElement('div');
+    imageWrapper.classList.add('page__image-wrapper');
+    imageWrapper.dataset.image = '';
+
+    const image = new Image();
+    image.src = imageFile;
+    image.classList.add('page__image');
+    image.width = "100";
+    image.height = "100";
+    image.alt = 'Image not uploaded';
+
+    imageWrapper.appendChild(image);
+
+    return imageWrapper;
+  }
+
   moveRunner() {
     this.tabs.runner.style.transform = `translate(${this.tabs.list.indexOf(this.tabs.selected) * 100}%, -50%)`;
   }
@@ -758,17 +865,23 @@ customElements.define('customization-tools', Tools);
 
 class Panel extends HTMLElement {
   static selectors = {
+    productInfo: '[data-product]',
     tools: '[data-customization-tools]'
   };
 
   constructor() {
     super();
 
+    this.productInfo = this.querySelector(Panel.selectors.productInfo);
     this.tools = this.querySelector(Panel.selectors.tools);
 
     this.tools.addEventListener('tab:changed', (event) => {
       console.log('current tab: ' + event.detail.tab.dataset.tab);
     });
+  }
+
+  init(product) {
+    this.productInfo.setProduct(product);
   }
 }
 customElements.define('customization-panel', Panel);
@@ -782,6 +895,19 @@ class ProductBuilder extends HTMLElement {
     super();
 
     this.panel = this.querySelector(ProductBuilder.selectors.panel);
+
+    this.init();
+  }
+
+  async init() {
+    const productId = productParams.get('id');
+
+    const product = await fetch(`product-builder/product?id=${productId}`)
+      .then(res => res.json());
+
+    this.product = product;
+
+    this.panel.init(product);
   }
 }
 customElements.define('product-builder', ProductBuilder);
@@ -789,4 +915,15 @@ customElements.define('product-builder', ProductBuilder);
 
 document.addEventListener('page:product:grid:changed', (event) => {
   console.log('grid changed: ' + event.detail.value );
-})
+});
+
+
+const string = `
+<div class="tools__page page page--edit" data-page="edit">Edit</div>
+            `;
+
+const parser = new DOMParser();
+
+const dom2 = parser.parseFromString(string, 'text/html');
+
+console.log(dom2.querySelector('div').textContent);

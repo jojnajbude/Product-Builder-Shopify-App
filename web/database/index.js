@@ -1,4 +1,6 @@
 import mongoose from "mongoose";
+import { config } from "dotenv";
+config();
 
-mongoose.connect('mongodb+srv://andriihladkevych:CYccm5c0YyROBnou@customizable-product.bamqtwn.mongodb.net/?retryWrites=true&w=majority');
+mongoose.connect(process.env.DATABASE_URL);
 export default mongoose;
