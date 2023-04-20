@@ -12,6 +12,7 @@ import ProductModel from "./models/Product.js";
 
 import * as dotenv from 'dotenv';
 import { productTypes } from "./models/ProductTypes.js";
+import multer from "multer";
 dotenv.config();
 
 const PORT = parseInt(process.env.BACKEND_PORT || process.env.PORT || '', 10);
@@ -21,7 +22,11 @@ const STATIC_PATH =
     ? `${process.cwd()}/frontend/dist`
     : `${process.cwd()}/frontend/`; 
 
-const PROXY_PATH = `${process.cwd()}/product-builder`;
+const PROXY_PATH = `${process.cwd()}/frontend/product-builder/src`;
+
+const upload = multer({
+  dest: 'product-builder/uploads/'
+});
 
 const app = express();
 
@@ -50,14 +55,24 @@ app.get('/product-builder/product', async (req, res) => {
 
   const product = await ProductModel.findOne({ shopify_id: `gid://shopify/Product/${id}` });
 
-  res.send(product);
+  res.send(product); 
 })
+
+app.get('/product-builder/products', async (req, res) => {
+  const products = await ProductModel.find({});
+
+  res.send(products);
+});
+
+app.post('/product-builder/uploads', async (req, res) => {
+  res.sendStatus(200);
+});
  
-app.use('/product-builder/', express.static('product-builder')); 
+app.use('/product-builder', express.static(PROXY_PATH)); 
 
 app.use("/api/*", shopify.validateAuthenticatedSession());
 
-app.use(express.json());
+app.use(express.json()); 
 
 app.get('/api/shopify/products', async (req, res) => {
   const { query, noRelated } = req.query;

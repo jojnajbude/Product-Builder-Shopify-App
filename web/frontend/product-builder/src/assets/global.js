@@ -1,3 +1,6 @@
+// import EditablePicture from './Elements/EditablePicture';
+// console.log(EditablePicture);
+
 // class ImageCropper {
 //   constructor(mockup) {
 //     this.container = document.createElement('div');
@@ -454,6 +457,26 @@
 
 // customElements.define('product-builder', ProductBuilder);
 
+const activeActions = [];
+
+// window.addEventListener('click', (event) => {
+//   console.log(event.target);
+  
+//   activeActions.forEach(item => {
+//     const toClose = item.target !== event.target
+//       || !item.target.contains(event.target)
+//       || item.opener !== event.target
+//       || !item.opener.contains(event.target)
+
+//     if (toClose) {
+//       console.log(item,
+//       item.opener.contains(event.target)
+//       );
+//       item.callback();
+//     }
+//   })
+// })
+
 const sizes = {
   ...Array
     .from(Array(100), (_, idx) => idx + 1)
@@ -465,19 +488,6 @@ const sizes = {
 }
 
 const productParams = new URLSearchParams(location.search);
-
-const getElements = (selectors, container) => {
-  return Object.keys(selectors)
-    .reduce((obj, elem) => {
-      if (typeof selectors[elem] === 'object') {
-        obj[elem] = getElements(selectors[elem], container);
-      } else {
-        obj[elem] = container.querySelector(selectors[elem]);
-      }
-
-      return obj;
-    }, {});
-}
 
 class Radio extends HTMLElement {
   constructor() {
@@ -636,6 +646,13 @@ class OptionSelector extends HTMLElement {
   }
 
   setData(option, selected) {
+    if (!option) {
+      this.style.display = 'none';
+      return;
+    }
+
+    this.style.display = null;
+
     this.elements.selected.textContent = selected;
     this.elements.selected.dataset.settedValue = sizes[selected];
 
@@ -682,10 +699,8 @@ class ProductInfo extends HTMLElement {
     this.elements.title.textContent = product.title;
 
     const sizeOptions = product.options.find(option => option.name === 'Size');
-
-    if (sizeOptions) {
-      this.elements.selector.setData(sizeOptions, productParams.get('size'));
-    }
+    
+    this.elements.selector.setData(sizeOptions, productParams.get('size'));
 
   }
 
@@ -707,6 +722,7 @@ class Tools extends HTMLElement {
       wrapper: '[data-pages',
       page: '[data-page]',
       products: {
+        container: '[data-products-list]',
         product: '[data-product]',
         switch: '[data-product-switch-grid]'
       },
@@ -770,19 +786,23 @@ class Tools extends HTMLElement {
     this.initImagePage();
   }
 
-  initProductPage() {
-    const selectProduct = (event) => {
+  selectProduct = (event) => {
+    if (this.pages.products.selected) {
       this.pages.products.selected.classList.remove('is-selected');
+    }
 
-      this.pages.products.selected = event.currentTarget;
-      this.pages.products.selected.classList.add('is-selected');
+    this.pages.products.selected = event.currentTarget;
+    this.pages.products.selected.classList.add('is-selected');
 
-      document.dispatchEvent(new CustomEvent('page:products:changed', {
-        detail: {
-          page: this.pages.products.selected
-        }
-      }))
-    };
+    document.dispatchEvent(new CustomEvent('page:products:changed', {
+      detail: {
+        page: this.pages.products.selected
+      }
+    }))
+  };
+
+  async initProductPage() {
+    const productsContainer = this.querySelector(Tools.selectors.pages.products.container)
 
     const gridSwitch = this.querySelector(Tools.selectors.pages.products.switch);
     this.classList.add('product-grid--' + gridSwitch.getValue());
@@ -796,23 +816,54 @@ class Tools extends HTMLElement {
       }
     });
 
-    const products = [...this.querySelectorAll(Tools.selectors.pages.products.product)]
+    const productsData = await fetch('product-builder/products')
+      .then(res => res.json());
+
+    const products = productsData
+      .filter(product => !product.shopify_id.includes(productParams.get('id')))
       .map(item => {
-        item.addEventListener('click', selectProduct.bind(this));
+        productsContainer.appendChild(this.productTemplate.call(this, item));
 
         return item;
       });
 
-    const selectedProduct = products.find(product => product.classList.contains('is-selected'));
-
     this.pages.products = {
       list: products,
-      selected: selectedProduct,
+      selected: null,
       grid: {
         switch: gridSwitch,
         value: gridSwitch.getValue
       }
     }
+  }
+
+  productTemplate(product) {
+    const container = document.createElement('div');
+    container.classList.add('page__product');
+    container.dataset.id = product._id;
+    
+    const productInner = `
+      <img
+        src="${product.imageUrl
+          ? product.imageUrl + '&width=250&height=250'
+          : 'https://cdn.shopify.com/shopifycloud/web/assets/v1/833d5270ee5c71c0.svg'}"
+        width="140"
+        height="140"
+        alt="product image"
+        class="page__product-image"
+      >
+
+      <div class="page__product-info">
+        <div class="page__product-title">${product.title}</div>
+
+        <div class="page__product-price">$10,90</div>
+      </div>
+    `;
+
+    container.innerHTML = productInner;
+    container.addEventListener('click', this.selectProduct.bind(this));
+
+    return container;
   }
 
   selectTab(event) {
@@ -849,6 +900,11 @@ class Tools extends HTMLElement {
       uploadSelector.classList.toggle('is-open');
 
       if (uploadSelector.classList.contains('is-open')) {
+        activeActions.push({
+          target: uploadSelector,
+          opener: uploadButton,
+          callback: () => {uploadSelector.classList.remove('is-open')}
+        })
         uploadSelector.style.height = uploadSelector.scrollHeight + 'px';
       } else {
         uploadSelector.style.height = null;
@@ -860,26 +916,14 @@ class Tools extends HTMLElement {
       uploadSelector
     }
 
-    const imagesFromLocal = [];
-
-    for (let i = 0; i < localStorage.length; i++) {
-      if (localStorage.key(i).startsWith('image-')) {
-        imagesFromLocal.push(localStorage.key(i));
-      }
-    }
-
-    imagesFromLocal.forEach(image => {
-      imagesWrapper.appendChild(this.imageTemplate(localStorage.getItem(image)))
-    })
-
     const inputFromPC = this.querySelector(Tools.selectors.pages.images.importFromPC);
     inputFromPC.addEventListener('change', (() => {
       Object.keys(inputFromPC.files)
         .forEach((file) => {
-          console.log(inputFromPC.files);
           imagesWrapper.appendChild(this.imageTemplate(inputFromPC.files[file]))
         })
     }).bind(this))
+
   }
 
   imageTemplate(imageFile) {
@@ -894,10 +938,11 @@ class Tools extends HTMLElement {
     } else {
       const reader = new FileReader;
       reader.onload = () => {
-        localStorage.setItem('image-' + imageFile.name.split('.')[0], reader.result);
         image.src = reader.result;
   
         this.pages.images.uploadButton.dispatchEvent(new Event('click'));
+
+        imageWrapper.appendChild(image);
       };
   
       reader.readAsDataURL(imageFile);
@@ -908,7 +953,6 @@ class Tools extends HTMLElement {
     image.height = "100";
     image.alt = 'Image not uploaded';
 
-    imageWrapper.appendChild(image);
 
     return imageWrapper;
   }
@@ -942,15 +986,199 @@ class Panel extends HTMLElement {
 }
 customElements.define('customization-panel', Panel);
 
+class EditablePicture extends HTMLElement {
+  static emptyState = `
+    <div class="editable-picture__empty-state">
+      <svg class="icon__empty-state" width="18" height="18" viewBox="0 0 20 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M1.75 4.25C1.75 3.14543 2.64543 2.25 3.75 2.25H16.25C17.3546 2.25 18.25 3.14543 18.25 4.25V13.75C18.25 14.8546 17.3546 15.75 16.25 15.75H3.75C2.64543 15.75 1.75 14.8546 1.75 13.75V4.25Z" stroke="#FF8714" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M5.125 15.75L12.8471 7.3844C13.5649 6.60681 14.7641 6.52294 15.5832 7.19305L18.25 9.375" stroke="#FF8714" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M1.75 7.5L7.5625 13.3125" stroke="#FF8714" stroke-width="2"/>
+        <path d="M10.375 9.75C10.375 9 9.03185 7.5 7.375 7.5C5.71815 7.5 4.375 9 4.375 9.75" stroke="#FF8714" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  `;
+
+  constructor() {
+    super();
+  }
+}
+customElements.define('editable-picture', EditablePicture);
+
+class ProductControls extends HTMLElement {
+  static template = `
+    <product-controls
+      class="product-element__controls product-controls"
+    >
+      <button data-remove class="product-controls__button">
+        <svg width="19" height="20" viewBox="0 0 19 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3.17499 4.75H16.225L15.8025 13.4914C15.6737 16.1559 13.4759 18.25 10.8083 18.25H8.59166C5.92407 18.25 3.72627 16.1559 3.59749 13.4914L3.17499 4.75Z" stroke="currentColor" stroke-width="2"/>
+          <path d="M6.07501 4.75V4.75C6.07501 3.09315 7.41816 1.75 9.07501 1.75H10.325C11.9819 1.75 13.325 3.09315 13.325 4.75V4.75" stroke="currentColor" stroke-width="2"/>
+          <path d="M11.875 9.25V13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M7.52499 9.25V13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M1.72501 4.75H17.675" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>                
+      </button>
+
+      <div class="product-controls__quantity" data-quantity>
+        <button class="product-controls__button" data-quantity-add>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6.52499 9.00977C6.52499 9.28591 6.30114 9.50977 6.02499 9.50977H4.75742C4.48127 9.50977 4.25742 9.28591 4.25742 9.00977V6.66113C4.25742 6.38499 4.03356 6.16113 3.75742 6.16113H1.3912C1.11506 6.16113 0.891205 5.93728 0.891205 5.66113V4.3584C0.891205 4.08226 1.11506 3.8584 1.3912 3.8584H3.75742C4.03356 3.8584 4.25742 3.63454 4.25742 3.3584V0.992188C4.25742 0.716045 4.48127 0.492188 4.75742 0.492188H6.02499C6.30114 0.492188 6.52499 0.716045 6.52499 0.992188V3.3584C6.52499 3.63454 6.74885 3.8584 7.02499 3.8584H9.40878C9.68493 3.8584 9.90878 4.08226 9.90878 4.3584V5.66113C9.90878 5.93728 9.68493 6.16113 9.40878 6.16113H7.02499C6.74885 6.16113 6.52499 6.38499 6.52499 6.66113V9.00977Z" fill="black"/>
+          </svg>
+        </button>
+
+        <span data-quantity-count>
+          1
+        </span>
+
+        <button class="product-controls__button" data-quantity-remove>
+          <svg width="7" height="4" viewBox="0 0 7 4" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4.78867 3.05957H2.01132C1.58945 3.05957 1.26718 2.96289 1.04453 2.76953C0.827728 2.57031 0.71933 2.31543 0.71933 2.00488C0.71933 1.68848 0.824799 1.43359 1.03574 1.24023C1.25253 1.04102 1.57773 0.941406 2.01132 0.941406H4.78867C5.22226 0.941406 5.54453 1.04102 5.75546 1.24023C5.97226 1.43359 6.08066 1.68848 6.08066 2.00488C6.08066 2.31543 5.97519 2.57031 5.76425 2.76953C5.55331 2.96289 5.22812 3.05957 4.78867 3.05957Z" fill="black"/>
+          </svg>
+        </button>
+      </div>
+
+      <button data-edit class="product-controls__button">
+        <svg width="19" height="18" viewBox="0 0 19 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3.30143 11.8619L13.6969 1.46643C13.7062 1.46378 13.7158 1.4611 13.7258 1.45839C13.8626 1.42133 14.0605 1.38264 14.2925 1.37944C14.7367 1.37331 15.3279 1.49293 15.9134 2.07843C16.4989 2.66392 16.6185 3.25504 16.6123 3.69925C16.6091 3.93131 16.5705 4.1292 16.5334 4.266C16.5307 4.27601 16.528 4.28563 16.5254 4.29486L6.12986 14.6904L2.91574 15.076L3.30143 11.8619Z" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          <path d="M3.30143 11.8619L13.6969 1.46643C13.7062 1.46378 13.7158 1.4611 13.7258 1.45839C13.8626 1.42133 14.0605 1.38264 14.2925 1.37944C14.7367 1.37331 15.3279 1.49293 15.9134 2.07843C16.4989 2.66392 16.6185 3.25504 16.6123 3.69925C16.6091 3.93131 16.5705 4.1292 16.5334 4.266C16.5307 4.27601 16.528 4.28563 16.5254 4.29486L6.12986 14.6904L2.91574 15.076L3.30143 11.8619Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M11.1003 2.64844L15.141 6.68905" stroke="white" stroke-width="2"/>
+          <path d="M11.1003 2.64844L15.141 6.68905" stroke="currentColor" stroke-width="2"/>
+          <path d="M3.90781 1V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M6.39999 3.5L1.39999 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>                
+      </button>
+    </product-controls>
+  `;
+
+  static selectors = {
+    remove: '[data-remove]',
+    quantity: {
+      plus: '[data-quantity-add]',
+      minus: '[data-quantity-remove]',
+      count: '[data-quantity-count]',
+    },
+    edit: '[data-edit]'
+  }
+
+  constructor() {
+    super();
+
+    this.init();
+  }
+
+  init() {
+    const remove = this.querySelector(ProductControls.selectors.remove);
+    const edit = this.querySelector(ProductControls.selectors.edit);
+
+    this.elements = {
+      remove,
+      edit
+    }
+
+    console.log(this.elements);
+  }
+}
+customElements.define('product-controls', ProductControls);
+
+class ProductElement extends HTMLElement {
+  constructor() {
+    super();
+  }
+}
+customElements.define('product-element', ProductElement);
+
+class StudioView extends HTMLElement {
+  static selectors = {
+    sizeSelector: '[data-product-option-selector]',
+    container: '[data-studio-view-container]',
+    productElement: '[product-element]'
+  };
+
+  constructor() {
+    super();
+  }
+
+  init(product) {
+    if (!product) {
+      return;
+    }
+    const container = this.querySelector(StudioView.selectors.container);
+
+    const sizeSelector = document.querySelector(StudioView.selectors.sizeSelector);
+    sizeSelector.addEventListener('product-option:changed', ((event) => {
+      this.setProductElements(event.detail.value);
+    }).bind(this));
+    
+    this.controls = {
+      sizeSelector: sizeSelector,
+      container,
+      count: container.children.length
+    }
+
+    this.setProductElements(+sizeSelector.querySelector('[data-setted-value]').dataset.settedValue);
+  }
+
+  createDefaultProductElement() {
+    const productElement = document.createElement('product-element');
+    productElement.classList.add('product-builder__element', 'product-element', 'is-default');
+    productElement.toggleAttribute('product-element');
+
+    const picture = document.createElement('editable-picture');
+    picture.classList.add(
+      'product-element__picture',
+      'editable-picture',
+      'is-empty'
+    );
+    picture.innerHTML += EditablePicture.emptyState;
+
+    productElement.style.opacity = 0;
+    setTimeout(() => {
+      productElement.style.opacity = null;
+    });
+
+    productElement.appendChild(picture);
+    productElement.innerHTML += ProductControls.template;
+
+    this.controls.container.appendChild(productElement);
+  }
+
+  clearView(size) {
+    this.controls.container.querySelectorAll(StudioView.selectors.productElement)
+      .forEach((item, idx) => {
+        if (idx >= size) {
+          item.style.opacity = 0;
+          setTimeout(() => {
+            this.controls.container.removeChild(item)
+          }, 300);
+        }
+      });
+  }
+
+  setProductElements(size) {
+    if (size > this.controls.container.children.length) {
+      const nowLength = this.controls.container.children.length;
+
+      for (let i = 0; i < size - nowLength; i++) {
+        this.createDefaultProductElement();
+      }
+    } else if (size < this.controls.container.children.length) {
+      this.clearView(size);
+    }
+  }
+}
+customElements.define('studio-view', StudioView);
+
 class ProductBuilder extends HTMLElement {
   static selectors = {
-    panel: '[data-customization-panel]'
+    panel: '[customization-panel]',
+    studioView: '[studio-view]'
   };
   
   constructor() {
     super();
 
     this.panel = this.querySelector(ProductBuilder.selectors.panel);
+    this.studioView = this.querySelector(ProductBuilder.selectors.studioView);
 
     this.init();
   }
@@ -964,10 +1192,10 @@ class ProductBuilder extends HTMLElement {
     this.product = product;
 
     this.panel.init(product);
+    this.studioView.init(product);
   }
 }
 customElements.define('product-builder', ProductBuilder);
-
 
 document.addEventListener('page:product:grid:changed', (event) => {
   console.log('grid changed: ' + event.detail.value );

@@ -77,7 +77,7 @@
     <product-builder class="main product-builder">
       <customization-panel
         class="product-builder__customization-panel customization-panel"
-        data-customization-panel
+        customization-panel
       >
         <product-info
           class="customization-panel__product"
@@ -141,11 +141,11 @@
           data-customization-tools
         >
           <div class="tools__tabs" data-tabs>
-            <button class="tools__tab" data-tab="products">
+            <button class="tools__tab is-selected" data-tab="products">
               Products
             </button>
 
-            <button class="tools__tab is-selected" data-tab="images">
+            <button class="tools__tab" data-tab="images">
               Images
             </button>
 
@@ -199,79 +199,12 @@
                 </custom-switch>
               </div>
 
-              <div class="page__products" data-products-list>
-                <div class="page__product is-selected" data-product>
-                  <img
-                    src="https://picsum.photos/300"
-                    width="160"
-                    height="160"
-                    alt="product image"
-                    class="page__product-image"
-                  >
-
-                  <div class="page__product-title">Cocun Tiles</div>
-
-                  <div class="page__product-price">$10,90</div>
-                </div>
-
-                <div class="page__product" data-product>
-                  <img
-                    src="https://picsum.photos/300"
-                    width="160"
-                    height="160"
-                    alt="product image"
-                    class="page__product-image"
-                  >
-
-                  <div class="page__product-title">Cocun Tiles</div>
-
-                  <div class="page__product-price">$10,90</div>
-                </div>
-
-                <div class="page__product" data-product>
-                  <img
-                    src="https://picsum.photos/300"
-                    width="160"
-                    height="160"
-                    alt="product image"
-                    class="page__product-image"
-                  >
-
-                  <div class="page__product-title">Cocun Tiles</div>
-
-                  <div class="page__product-price">$10,90</div>
-                </div>
-
-                <div class="page__product" data-product>
-                  <img
-                    src="https://picsum.photos/300"
-                    width="160"
-                    height="160"
-                    alt="product image"
-                    class="page__product-image"
-                  >
-
-                  <div class="page__product-title">Cocun Tiles</div>
-
-                  <div class="page__product-price">$10,90</div>
-                </div>
-
-                <div class="page__product" data-product>
-                  <img
-                    src="https://picsum.photos/300"
-                    width="160"
-                    height="160"
-                    alt="product image"
-                    class="page__product-image"
-                  >
-
-                  <div class="page__product-title">Cocun Tiles</div>
-
-                  <div class="page__product-price">$10,90</div>
+              <div class="page__product-container">
+                <div class="page__products" data-products-list>
                 </div>
               </div>
 
-              <div class="button button--primary" data-product-button>
+              <div class="button button--primary page__product-button" data-product-button>
                 Open product
               </div>
             </div>
@@ -362,8 +295,12 @@
                       From PC
                     </label>
                   </div>
-                  <div class="upload__variant">From Instagram</div>
-                  <div class="upload__variant">From Google Photos</div>
+                  <div class="upload__variant">
+                    <span>From Instagram</span>
+                  </div>
+                  <div class="upload__variant">
+                    <span>From Google Photos</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -377,11 +314,13 @@
         </customization-tools>
       </customization-panel>
 
-      <customization-playground
-        class="product-builder__playground playground"
+      <studio-view
+        class="product-builder__playground studio-view"
+        studio-view
       >
-
-      </customization-playground>
+        <div class="studio-view__container" data-studio-view-container>
+        </div>
+      </studio-view>
     </product-builder>
   </body>
 </html>

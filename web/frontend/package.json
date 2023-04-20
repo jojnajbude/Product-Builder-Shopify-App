@@ -11,6 +11,7 @@
   "engines": {
     "node": ">= 12.16"
   },
+  "files": ["dist"],
   "dependencies": {
     "@shopify/app-bridge": "^3.1.0",
     "@shopify/app-bridge-react": "^3.1.0",
