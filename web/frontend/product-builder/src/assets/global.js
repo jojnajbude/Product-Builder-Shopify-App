@@ -457,25 +457,34 @@
 
 // customElements.define('product-builder', ProductBuilder);
 
-const activeActions = [];
+let activeActions = [];
 
-// window.addEventListener('click', (event) => {
-//   console.log(event.target);
-  
-//   activeActions.forEach(item => {
-//     const toClose = item.target !== event.target
-//       || !item.target.contains(event.target)
-//       || item.opener !== event.target
-//       || !item.opener.contains(event.target)
+window.addEventListener('click', (event) => {  
+  activeActions.map(item => {
+    const toClose = item.target !== event.target
+      && !item.target.contains(event.target)
+      && item.opener !== event.target
+      && !item.opener.contains(event.target);
 
-//     if (toClose) {
-//       console.log(item,
-//       item.opener.contains(event.target)
-//       );
-//       item.callback();
-//     }
-//   })
-// })
+    if (toClose) {
+      item.callback();
+      item.closed = true;
+    }
+
+    return item;
+  });
+
+  activeActions = activeActions.filter(item => !item.closed)
+})
+
+const ImageLimits = {
+  size: 3 * 1048576,
+  resolution: {
+    width: 200,
+    height: 200
+  },
+  types: ['image/jpeg', 'image/png', 'image/webp']
+};
 
 const sizes = {
   ...Array
@@ -601,6 +610,11 @@ class OptionSelector extends HTMLElement {
       this.close();
     } else {
       this.open();
+      activeActions.push({
+        target: this,
+        opener: this.elements.selectedWrapper,
+        callback: this.close.bind(this)
+      })
     }
   }
 
@@ -719,7 +733,7 @@ class Tools extends HTMLElement {
       runner: '[data-pagination-runner]'
     },
     pages: {
-      wrapper: '[data-pages',
+      wrapper: '[data-pages]',
       page: '[data-page]',
       products: {
         container: '[data-products-list]',
@@ -891,6 +905,10 @@ class Tools extends HTMLElement {
   }
 
   initImagePage() {
+    this.addEventListener('image-load:error', (event) => {
+      event.detail.imageWrapper.remove();
+    })
+
     const imagesWrapper = this.querySelector(Tools.selectors.pages.images.imagesWrapper);
 
     const uploadButton = this.querySelector(Tools.selectors.pages.images.uploadImage);
@@ -903,7 +921,10 @@ class Tools extends HTMLElement {
         activeActions.push({
           target: uploadSelector,
           opener: uploadButton,
-          callback: () => {uploadSelector.classList.remove('is-open')}
+          callback: () => {
+            uploadSelector.classList.remove('is-open');
+            uploadSelector.style.height = null;
+          }
         })
         uploadSelector.style.height = uploadSelector.scrollHeight + 'px';
       } else {
@@ -913,48 +934,111 @@ class Tools extends HTMLElement {
 
     this.pages.images = {
       uploadButton,
-      uploadSelector
+      uploadSelector,
+      imageList: []
     }
 
     const inputFromPC = this.querySelector(Tools.selectors.pages.images.importFromPC);
-    inputFromPC.addEventListener('change', (() => {
+    inputFromPC.addEventListener('change', (async () => {
+      const formData = new FormData();
+
+      const imagesToLoad = [];
+
       Object.keys(inputFromPC.files)
         .forEach((file) => {
-          imagesWrapper.appendChild(this.imageTemplate(inputFromPC.files[file]))
-        })
-    }).bind(this))
+          formData.append(inputFromPC.name, inputFromPC.files[file]);
+          imagesToLoad.push(this.imageTemplate(inputFromPC.files[file]));
+        });
 
+      imagesToLoad.forEach(image => {
+          if (image) {
+            imagesWrapper.appendChild(image.container)
+          }
+        })
+
+      const fileNames = await fetch('product-builder/uploads', {
+        method: 'POST',
+        body: formData
+      }).then(res => res.json());
+
+      fileNames
+        .forEach((file, idx) => {
+          if (!this.pages.images.imageList.includes(file)) {
+            imagesToLoad[idx].setImage(file);
+          }
+        });
+    }).bind(this))
   }
 
   imageTemplate(imageFile) {
-    const imageWrapper = document.createElement('div');
-    imageWrapper.classList.add('page__image-wrapper');
-    imageWrapper.dataset.image = '';
-
     const image = new Image();
+    const imageWrapper = document.createElement('div');
+    imageWrapper.classList.add('page__image-wrapper', 'is-loading');
+    imageWrapper.toggleAttribute('data-image');
 
-    if (typeof imageFile === 'string') {
-      image.src = imageFile;
-    } else {
-      const reader = new FileReader;
-      reader.onload = () => {
-        image.src = reader.result;
-  
-        this.pages.images.uploadButton.dispatchEvent(new Event('click'));
+    if (imageFile.size >= ImageLimits.size) {
+      this.dispatchEvent(new CustomEvent('image-load:error', {
+        detail: {
+          type: 'size',
+          imageWrapper
+        }
+      }))
+    }
 
-        imageWrapper.appendChild(image);
-      };
-  
-      reader.readAsDataURL(imageFile);
-    }    
+    if (!ImageLimits.types.includes(imageFile.type)) {
+      this.dispatchEvent(new CustomEvent('image-load:error', {
+        detail: {
+          type: 'type',
+          imageWrapper
+        }
+      }))
+    }
+
+    const reader = new FileReader;
+
+    reader.onload = async () => {
+      image.src = reader.result;
+      image.onload = () => {
+        if (image.naturalWidth <= ImageLimits.resolution.width && image.naturalHeight <= ImageLimits.resolution.height) {
+          this.dispatchEvent(new CustomEvent('image-load:error', {
+            detail: {
+              type: 'resolution',
+              imageWrapper
+            }
+          }))
+        }
+      }
+
+      this.pages.images.uploadButton.dispatchEvent(new Event('click'));
+      imageWrapper.classList.remove('is-loading');
+      image.style.opacity = null;
+    }
+
+    reader.readAsDataURL(imageFile);
+
+    image.style.opacity = 0;
+
+    imageWrapper.appendChild(image);
 
     image.classList.add('page__image');
     image.width = "100";
     image.height = "100";
     image.alt = 'Image not uploaded';
 
+    const setImage = (imageFile) => {
+      image.src = 'product-builder/uploads/' + imageFile;
 
-    return imageWrapper;
+      image.onload = () => {
+        console.log(image.src);
+      };
+
+      this.pages.images.imageList.push(imageFile);
+    }
+
+    return {
+      container: imageWrapper,
+      setImage
+    };
   }
 
   moveRunner() {
@@ -989,11 +1073,11 @@ customElements.define('customization-panel', Panel);
 class EditablePicture extends HTMLElement {
   static emptyState = `
     <div class="editable-picture__empty-state">
-      <svg class="icon__empty-state" width="18" height="18" viewBox="0 0 20 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M1.75 4.25C1.75 3.14543 2.64543 2.25 3.75 2.25H16.25C17.3546 2.25 18.25 3.14543 18.25 4.25V13.75C18.25 14.8546 17.3546 15.75 16.25 15.75H3.75C2.64543 15.75 1.75 14.8546 1.75 13.75V4.25Z" stroke="#FF8714" stroke-width="2" stroke-linejoin="round"/>
-        <path d="M5.125 15.75L12.8471 7.3844C13.5649 6.60681 14.7641 6.52294 15.5832 7.19305L18.25 9.375" stroke="#FF8714" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M1.75 7.5L7.5625 13.3125" stroke="#FF8714" stroke-width="2"/>
-        <path d="M10.375 9.75C10.375 9 9.03185 7.5 7.375 7.5C5.71815 7.5 4.375 9 4.375 9.75" stroke="#FF8714" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M1.10156 3.98131C1.10156 3.00356 1.89418 2.21094 2.87193 2.21094H13.9367C14.9145 2.21094 15.7071 3.00356 15.7071 3.98131V12.3906C15.7071 13.3683 14.9145 14.1609 13.9367 14.1609H2.87193C1.89418 14.1609 1.10156 13.3683 1.10156 12.3906V3.98131Z" stroke="#FF0079" stroke-width="1.77037" stroke-linejoin="round"/>
+        <path d="M4.08594 14.1618L10.9214 6.7567C11.5568 6.06839 12.6184 5.99415 13.3434 6.58732L15.704 8.51875" stroke="#FF0079" stroke-width="1.77037" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M1.10156 6.85938L6.2467 12.0045" stroke="#FF0079" stroke-width="1.77037"/>
+        <path d="M8.73299 8.85104C8.73299 8.18715 7.54405 6.85938 6.07743 6.85938C4.61081 6.85938 3.42188 8.18715 3.42188 8.85104" stroke="#FF0079" stroke-width="1.77037" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
   `;
@@ -1045,7 +1129,11 @@ class ProductControls extends HTMLElement {
           <path d="M11.1003 2.64844L15.141 6.68905" stroke="currentColor" stroke-width="2"/>
           <path d="M3.90781 1V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           <path d="M6.39999 3.5L1.39999 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>                
+        </svg>  
+        
+        <span class="button__tooltip">
+          Edit
+        </span>
       </button>
     </product-controls>
   `;
@@ -1053,6 +1141,7 @@ class ProductControls extends HTMLElement {
   static selectors = {
     remove: '[data-remove]',
     quantity: {
+      wrapper: '[data-quantity]',
       plus: '[data-quantity-add]',
       minus: '[data-quantity-remove]',
       count: '[data-quantity-count]',
@@ -1067,15 +1156,58 @@ class ProductControls extends HTMLElement {
   }
 
   init() {
+    const parent = this.parentElement;
+
     const remove = this.querySelector(ProductControls.selectors.remove);
     const edit = this.querySelector(ProductControls.selectors.edit);
 
-    this.elements = {
-      remove,
-      edit
-    }
+    remove.addEventListener('click', () => {
+      console.log('should to remove');
+    });
 
-    console.log(this.elements);
+    edit.addEventListener('click', () => {
+      console.log('should to edit');
+    });
+
+    const increaseQuantity = this.querySelector(ProductControls.selectors.quantity.plus);
+    const decreaseQuantity = this.querySelector(ProductControls.selectors.quantity.minus);
+
+    increaseQuantity.addEventListener('click', () => {
+      parent.setQuantity(parent.getQuantity() + 1);
+
+      this.setValue();
+    });
+
+    decreaseQuantity.addEventListener('click', () => {
+      if (parent.getQuantity() > 1) {
+        parent.setQuantity(parent.getQuantity() - 1);
+      }
+
+      this.setValue();
+    });
+
+    const quantity = this.querySelector(ProductControls.selectors.quantity.count);
+
+    this.elements = {
+      product: parent,
+      remove,
+      edit,
+      increaseQuantity,
+      decreaseQuantity,
+      quantity
+    }
+  }
+
+  setValue() {
+    this.elements.quantity.textContent = this.elements.product.getQuantity();
+
+    this.elements.product
+      .dispatchEvent(new CustomEvent('product-controls:quantity:changed', {
+        detail: {
+          value: this.elements.product.getQuantity()
+        }
+      }
+    ));
   }
 }
 customElements.define('product-controls', ProductControls);
@@ -1083,6 +1215,14 @@ customElements.define('product-controls', ProductControls);
 class ProductElement extends HTMLElement {
   constructor() {
     super();
+  }
+
+  setQuantity(newQuantity) {
+    this.setAttribute('quantity', newQuantity);
+  }
+
+  getQuantity() {
+    return +this.getAttribute('quantity');
   }
 }
 customElements.define('product-element', ProductElement);
@@ -1111,8 +1251,7 @@ class StudioView extends HTMLElement {
     
     this.controls = {
       sizeSelector: sizeSelector,
-      container,
-      count: container.children.length
+      container
     }
 
     this.setProductElements(+sizeSelector.querySelector('[data-setted-value]').dataset.settedValue);
@@ -1122,6 +1261,7 @@ class StudioView extends HTMLElement {
     const productElement = document.createElement('product-element');
     productElement.classList.add('product-builder__element', 'product-element', 'is-default');
     productElement.toggleAttribute('product-element');
+    productElement.setAttribute('quantity', 1);
 
     const picture = document.createElement('editable-picture');
     picture.classList.add(
@@ -1136,6 +1276,11 @@ class StudioView extends HTMLElement {
       productElement.style.opacity = null;
     });
 
+    productElement.addEventListener('product-controls:quantity:changed', (event) => {
+      console.log(event.detail.value);
+      // this.setProductElements(event.detail.value);
+    })
+
     productElement.appendChild(picture);
     productElement.innerHTML += ProductControls.template;
 
@@ -1147,11 +1292,20 @@ class StudioView extends HTMLElement {
       .forEach((item, idx) => {
         if (idx >= size) {
           item.style.opacity = 0;
+          item.setAttribute('quantity', 0);
           setTimeout(() => {
             this.controls.container.removeChild(item)
           }, 300);
         }
       });
+  }
+
+  getQuantity() {
+    return [...this.controls.container
+      .querySelectorAll(StudioView.selectors.productElement)]
+      .reduce((sum, elem) => {
+        return sum + +elem.getAttribute('quantity');
+      }, 0) || 0;
   }
 
   setProductElements(size) {
@@ -1185,6 +1339,10 @@ class ProductBuilder extends HTMLElement {
 
   async init() {
     const productId = productParams.get('id');
+
+    if (!productId) {
+      return;
+    }
 
     const product = await fetch(`product-builder/product?id=${productId}`)
       .then(res => res.json());

@@ -24,8 +24,19 @@ const STATIC_PATH =
 
 const PROXY_PATH = `${process.cwd()}/frontend/product-builder/src`;
 
-const upload = multer({
-  dest: 'product-builder/uploads/'
+const imageStorage = multer.diskStorage({
+  destination: './frontend/product-builder/src/uploads',
+  filename: function (req, file, cb) {
+    const { originalname } = file;
+
+    cb(null, originalname);
+  },
+});
+const imageUpload = multer({
+  storage: imageStorage,
+  limits: {
+    fileSize: 1048576 * 10
+  }
 });
 
 const app = express();
@@ -63,9 +74,11 @@ app.get('/product-builder/products', async (req, res) => {
 
   res.send(products);
 });
+ 
+app.post('/product-builder/uploads', imageUpload.array('images') ,async (req, res) => {
+  const fileNames = req.files?.map(file => file.originalname);
 
-app.post('/product-builder/uploads', async (req, res) => {
-  res.sendStatus(200);
+  res.send(fileNames);
 });
  
 app.use('/product-builder', express.static(PROXY_PATH)); 

@@ -37,6 +37,26 @@ body {
 button {
   border: 0;
   outline: none;
+  position: relative;
+}
+
+button .button__tooltip {
+  position: absolute;
+  background-color: #000;
+  padding: 4px 10px;
+  color: #fff;
+  opacity: 0;
+  transition: opacity .3s;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  border-radius: 20px;
+}
+
+button:hover .button__tooltip {
+  opacity: 1;
+  transition: opacity .3s 1s;
 }
 
 .button {
@@ -195,6 +215,7 @@ product-builder {
 
 .customization-panel__product.customization-panel__product .product-info__title {
   font-weight: 600;
+  font-size: 14px;
 }
 
 .customization-panel__product.customization-panel__product .product-info__option-selector {
@@ -475,6 +496,34 @@ product-builder {
   overflow: hidden;
 }
 
+.page__image-wrapper.is-loading {
+  background-color: var(--product-element-background);
+  z-index: 0;
+}
+
+.page__image-wrapper.is-loading::before {
+  content: '';
+  height: 0;
+  width: 0;
+  padding: 15px;
+  border: 6px solid #ccc;
+  border-right-color: #888;
+  border-radius: 22px;
+  animation: rotate 1s infinite linear;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+}
+
+@keyframes rotate {
+  0% {
+    transform: translate(-50%, -50%) rotate(0);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
 .page__image {
   position: absolute;
   width: 100%;
@@ -482,6 +531,8 @@ product-builder {
   left: 0;
   top: 0;
   object-fit: cover;
+  opacity: 1;
+  transition: opacity .3s;
 }
 
 .page--images .page__upload {
@@ -698,8 +749,9 @@ product-option-selector {
   position: absolute;
   top: 50px;
   left: 50px;
-  right: 100px;
+  right: 0px;
   bottom: 50px;
+  padding-right: 100px;
   display: flex;
   align-content: flex-start;
   flex-wrap: wrap;
@@ -803,22 +855,32 @@ product-controls {
   border-radius: 50%;
   width: 24px;
   height: 24px;
+  transition: color .3s;
 }
 
 .product-controls__button:hover {
   cursor: pointer;
+  color: #000;
 }
 
 .product-controls__quantity {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 10px 0;
 }
 
 .product-controls__quantity span {
-  padding: 10px;
+  min-width: 25px;
+  text-align: center;
+  color: #000;
 }
 
 .product-controls__quantity .product-controls__button {
   background-color: var(--action-background);
+  transition: background-color .3s;
+}
+
+.product-controls__quantity .product-controls__button:hover {
+  background-color: #e4e4e4;
 }
