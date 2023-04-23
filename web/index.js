@@ -75,10 +75,14 @@ app.get('/product-builder/products', async (req, res) => {
   res.send(products);
 });
  
-app.post('/product-builder/uploads', imageUpload.array('images') ,async (req, res) => {
-  const fileNames = req.files?.map(file => file.originalname);
+app.post('/product-builder/uploads', imageUpload.single('images') ,async (req, res) => {
+  const file = req.file;
 
-  res.send(fileNames);
+  if (!file) {
+    res.send(400);
+  } else {
+    res.send(file.originalname);
+  }  
 });
  
 app.use('/product-builder', express.static(PROXY_PATH)); 

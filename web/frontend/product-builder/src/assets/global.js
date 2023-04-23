@@ -457,28 +457,42 @@
 
 // customElements.define('product-builder', ProductBuilder);
 
-let activeActions = [];
+function ActiveActionsController() {
+  let activeActions = [];
 
-window.addEventListener('click', (event) => {  
-  activeActions.map(item => {
-    const toClose = item.target !== event.target
-      && !item.target.contains(event.target)
-      && item.opener !== event.target
-      && !item.opener.contains(event.target);
+  window.addEventListener('click', (event) => {  
+    activeActions.map(item => {
+      const toClose = item.target !== event.target
+        && !item.target.contains(event.target)
+        && item.opener !== event.target
+        && !item.opener.contains(event.target);
+  
+      if (toClose) {
+        item.callback();
+        item.closed = true;
+      }
+  
+      return item;
+    });
+  
+    activeActions = activeActions.filter(item => !item.closed)
+  })
 
-    if (toClose) {
-      item.callback();
-      item.closed = true;
-    }
+  const addToActiveAction = ({ target, opener, callback }) => {
+    activeActions.push({
+      target,
+      opener,
+      callback
+    })
+  }
 
-    return item;
-  });
+  return addToActiveAction
+}
 
-  activeActions = activeActions.filter(item => !item.closed)
-})
+const subsctibeToActionController = ActiveActionsController();
 
 const ImageLimits = {
-  size: 3 * 1048576,
+  size: 10 * 1048576,
   resolution: {
     width: 200,
     height: 200
@@ -497,6 +511,49 @@ const sizes = {
 }
 
 const productParams = new URLSearchParams(location.search);
+
+class ErrorToast extends HTMLElement {
+  static selectors = {
+    text: '[data-text]',
+    errorsContainer: '[data-errors]'
+  }
+
+  constructor() {
+    super();
+
+    this.errorContainer = this.querySelector(ErrorToast.selectors.errorsContainer);
+
+    this.addEventListener('image-load:error', this.toggle.bind(this));
+  }
+
+  toggle({ detail: { text, type }}) {
+    if (!this.hasAttribute('show')) {
+      this.toggleAttribute('show');
+    }
+
+    this.createError(text
+      ? text
+      : `Error type: ${type}.`);
+
+    clearTimeout(this.timeout);
+
+    this.timeout = setTimeout(() => {
+      this.toggleAttribute('show');
+
+      this.errorContainer.innerHTML = '';
+    }, 10000);
+  }
+
+  createError(text) {
+    const errorWrapper = document.createElement('span');
+    errorWrapper.toggleAttribute('data-text');
+
+    errorWrapper.textContent = text;
+
+    this.errorContainer.appendChild(errorWrapper);
+  }
+}
+customElements.define('error-toast', ErrorToast);
 
 class Radio extends HTMLElement {
   constructor() {
@@ -610,11 +667,12 @@ class OptionSelector extends HTMLElement {
       this.close();
     } else {
       this.open();
-      activeActions.push({
+
+      subsctibeToActionController({
         target: this,
         opener: this.elements.selectedWrapper,
         callback: this.close.bind(this)
-      })
+      });
     }
   }
 
@@ -749,7 +807,8 @@ class Tools extends HTMLElement {
         uploadSelector: '[data-upload-wrapper]',
         importFromPC: '[data-import-from-pc]'
       }
-    }
+    },
+    errorToast: 'error-toast'
   }
 
   constructor() {
@@ -759,6 +818,8 @@ class Tools extends HTMLElement {
   }
 
   init() {
+    this.errorToast = document.querySelector(Tools.selectors.errorToast);
+
     this.initTabs();
     this.initPages();
   }
@@ -905,7 +966,7 @@ class Tools extends HTMLElement {
   }
 
   initImagePage() {
-    this.addEventListener('image-load:error', (event) => {
+    this.errorToast.addEventListener('image-load:error', (event) => {
       event.detail.imageWrapper.remove();
     })
 
@@ -918,14 +979,15 @@ class Tools extends HTMLElement {
       uploadSelector.classList.toggle('is-open');
 
       if (uploadSelector.classList.contains('is-open')) {
-        activeActions.push({
+        subsctibeToActionController({
           target: uploadSelector,
           opener: uploadButton,
           callback: () => {
             uploadSelector.classList.remove('is-open');
             uploadSelector.style.height = null;
           }
-        })
+        });
+
         uploadSelector.style.height = uploadSelector.scrollHeight + 'px';
       } else {
         uploadSelector.style.height = null;
@@ -939,78 +1001,100 @@ class Tools extends HTMLElement {
     }
 
     const inputFromPC = this.querySelector(Tools.selectors.pages.images.importFromPC);
+    this.inputFromPC = inputFromPC;
+
     inputFromPC.addEventListener('change', (async () => {
-      const formData = new FormData();
-
-      const imagesToLoad = [];
-
       Object.keys(inputFromPC.files)
         .forEach((file) => {
-          formData.append(inputFromPC.name, inputFromPC.files[file]);
-          imagesToLoad.push(this.imageTemplate(inputFromPC.files[file]));
-        });
+          const imageTemplate = this.createNewImage(inputFromPC.files[file]);
 
-      imagesToLoad.forEach(image => {
-          if (image) {
-            imagesWrapper.appendChild(image.container)
-          }
-        })
-
-      const fileNames = await fetch('product-builder/uploads', {
-        method: 'POST',
-        body: formData
-      }).then(res => res.json());
-
-      fileNames
-        .forEach((file, idx) => {
-          if (!this.pages.images.imageList.includes(file)) {
-            imagesToLoad[idx].setImage(file);
+          if (imageTemplate) {
+            imagesWrapper.appendChild(imageTemplate);
           }
         });
     }).bind(this))
   }
 
-  imageTemplate(imageFile) {
+  createNewImage(imageFile) {
+    const formData = new FormData();
+
     const image = new Image();
     const imageWrapper = document.createElement('div');
     imageWrapper.classList.add('page__image-wrapper', 'is-loading');
     imageWrapper.toggleAttribute('data-image');
 
+    const setImage = (imageName) => {
+      image.src = 'product-builder/uploads/' + imageName;
+
+      image.onload = () => {
+        console.log(image.src);
+        imageWrapper.classList.remove('is-loading');
+      };
+
+      this.pages.images.imageList.push(imageName);
+    }
+
     if (imageFile.size >= ImageLimits.size) {
-      this.dispatchEvent(new CustomEvent('image-load:error', {
+      this.errorToast.dispatchEvent(new CustomEvent('image-load:error', {
         detail: {
           type: 'size',
-          imageWrapper
+          imageWrapper,
+          text: 'Some files have too big size.'
         }
-      }))
+      }));
+      return;
     }
 
     if (!ImageLimits.types.includes(imageFile.type)) {
-      this.dispatchEvent(new CustomEvent('image-load:error', {
+      this.errorToast.dispatchEvent(new CustomEvent('image-load:error', {
         detail: {
           type: 'type',
-          imageWrapper
+          imageWrapper,
+          text: 'Some files have an incompatible type.'
         }
       }))
+      return;
     }
 
     const reader = new FileReader;
 
     reader.onload = async () => {
       image.src = reader.result;
-      image.onload = () => {
+
+      image.onload = async () => {
         if (image.naturalWidth <= ImageLimits.resolution.width && image.naturalHeight <= ImageLimits.resolution.height) {
-          this.dispatchEvent(new CustomEvent('image-load:error', {
+          this.errorToast.dispatchEvent(new CustomEvent('image-load:error', {
             detail: {
               type: 'resolution',
-              imageWrapper
+              imageWrapper,
+              text: 'Some files have too low resolution.'
             }
           }))
+        } else {
+          formData.append(this.inputFromPC.name, imageFile);
+
+          const response = await fetch('product-builder/uploads', {
+            method: 'POST',
+            body: formData
+          });
+
+          const imageName = await response.text();
+
+          if (!this.pages.images.imageList.includes(imageName) && response.ok) {
+            setImage(imageName);
+          } else {
+            this.errorToast.dispatchEvent(new CustomEvent('image-load:error', {
+              detail: {
+                type: "loadErr",
+                imageWrapper,
+                text: 'Cannot load the file.'
+              }
+            }))
+          }
         }
       }
 
       this.pages.images.uploadButton.dispatchEvent(new Event('click'));
-      imageWrapper.classList.remove('is-loading');
       image.style.opacity = null;
     }
 
@@ -1025,20 +1109,7 @@ class Tools extends HTMLElement {
     image.height = "100";
     image.alt = 'Image not uploaded';
 
-    const setImage = (imageFile) => {
-      image.src = 'product-builder/uploads/' + imageFile;
-
-      image.onload = () => {
-        console.log(image.src);
-      };
-
-      this.pages.images.imageList.push(imageFile);
-    }
-
-    return {
-      container: imageWrapper,
-      setImage
-    };
+    return imageWrapper;
   }
 
   moveRunner() {
