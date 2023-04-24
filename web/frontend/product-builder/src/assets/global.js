@@ -491,8 +491,16 @@ function ActiveActionsController() {
 
 const subsctibeToActionController = ActiveActionsController();
 
+(function() {
+  let counter = 0;
+
+  window.uniqueId = () => {
+    return 'id-' + counter++;
+  }
+})();
+
 const ImageLimits = {
-  size: 10 * 1048576,
+  size: 3 * 1048576,
   resolution: {
     width: 200,
     height: 200
@@ -523,10 +531,10 @@ class ErrorToast extends HTMLElement {
 
     this.errorContainer = this.querySelector(ErrorToast.selectors.errorsContainer);
 
-    this.addEventListener('image-load:error', this.toggle.bind(this));
+    this.addEventListener('error:show', this.showErrors.bind(this));
   }
 
-  toggle({ detail: { text, type }}) {
+  showErrors({ detail: { text, type }}) {
     if (!this.hasAttribute('show')) {
       this.toggleAttribute('show');
     }
@@ -541,7 +549,7 @@ class ErrorToast extends HTMLElement {
       this.toggleAttribute('show');
 
       this.errorContainer.innerHTML = '';
-    }, 10000);
+    }, 5000);
   }
 
   createError(text) {
@@ -588,6 +596,7 @@ class Radio extends HTMLElement {
       this.classList.replace('option-2', 'option-1');
     }
 
+    this.dispatchEvent(new Event('change'));
   }
 }
 customElements.define('custom-radio', Radio);
@@ -763,7 +772,12 @@ class ProductInfo extends HTMLElement {
       }
     };
 
-    this.elements.selector.addEventListener('product-option:changed', this.setQuantity.bind(this));
+    this.elements.selector.addEventListener('product-option:changed', ((event) => {
+      this.checkDoneProduct();
+      this.setQuantity(event.detail.value);
+    }).bind(this));
+
+    this.addEventListener('check-images', this.checkOnEvent.bind(this));
   }
 
   setProduct(product) {
@@ -776,14 +790,42 @@ class ProductInfo extends HTMLElement {
 
   }
 
-  setQuantity() {
-    this.elements.quantity.request.textContent = event.detail.value;
+  checkOnEvent(event) {
+    if (typeof event.detail.currentCount !== 'number') {
+      return;
+    }
+
+    this.elements.quantity.current.textContent = event.detail.currentCount;
+
+    this.checkDoneProduct();
+  }
+
+  checkDoneProduct() {
+    const current = +this.elements.quantity.current.textContent;
+    const required = +this.elements.quantity.request.textContent;
+
+    if (current > required) {
+      this.elements.quantity.current.textContent = required;
+      this.checkDoneProduct();
+      return;
+    }
+
+    if (current === required) {
+      this.elements.quantity.wrapper.classList.remove('is-not-enough');
+    } else {
+      this.elements.quantity.wrapper.classList.add('is-not-enough');
+    }
+  }
+
+  setQuantity(quantity) {
+    this.elements.quantity.request.textContent = quantity;
   }
 }
 customElements.define('product-info', ProductInfo);
 
 class Tools extends HTMLElement {
   static selectors = {
+    playground: '[studio-view]',
     tabs: {
       wrapper: '[data-tabs]',
       tab: '[data-tab]',
@@ -819,6 +861,7 @@ class Tools extends HTMLElement {
 
   init() {
     this.errorToast = document.querySelector(Tools.selectors.errorToast);
+    this.playground = document.querySelector(Tools.selectors.playground);
 
     this.initTabs();
     this.initPages();
@@ -966,7 +1009,7 @@ class Tools extends HTMLElement {
   }
 
   initImagePage() {
-    this.errorToast.addEventListener('image-load:error', (event) => {
+    this.errorToast.addEventListener('error:show', (event) => {
       event.detail.imageWrapper.remove();
     })
 
@@ -974,6 +1017,17 @@ class Tools extends HTMLElement {
 
     const uploadButton = this.querySelector(Tools.selectors.pages.images.uploadImage);
     const uploadSelector = this.querySelector(Tools.selectors.pages.images.uploadSelector);
+
+    const hideUsedImages = this.querySelector(Tools.selectors.pages.images.imageHide);
+    hideUsedImages.addEventListener('change', () => {
+      if (JSON.parse(hideUsedImages.getAttribute('value'))) {
+        [...this.querySelectorAll(Tools.selectors.pages.images.image + '.is-selected')]
+          .forEach(item => item.style.display = 'none');
+      } else {
+        [...this.querySelectorAll(Tools.selectors.pages.images.image + '.is-selected')]
+          .forEach(item => item.style.display = null);
+      }
+    });
 
     uploadButton.addEventListener('click', () => {
       uploadSelector.classList.toggle('is-open');
@@ -1023,34 +1077,41 @@ class Tools extends HTMLElement {
     imageWrapper.classList.add('page__image-wrapper', 'is-loading');
     imageWrapper.toggleAttribute('data-image');
 
+    imageWrapper.addEventListener('click', () => {
+      this.playground.dispatchEvent(new CustomEvent('image:selected', {
+        detail: {
+          imageSrc: image.src
+        }
+      }));
+    })
+
     const setImage = (imageName) => {
       image.src = 'product-builder/uploads/' + imageName;
 
       image.onload = () => {
-        console.log(image.src);
         imageWrapper.classList.remove('is-loading');
       };
 
-      this.pages.images.imageList.push(imageName);
+      this.pages.images.imageList.push(image.src);
     }
 
     if (imageFile.size >= ImageLimits.size) {
-      this.errorToast.dispatchEvent(new CustomEvent('image-load:error', {
+      this.errorToast.dispatchEvent(new CustomEvent('error:show', {
         detail: {
           type: 'size',
           imageWrapper,
-          text: 'Some files have too big size.'
+          text: `Some files have too big size. File: ${imageFile.name}`
         }
       }));
       return;
     }
 
     if (!ImageLimits.types.includes(imageFile.type)) {
-      this.errorToast.dispatchEvent(new CustomEvent('image-load:error', {
+      this.errorToast.dispatchEvent(new CustomEvent('error:show', {
         detail: {
           type: 'type',
           imageWrapper,
-          text: 'Some files have an incompatible type.'
+          text: `Some files have an incompatible type. File: ${imageFile.name}`
         }
       }))
       return;
@@ -1063,11 +1124,11 @@ class Tools extends HTMLElement {
 
       image.onload = async () => {
         if (image.naturalWidth <= ImageLimits.resolution.width && image.naturalHeight <= ImageLimits.resolution.height) {
-          this.errorToast.dispatchEvent(new CustomEvent('image-load:error', {
+          this.errorToast.dispatchEvent(new CustomEvent('error:show', {
             detail: {
               type: 'resolution',
               imageWrapper,
-              text: 'Some files have too low resolution.'
+              text: `Some files are too low resolution. File: ${imageFile.name}`
             }
           }))
         } else {
@@ -1083,11 +1144,11 @@ class Tools extends HTMLElement {
           if (!this.pages.images.imageList.includes(imageName) && response.ok) {
             setImage(imageName);
           } else {
-            this.errorToast.dispatchEvent(new CustomEvent('image-load:error', {
+            this.errorToast.dispatchEvent(new CustomEvent('error:show', {
               detail: {
                 type: "loadErr",
                 imageWrapper,
-                text: 'Cannot load the file.'
+                text: 'This image already uploaded'
               }
             }))
           }
@@ -1110,6 +1171,25 @@ class Tools extends HTMLElement {
     image.alt = 'Image not uploaded';
 
     return imageWrapper;
+  }
+
+  getImages() {
+    return this.pages.images.imageList;
+  }
+
+  isSelectedImage(imageLink, isSelected) {
+    const imagesList = [...this.querySelectorAll(`.page__image`)];
+    const image = imagesList.find(item => item.src === imageLink); 
+
+    if (!image) {
+      return;
+    }
+
+    if (isSelected) {
+      image.parentElement.classList.add('is-selected');
+    } else {
+      image.parentElement.classList.remove('is-selected');
+    }
   }
 
   moveRunner() {
@@ -1138,6 +1218,10 @@ class Panel extends HTMLElement {
   init(product) {
     this.productInfo.setProduct(product);
   }
+
+  getImages() {
+    return this.tools.getImages();
+  }
 }
 customElements.define('customization-panel', Panel);
 
@@ -1155,6 +1239,41 @@ class EditablePicture extends HTMLElement {
 
   constructor() {
     super();
+
+    this.initImage();
+  }
+
+  connectedCallback() {
+  }
+
+  initImage() {
+  }
+  
+  setImage(imageUrl) {
+    if (this.image) {
+      this.oldImage = this.image;
+      this.oldImage.remove();
+    }
+    
+    this.image = new Image();
+    this.image.classList.add('editable-picture__image');
+    this.image.style.opacity = 0;
+    
+    this.image.onload = () => {
+      this.image.style.opacity = null;
+        
+    }
+    
+    this.image.src = imageUrl;
+    
+    this.classList.remove('is-empty');
+    this.appendChild(this.image);
+  }
+
+  removeImage() {
+    this.image.remove();
+
+    this.classList.add('is-empty');
   }
 }
 customElements.define('editable-picture', EditablePicture);
@@ -1232,14 +1351,6 @@ class ProductControls extends HTMLElement {
     const remove = this.querySelector(ProductControls.selectors.remove);
     const edit = this.querySelector(ProductControls.selectors.edit);
 
-    remove.addEventListener('click', () => {
-      console.log('should to remove');
-    });
-
-    edit.addEventListener('click', () => {
-      console.log('should to edit');
-    });
-
     const increaseQuantity = this.querySelector(ProductControls.selectors.quantity.plus);
     const decreaseQuantity = this.querySelector(ProductControls.selectors.quantity.minus);
 
@@ -1267,6 +1378,16 @@ class ProductControls extends HTMLElement {
       decreaseQuantity,
       quantity
     }
+
+    remove.addEventListener('click', () => {
+      this.dispatchEvent(new CustomEvent('clear:product', {
+        detail: {}
+      }))
+    });
+
+    edit.addEventListener('click', () => {
+      console.log('should to edit');
+    });
   }
 
   setValue() {
@@ -1284,8 +1405,110 @@ class ProductControls extends HTMLElement {
 customElements.define('product-controls', ProductControls);
 
 class ProductElement extends HTMLElement {
+  static selectors = {
+    picture: 'editable-picture',
+    controls: 'product-controls'
+  }
+
+  static get observedAttributes() {
+    return ['count-of-images'];
+  }
+
   constructor() {
     super();
+
+    this.addEventListener('click', this.select.bind(this));
+
+    this.state = {
+      selectedPicture: this.querySelector('editable-picture'),
+    };
+    this.studioView = document.querySelector('studio-view');
+
+    this.state = {
+      images: []
+    }
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    if (name === 'count-of-images' && +newValue === 0 ) {
+      this.studioView.dispatchEvent(new CustomEvent('image:removed'));
+    }
+  }
+
+  connectedCallback() {
+    this.setAttribute('required-count-of-images', 1);
+    this.setAttribute('count-of-images', 0);
+
+    this.initControls();
+  }
+
+  initControls() {
+    this.controls = this.querySelector(ProductElement.selectors.controls);
+  
+    this.controls.addEventListener('clear:product', (() => {
+      this.clear()
+    }).bind(this));
+  }
+
+  toggle(event) {
+    if (this.classList.contains('is-selected')) {
+      this.unselect(event.target);
+      return;
+    }
+
+    this.select();
+  }
+
+  clear() {
+    [...this.querySelectorAll(ProductElement.selectors.picture)]
+      .forEach(picture => picture.removeImage());
+
+    const currImages = this.querySelectorAll(ProductElement.selectors.picture + ':not(.is-empty)').length
+
+    this.setAttribute('count-of-images', currImages);
+  }
+
+  setImage(imageUrl) {
+    if (!this.state.selectedPicture) {
+      this.state.selectedPicture = this.querySelector(ProductElement.selectors.picture);
+    }
+
+    this.state.selectedPicture.setImage(imageUrl);
+
+    const currImages = this.querySelectorAll(ProductElement.selectors.picture + ':not(.is-empty)').length
+
+    this.setAttribute('count-of-images', currImages);
+  }
+  
+
+  select() {
+    this.classList.add('is-selected');
+
+    this.dispatchEvent(new CustomEvent('select', {
+      detail: {
+        element: this,
+        id: this.getId()
+      }
+    }))
+  }
+
+  unselect(target) {
+    if (target !== this) {
+      return;
+    }
+
+    this.classList.remove('is-selected');
+
+    this.dispatchEvent(new CustomEvent('unselect', {
+      detail: {
+        element: this,
+        id: this.getId()
+      }
+    }))
+  }
+
+  getId() {
+    return this.getAttribute('product-element');
   }
 
   setQuantity(newQuantity) {
@@ -1298,11 +1521,19 @@ class ProductElement extends HTMLElement {
 }
 customElements.define('product-element', ProductElement);
 
+class Tiles extends ProductElement {
+  constructor() {
+    super();
+  }
+}
+customElements.define('product-tiles', Tiles);
+
 class StudioView extends HTMLElement {
   static selectors = {
     sizeSelector: '[data-product-option-selector]',
     container: '[data-studio-view-container]',
-    productElement: '[product-element]'
+    productElement: '[product-element]',
+    productInfo: 'product-info'
   };
 
   constructor() {
@@ -1313,6 +1544,7 @@ class StudioView extends HTMLElement {
     if (!product) {
       return;
     }
+
     const container = this.querySelector(StudioView.selectors.container);
 
     const sizeSelector = document.querySelector(StudioView.selectors.sizeSelector);
@@ -1320,18 +1552,64 @@ class StudioView extends HTMLElement {
       this.setProductElements(event.detail.value);
     }).bind(this));
     
-    this.controls = {
+    this.elements = {
       sizeSelector: sizeSelector,
-      container
+      container,
+      productInfo: document.querySelector(StudioView.selectors.productInfo)
     }
+
+    this.state = {
+      selected: [],
+      images: []
+    };
+
+    this.addEventListener('image:removed', () => {
+      this.checkProductsReady();
+      this.parentElement.dispatchEvent(new CustomEvent('image:check'));
+    })
+
+
+    this.addEventListener('image:selected', (event) => {
+      if (this.state.selected.length === 0) {
+        console.log('error to image set');
+      }
+      this.state.selected.forEach(item => {
+        const toSelect = this.querySelector(`[product-element="${item}"]`);
+
+        if (toSelect) {
+          toSelect.setImage(event.detail.imageSrc);
+        }
+      });
+
+      this.checkProductsReady();
+
+      this.parentElement.dispatchEvent(new CustomEvent('image:check'));
+    })
 
     this.setProductElements(+sizeSelector.querySelector('[data-setted-value]').dataset.settedValue);
   }
 
-  createDefaultProductElement() {
+  checkProductsReady() {
+    const imagesInfo = [...this.querySelectorAll('[product-element]')]
+      .reduce((obj, item) => {
+        if (+item.getAttribute('count-of-images') === +item.getAttribute('required-count-of-images')) {
+          obj.currentCount++;
+        }
+
+        return obj;
+      }, {
+        currentCount: 0,
+      });
+
+    this.elements.productInfo.dispatchEvent(new CustomEvent('check-images', {
+      detail: imagesInfo
+    }));
+  }
+
+  createDefaultProductElement(id) {
     const productElement = document.createElement('product-element');
     productElement.classList.add('product-builder__element', 'product-element', 'is-default');
-    productElement.toggleAttribute('product-element');
+    productElement.setAttribute('product-element', id || '');
     productElement.setAttribute('quantity', 1);
 
     const picture = document.createElement('editable-picture');
@@ -1340,7 +1618,9 @@ class StudioView extends HTMLElement {
       'editable-picture',
       'is-empty'
     );
+
     picture.innerHTML += EditablePicture.emptyState;
+    productElement.appendChild(picture);
 
     productElement.style.opacity = 0;
     setTimeout(() => {
@@ -1349,30 +1629,49 @@ class StudioView extends HTMLElement {
 
     productElement.addEventListener('product-controls:quantity:changed', (event) => {
       console.log(event.detail.value);
-      // this.setProductElements(event.detail.value);
+    });
+
+    productElement.addEventListener('select', (event) => {
+      this.state.selected.forEach(item => {
+        if (event.currentTarget.getAttribute('product-element') === item) {
+          return;
+        }
+
+        const toRemove = this.querySelector(`[product-element="${item}"]`)
+        if (toRemove) {
+          toRemove.classList.remove('is-selected');
+        }
+      })
+
+      this.state.selected = [event.detail.id];
+    });
+
+    productElement.addEventListener('unselect', (event) => {
+      this.state.selected = this.state.selected.filter(item => item !== event.detail.id);
     })
 
-    productElement.appendChild(picture);
     productElement.innerHTML += ProductControls.template;
 
-    this.controls.container.appendChild(productElement);
+    this.elements.container.appendChild(productElement);
   }
 
   clearView(size) {
-    this.controls.container.querySelectorAll(StudioView.selectors.productElement)
+    this.elements.container.querySelectorAll(StudioView.selectors.productElement)
       .forEach((item, idx) => {
         if (idx >= size) {
           item.style.opacity = 0;
           item.setAttribute('quantity', 0);
           setTimeout(() => {
-            this.controls.container.removeChild(item)
+            this.elements.container.removeChild(item)
           }, 300);
         }
       });
+
+      this.checkProductsReady();
   }
 
   getQuantity() {
-    return [...this.controls.container
+    return [...this.elements.container
       .querySelectorAll(StudioView.selectors.productElement)]
       .reduce((sum, elem) => {
         return sum + +elem.getAttribute('quantity');
@@ -1380,15 +1679,20 @@ class StudioView extends HTMLElement {
   }
 
   setProductElements(size) {
-    if (size > this.controls.container.children.length) {
-      const nowLength = this.controls.container.children.length;
+    if (size > this.elements.container.children.length) {
+      const nowLength = this.elements.container.children.length;
 
       for (let i = 0; i < size - nowLength; i++) {
-        this.createDefaultProductElement();
+        this.createDefaultProductElement(uniqueId());
       }
-    } else if (size < this.controls.container.children.length) {
+    } else if (size < this.elements.container.children.length) {
       this.clearView(size);
     }
+  }
+
+  getImages() {
+    return [...this.querySelectorAll('.editable-picture__image')]
+      .map(img => img.src);
   }
 }
 customElements.define('studio-view', StudioView);
@@ -1422,9 +1726,20 @@ class ProductBuilder extends HTMLElement {
 
     this.panel.init(product);
     this.studioView.init(product);
+
+    this.addEventListener('image:check', this.checkImages.bind(this));
+  }
+
+  checkImages() {
+    this.panel.getImages()
+      .forEach(image => {
+        this.panel.tools.isSelectedImage(image, this.studioView.getImages().includes(image));
+      })
   }
 }
 customElements.define('product-builder', ProductBuilder);
+
+window.Studio = document.querySelector('product-builder');
 
 document.addEventListener('page:product:grid:changed', (event) => {
   console.log('grid changed: ' + event.detail.value );

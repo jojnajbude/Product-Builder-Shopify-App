@@ -14,10 +14,15 @@ body {
 
   --product-element-background: #FFF4F4;
   --product-element-hover-background: #ffd9d9;
+  --product-element-is-selected: #ff8714;
 
   display: flex;
   flex-direction: column;
   height: 100vh;
+}
+
+img[src=""], img:not([src]) {
+  opacity: 0 !important;
 }
 
 .hidden {
@@ -232,12 +237,15 @@ product-builder {
   letter-spacing: 0.25px;
   font-size: 14px;
   line-height: 22px;
-  background-color: #fff3f3;
   border-radius: 20px;
+  background-color: #E5FEF2;
+  color: #03ca82;
+  transition: background-color .3s, color .3s;
 }
 
 .customization-panel__product-quantity.is-not-enough {
   color: #ff0079;
+  background-color: #fff3f3;
 }
 
 /* Tools */
@@ -477,8 +485,8 @@ product-builder {
 .page__images {
   position: absolute;
   top: 0;
-  left: 0;
-  right: 0;
+  left: 10px;
+  right: 10px;
   bottom: 0;
   overflow-y: auto;
   display: grid;
@@ -500,11 +508,17 @@ product-builder {
   padding-bottom: 100%;
   border-radius: 12px;
   overflow: hidden;
+  background-color: var(--product-element-background);
+  transition: background-color .3s;
+}
+
+.page__image-wrapper:not(.is-loading):hover {
+  cursor: pointer;
 }
 
 .page__image-wrapper.is-loading {
-  background-color: var(--product-element-background);
   z-index: 0;
+  pointer-events: none;
 }
 
 .page__image-wrapper.is-loading::before {
@@ -512,7 +526,7 @@ product-builder {
   height: 0;
   width: 0;
   padding: 15px;
-  border: 6px solid #ccc;
+  border: 6px solid #f8f8f8;
   border-right-color: #888;
   border-radius: 22px;
   animation: rotate 1s infinite linear;
@@ -521,6 +535,38 @@ product-builder {
   top: 50%;
   z-index: 1;
 }
+
+.page__image-wrapper.is-selected {
+  background-color: #000;
+}
+
+.page__image-wrapper.is-selected .page__image {
+  opacity: 0.7;
+}
+
+.page__image-wrapper.is-selected::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 20px;
+  height: 20px;
+  background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='12.0193' cy='12.0193' r='10.1014' stroke='white' stroke-width='2.44882'/%3E%3Cpath d='M9.26562 11.9727L11.2136 13.9207L15.1097 10.0246' stroke='white' stroke-width='2.44882' stroke-linecap='round'/%3E%3C/svg%3E%0A");
+  background-size: contain;
+  z-index: 2;
+}
+
+/* .page__image-wrapper.is-selected::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  border-radius: 20px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3));
+} */
 
 @keyframes rotate {
   0% {
@@ -537,7 +583,7 @@ product-builder {
   height: 100%;
   left: 0;
   top: 0;
-  object-fit: contain;
+  object-fit: cover;
   opacity: 1;
   transition: opacity .3s;
 }
@@ -773,12 +819,35 @@ product-element {
 }
 
 .product-element {
+  user-select: none;
   position: relative;
+  padding-top: 15px;
   opacity: 1;
   transition: opacity .3s;
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.product-element:hover {
+  cursor: pointer;
+}
+
+.product-element::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  left: 0;
+  top: 0;
+  height: 5px;
+  background-color: var(--product-element-is-selected);
+  border-radius: 20px;
+  opacity: 0;
+  transition: opacity .2s ease-out;
+}
+
+.product-element.is-selected::before {
+  opacity: 1;
 }
 
 .product-element .product-element__picture {
@@ -803,7 +872,7 @@ editable-picture {
   transition: background-color .3s;
 }
 
-.product-element:hover .editable-picture {
+.editable-picture:hover {
   cursor: pointer;
   background-color: var(--product-element-hover-background);
 }
@@ -828,6 +897,17 @@ editable-picture {
   padding: 10px;
 }
 
+.editable-picture .editable-picture__image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 1;
+  transition: opacity .3s;
+}
+
 /* product-controls */
 product-controls {
   display: inline-flex;
@@ -841,6 +921,7 @@ product-controls {
   width: 100%;
   border-radius: 20px;
   border: 1px solid #ebebeb;
+  background-color: #fff;
   align-items: center;
   gap: 20px;
   opacity: 0;
@@ -848,7 +929,8 @@ product-controls {
   transition: opacity 0.3s;
 }
 
-.product-element:hover .product-controls {
+.product-element:hover .product-controls,
+.product-element.is-selected .product-controls {
   pointer-events: all;
   opacity: 1;
 }
