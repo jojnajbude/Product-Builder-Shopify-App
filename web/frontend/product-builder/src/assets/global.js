@@ -457,6 +457,13 @@
 
 // customElements.define('product-builder', ProductBuilder);
 
+const backButton = document.querySelector('[data-back-button]');
+if (backButton) {
+  backButton.addEventListener('click', () => {
+    window.history.go(-1);
+  })
+}
+
 function ActiveActionsController() {
   let activeActions = [];
 
