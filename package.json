@@ -12,13 +12,17 @@
     "deploy": "shopify app deploy"
   },
   "dependencies": {
+    "@googleapis/docs": "^2.0.1",
     "@shopify/app": "3.44.1",
     "@shopify/cli": "3.44.1",
     "classnames": "^2.3.2",
+    "cors": "^2.8.5",
     "dotenv": "^16.0.3",
+    "googleapis": "^118.0.0",
     "mongodb": "^5.2.0",
     "mongoose": "^7.0.3",
-    "multer": "^1.4.5-lts.1"
+    "multer": "^1.4.5-lts.1",
+    "url": "^0.11.0"
   },
   "author": "andriihladkevych"
 }

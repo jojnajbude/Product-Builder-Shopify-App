@@ -6,14 +6,33 @@ import express from "express";
 import serveStatic from "serve-static";
 
 import shopify from "./shopify.js";
-import productCreator from "./product-creator.js";
 import GDPRWebhookHandlers from "./gdpr.js";
 import ProductModel from "./models/Product.js";
 
 import * as dotenv from 'dotenv';
 import { productTypes } from "./models/ProductTypes.js";
 import multer from "multer";
+import url from 'url';
+import cors from 'cors';
+
+import { google } from "googleapis";
 dotenv.config();
+
+const keys = {
+  cliendId: process.env.CLIEND_ID,
+  client_secret: process.env.CLIENT_SECRET,
+  redirect_url: process.env.REDIRECT_URL
+};
+
+const oauth2Client = new google.auth.OAuth2(
+  keys.cliendId,
+  keys.client_secret,
+  keys.redirect_url
+);
+ 
+google.options({
+  auth: oauth2Client
+});
 
 const PORT = parseInt(process.env.BACKEND_PORT || process.env.PORT || '', 10);
 
@@ -41,6 +60,8 @@ const imageUpload = multer({
 
 const app = express();
 
+app.use(cors())
+
 // Set up Shopify authentication and webhook handling
 app.get(shopify.config.auth.path, shopify.auth.begin());
 app.get(
@@ -58,7 +79,7 @@ app.post(
 // also add a proxy rule for them in web/frontend/vite.config.js
 
 app.get("/product-builder", (req, res) => {
-  res.sendFile(join(PROXY_PATH, 'builder.html'));
+  res.sendFile(join(PROXY_PATH, 'builder.html')); 
 });
 
 app.get('/product-builder/product', async (req, res) => {
@@ -87,6 +108,23 @@ app.post('/product-builder/uploads', imageUpload.single('images') ,async (req, r
  
 app.use('/product-builder', express.static(PROXY_PATH)); 
 
+app.use('/api/googleOAth', async (req, res) => {
+  const qs = new url.URL(req.url, 'https://432e-109-68-43-50.ngrok-free.app').searchParams;
+
+  const code = qs.get('code');
+
+  if (code) {
+    const { tokens } = await oauth2Client.getToken(code);
+    console.log(tokens);
+    oauth2Client.credentials = tokens;
+
+    res.sendStatus(201);
+    return;
+  }
+
+  res.sendStatus(400);
+})
+
 app.use("/api/*", shopify.validateAuthenticatedSession());
 
 app.use(express.json()); 
@@ -95,7 +133,7 @@ app.get('/api/shopify/products', async (req, res) => {
   const { query, noRelated } = req.query;
 
   const client = new shopify.api.clients.Graphql({
-    session: res.locals.shopify.session,
+    session: res.locals.shopify.session, 
     apiVersion: LATEST_API_VERSION
   }); 
 
