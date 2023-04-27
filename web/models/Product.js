@@ -3,6 +3,7 @@ import mongoose from "./../database/index.js";
 
 const ProductSchema = new mongoose.Schema({
   shopify_id: String,
+  shop: { type: Schema.Types.ObjectId, ref: 'Shop'},
   title: String,
   handle: String,
   imageUrl: String,

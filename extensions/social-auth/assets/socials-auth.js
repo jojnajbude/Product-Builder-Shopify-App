@@ -166,19 +166,10 @@ class SocialAuth extends HTMLElement {
 
     this.googleClient = google.accounts.oauth2.initCodeClient({
       client_id: SocialAuth.cliendId,
-      scope: 'https://www.googleapis.com/auth/calendar.readonly',
-      ux_mode: 'popup',
-      callback: (response) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', SocialAuth.redirectUrl + `?code=${response.code}`, true);
-        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-
-        xhr.setRequestHeader('X-Requested-With', 'XmlHttpRequest');
-        xhr.onload = () => {
-          console.log('Auth code response: ' + xhr.responseText);
-        };
-        xhr.send();
-      },
+      redirect_uri: SocialAuth.redirectUrl,
+      ux_mode: 'redirect',
+      scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.profile openid',
+      state: location.href
     });
 
     this.container.appendChild(button);

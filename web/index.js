@@ -8,15 +8,27 @@ import serveStatic from "serve-static";
 import shopify from "./shopify.js";
 import GDPRWebhookHandlers from "./gdpr.js";
 import ProductModel from "./models/Product.js";
+import Shop from './models/Shop.js';
 
 import * as dotenv from 'dotenv';
 import { productTypes } from "./models/ProductTypes.js";
 import multer from "multer";
-import url from 'url';
 import cors from 'cors';
 
 import { google } from "googleapis";
 dotenv.config();
+
+function makeid(l) {
+  let result = '';
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const charactersLength = characters.length;
+  let counter = 0;
+  while (counter < l) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    counter += 1;
+  }
+  return result;
+}
 
 const keys = {
   cliendId: process.env.CLIEND_ID,
@@ -32,6 +44,17 @@ const oauth2Client = new google.auth.OAuth2(
  
 google.options({
   auth: oauth2Client
+});
+
+const people = google.people('v1');
+
+const googleScopes = [
+  'https://www.googleapis.com/auth/calendar.readonly',
+  'profile'
+];
+
+const authGoogleUrl = oauth2Client.generateAuthUrl({
+  scope: googleScopes.join(' ')
 });
 
 const PORT = parseInt(process.env.BACKEND_PORT || process.env.PORT || '', 10);
@@ -67,6 +90,20 @@ app.get(shopify.config.auth.path, shopify.auth.begin());
 app.get(
   shopify.config.auth.callbackPath,
   shopify.auth.callback(),
+  async (req, res, next) => {
+                        const shop = new Shop({
+      session: res.locals.shopify.session,
+      name: res.locals.shopify.session.shop
+    });
+
+    const isExists = await Shop.exists({ name: res.locals.shopify.session.shop });
+
+    if (!isExists) {
+      await shop.save();
+    } 
+
+    next();
+  },
   shopify.redirectToShopifyOrAppRoot()
 );
 app.post( 
@@ -106,23 +143,41 @@ app.post('/product-builder/uploads', imageUpload.single('images') ,async (req, r
   }  
 });
  
-app.use('/product-builder', express.static(PROXY_PATH)); 
+app.use('/product-builder', express.static(PROXY_PATH));
+
+app.get('/api/socialAuth', async (req, res) => {
+  res.send(200);
+});
 
 app.use('/api/googleOAth', async (req, res) => {
-  const qs = new url.URL(req.url, 'https://432e-109-68-43-50.ngrok-free.app').searchParams;
+  const { code, state } = req.query;
 
-  const code = qs.get('code');
-
-  if (code) {
+  if (code && typeof code === 'string' && state && typeof state === 'string') {
     const { tokens } = await oauth2Client.getToken(code);
-    console.log(tokens);
-    oauth2Client.credentials = tokens;
+    oauth2Client.setCredentials(tokens);
 
-    res.sendStatus(201);
+    try {
+    const person = await people.people.get({
+      resourceName: 'people/me',
+      personFields: 'emailAddresses,photos,names'
+    }).then(res => res.data);
+
+    // const shop = 
+
+    // const customers = await shopify.api.rest.Customer.all({});
+
+    console.log(person);
+    } catch(e) {
+      console.log(e) 
+    }
+
+    const id = makeid(150);
+
+    res.redirect(state + `?code=${id}`);
     return;
   }
 
-  res.sendStatus(400);
+  res.sendStatus(400); 
 })
 
 app.use("/api/*", shopify.validateAuthenticatedSession());
@@ -130,12 +185,12 @@ app.use("/api/*", shopify.validateAuthenticatedSession());
 app.use(express.json()); 
 
 app.get('/api/shopify/products', async (req, res) => {
-  const { query, noRelated } = req.query;
+  const { query, noRelated } = req.query;  
 
   const client = new shopify.api.clients.Graphql({
     session: res.locals.shopify.session, 
     apiVersion: LATEST_API_VERSION
-  }); 
+  });  
 
   const data = await client.query({
     data: `{
@@ -180,8 +235,10 @@ app.get('/api/shopify/products', async (req, res) => {
 app.get('/api/products', async (req, res) => {
   const { id } = req.query;
 
+  const shop = await Shop.findOne({ name: res.locals.shopify.session.shop });
+
   if (id) {
-    const product = await ProductModel.findOne({ shopify_id: id });
+    const product = await ProductModel.findOne({ shopify_id: id, shop: shop?._id });
 
     if (product) {
       res.status(200).send(product);
@@ -192,7 +249,7 @@ app.get('/api/products', async (req, res) => {
     return;
   }
 
-  const products = await ProductModel.find({});
+  const products = await ProductModel.find({ shop: shop?._id});
 
   res.status(200).send(products);
 });
@@ -201,11 +258,16 @@ app.post('/api/products', async (req, res) => {
   const client = new shopify.api.clients.Graphql({
     session: res.locals.shopify.session,
     apiVersion: LATEST_API_VERSION
-  }); 
+  });
+  console.log(res.locals.shopify.session);
 
   const { id, title, image, handle, options } = req.body;
+
+  const shop = await Shop.findOne({ name: res.locals.shopify.session.shop });
+
   const product = new ProductModel({
     shopify_id: id,
+    shop: shop?._id,
     title,
     imageUrl: image?.url,
     handle, 
