@@ -15,28 +15,19 @@ import { productTypes } from "./models/ProductTypes.js";
 import multer from "multer";
 import cors from 'cors';
 
-import { google } from "googleapis";
-dotenv.config();
+import GetCode from "./utils/makeCode.js";
 
-function makeid(l) {
-  let result = '';
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  const charactersLength = characters.length;
-  let counter = 0;
-  while (counter < l) {
-    result += characters.charAt(Math.floor(Math.random() * charactersLength));
-    counter += 1;
-  }
-  return result;
-}
+import { google } from "googleapis";
+import Customer from "./models/Customer.js";
+dotenv.config();
 
 const keys = {
   cliendId: process.env.CLIEND_ID,
-  client_secret: process.env.CLIENT_SECRET,
+  client_secret: process.env.CLIENT_SECRET, 
   redirect_url: process.env.REDIRECT_URL
 };
 
-const oauth2Client = new google.auth.OAuth2(
+const oauth2Client = new google.auth.OAuth2( 
   keys.cliendId,
   keys.client_secret,
   keys.redirect_url
@@ -52,10 +43,6 @@ const googleScopes = [
   'https://www.googleapis.com/auth/calendar.readonly',
   'profile'
 ];
-
-const authGoogleUrl = oauth2Client.generateAuthUrl({
-  scope: googleScopes.join(' ')
-});
 
 const PORT = parseInt(process.env.BACKEND_PORT || process.env.PORT || '', 10);
 
@@ -96,17 +83,32 @@ app.get(
       name: res.locals.shopify.session.shop
     });
 
-    const isExists = await Shop.exists({ name: res.locals.shopify.session.shop });
+    const shopExists = await Shop.findOne({ name: res.locals.shopify.session.shop });
 
-    if (!isExists) {
+    if (!shopExists) {
       await shop.save();
-    } 
+    } else {
+      shopExists.set('session', res.locals.shopify.session);
+    }
+
+    next();
+  },
+  async (req, res, next) => {
+    const webhook = new shopify.api.rest.Webhook({
+      session: res.locals.shopify.session
+    });
+      webhook.address = "https://product-builder.dev-test.pro/api/customers/create";
+      webhook.topic = "customers/create";
+      webhook.format = "json";
+      await webhook.save({
+        update: true,
+      });
 
     next();
   },
   shopify.redirectToShopifyOrAppRoot()
 );
-app.post( 
+app.post(
   shopify.config.webhooks.path,
   // @ts-ignore
   shopify.processWebhooks({ webhookHandlers: GDPRWebhookHandlers })
@@ -145,12 +147,90 @@ app.post('/product-builder/uploads', imageUpload.single('images') ,async (req, r
  
 app.use('/product-builder', express.static(PROXY_PATH));
 
-app.get('/api/socialAuth', async (req, res) => {
-  res.send(200);
+app.post('/api/customers/create', express.json(), async (req, res) => {
+  const { email, id } = req.body;
+  
+  const customer = await Customer.findOne({ email: email });
+
+  if (customer) {
+    customer.set('shopify_id', id);
+
+    customer.save();
+  }
+
+  res.sendStatus(200);
+});
+
+app.post('/api/social/login', express.json(), async (req, res) => {
+  const { code, shop: shopName } = req.body;
+
+  const customer = await Customer.findOne({ authCode: code });
+
+  if (!customer || (customer && customer.authCode === null)) {
+    res.status(200).send('Code has been expired');
+    return;
+  }
+
+  const shop = await Shop.findOne({ name: shopName });
+
+
+
+  if (customer) {
+    customer.set('authCode', null);
+  }
+
+  res.status(200).send({
+    email: customer.email,
+    password: customer.password
+  });
+});
+
+app.post('/api/social/register', express.json(), async (req, res) => {
+  const { code, shop: shopName } = req.body;
+  console.log(code, req.body);
+
+  const customer = await Customer.findOne({ authCode: code });
+
+  if (!customer || (customer && customer.authCode === null)) {
+    res.status(200).send('Code has been expired');
+    return;
+  }
+
+  const shop = await Shop.findOne({ name: shopName });
+
+  const shopifyCustomer = await shopify.api.rest.Customer.search({
+    session: shop?.session,
+    query: `email:${customer.email}`,
+  }).then(data => data.customers);
+
+  const password = GetCode(20);
+
+  if (customer) {
+    customer.set('password', password)
+    customer.set('authCode', null);
+
+    await customer?.save();
+  }
+
+  res.status(200).send({
+    email: customer?.email,
+    password: password,
+    name: customer.name,
+    lastName: customer.lastName
+  });
 });
 
 app.use('/api/googleOAth', async (req, res) => {
   const { code, state } = req.query;
+
+  if (!state || !code) {
+    res.sendStatus(400);
+    return;
+  }
+
+  const { redirect, shop: shopName, action } = typeof state === 'string'
+    ? JSON.parse(state)
+    : null;
 
   if (code && typeof code === 'string' && state && typeof state === 'string') {
     const { tokens } = await oauth2Client.getToken(code);
@@ -162,18 +242,62 @@ app.use('/api/googleOAth', async (req, res) => {
       personFields: 'emailAddresses,photos,names'
     }).then(res => res.data);
 
-    // const shop = 
+    const shop = await Shop.findOne({ name: shopName });
 
-    // const customers = await shopify.api.rest.Customer.all({});
+    const personEmail = person.emailAddresses?.find(email => {
+      return email.metadata?.primary
+    });
 
-    console.log(person);
-    } catch(e) {
-      console.log(e) 
+    console.log(`email:${personEmail?.value}`, action);
+
+    const customers = await shopify.api.rest.Customer.search({
+      session: shop?.session,
+      query: `email:${personEmail?.value}`,
+      fields: 'email, id'
+    }).then(data => data.customers);
+
+    const isExists = await Customer.findOne({ email: personEmail?.value });
+
+    const id = GetCode(150);
+
+    if (customers.length === 0 && !isExists && action === 'register') {
+      let personName, personLastName;
+
+      if (person.names) {
+        personName = person.names[0].givenName;
+        personLastName = person.names[0].familyName;
+      }
+
+      const newCustomer = new Customer({
+        authCode: id,
+        email: personEmail?.value,
+        name: personName,
+        lastName: personLastName,
+      });
+
+      await newCustomer.save();
+    } else if (isExists && action === 'login') {
+      isExists.set('authCode', id);
+      await isExists.save();
+    } else if (isExists && action === 'register') {
+      if (redirect.includes('?')) {
+        res.redirect(redirect + `&error=userExists`);
+      } else {
+        res.redirect(redirect + `?error=userExists`);
+      }
+
+      return;
     }
 
-    const id = makeid(150);
+    if (redirect.includes('?')) {
+      res.redirect(redirect + `&code=${id}&action=${action}`);
+    } else {
+      res.redirect(redirect + `?code=${id}&action=${action}`);
+    }
 
-    res.redirect(state + `?code=${id}`);
+    } catch(e) {
+      console.log(e)
+    }
     return;
   }
 

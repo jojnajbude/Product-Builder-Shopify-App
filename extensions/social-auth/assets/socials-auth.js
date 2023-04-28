@@ -16,7 +16,8 @@ class SocialAuth extends HTMLElement {
           </defs>
         </svg>
       `,
-      text: 'Log in with Google'
+      textLogin: 'Log in with Google',
+      textSign: 'Sign up with Google'
     },
     facebook: {
       icon: `
@@ -31,32 +32,135 @@ class SocialAuth extends HTMLElement {
           </defs>
         </svg>
       `,
-      text: 'Log in with Facebook'
+      textLogin: 'Log in with Facebook',
+      textSign: 'Sign up with Facebook'
     }
   }
 
   static cliendId = '29293067184-soculp7hd0h4o21a9hp3iju3rhivngoi.apps.googleusercontent.com';
-  static redirectUrl = 'https://432e-109-68-43-50.ngrok-free.app/api/googleOAth';
+  static redirectUrl = 'https://product-builder.dev-test.pro/api/googleOAth';
+
+  static getUserLogin = 'https://product-builder.dev-test.pro/api/social/login';
+  static getUserRegister = 'https://product-builder.dev-test.pro/api/social/register';
 
   constructor() {
     super();
+
+    const params = new URLSearchParams(location.search);
+
+    this.code = params.get('code');
+    this.action = params.get('action');
   }
   
   connectedCallback() {
+    this.form = this.nextElementSibling;
+
     this.classList.add('social-auth');
 
     const googleScrpits = document.createElement('script');
 
-    googleScrpits.onload = () => {
-      this.initShadowDom();
-
-      this.initGoogleButton();
-      this.initMetaButton();
-      this.initOrUsingText();
-    };
+    googleScrpits.onload = this.onScriptLoad.bind(this);
 
     googleScrpits.src = "https://accounts.google.com/gsi/client";
     this.appendChild(googleScrpits);
+  }
+
+  async onScriptLoad() {
+    this.initShadowDom();
+
+    this.initGoogleButton();
+    this.initMetaButton();
+    this.initOrUsingText();
+
+    if (this.code && this.action) {
+      switch(this.action) {
+        case 'register':
+          this.registerUser();
+          break;
+        case 'login':
+          this.loginUser();
+          break;
+      }
+    } else if (this.code && !this.action) {
+      console.log('no action provided');
+    }
+  }
+
+  async loginUser() {
+    const response = await fetch(SocialAuth.getUserLogin, {
+      method: 'POST',
+      header: {
+        'Content-Type': 'application-json'
+      },
+      body: JSON.stringify({
+        code: this.code,
+        shop: Shopify.shop
+      })
+    });
+
+      const userData = await response.json();
+
+      if (response.status === 200) {
+        const { email, password } = userData;
+
+        const inputEmail = this.form.querySelector('input[name="customer[email]"]');
+        const inputPassword = this.form.querySelector('input[name="customer[password]"]');
+
+        inputEmail.value = email;
+        inputPassword.value = password;
+
+        console.log(email, password);
+
+        console.log(this.form);
+
+        document.querySelector('form[action="/account/login"').submit();
+      } else {
+        this.ErrorUser();
+      }
+
+      this.initLoader();
+  }
+
+  async registerUser() {
+    const response = await fetch(SocialAuth.getUserRegister, {
+      method: 'POST',
+      header: {
+        'Content-Type': 'application-json'
+      },
+      body: JSON.stringify({
+        code: this.code,
+        shop: Shopify.shop
+      })
+    });
+
+    const userData = await response.json();
+
+    if (response.status === 200) {
+      const { email, password, name, lastName } = userData;
+
+
+      const inputEmail = this.form.querySelector('input[name="customer[email]"]');
+      const inputPassword = this.form.querySelector('input[name="customer[password]"]');
+
+      inputEmail.value = email;
+      inputPassword.value = password;
+
+      const inputName = this.form.querySelector('input[name="customer[first_name]"]');
+      const inputLastName = this.form.querySelector('input[name="customer[last_name]"]');
+
+      if (inputName && inputLastName) {
+        inputName.value = name;
+        inputLastName.value = lastName;
+      }
+
+      console.log(email, password, name, lastName);
+
+      document.querySelector('form[action="/account"]').submit();
+    } else {
+      this.ErrorUser();
+    }
+
+    this.initLoader();
   }
 
   initShadowDom() {
@@ -66,6 +170,21 @@ class SocialAuth extends HTMLElement {
 
     this.shadow.appendChild(this.container);
     this.initStyle();
+  }
+
+  ErrorUser() {
+    this.destroyLoader();
+
+    const error = document.createElement('div');
+    error.textContent = 'Error!';
+
+    this.container.append(error)
+  }
+
+  destroyLoader() {
+    if (this.loader) {
+      this.loader.remove();
+    }
   }
 
   initStyle() {
@@ -146,9 +265,28 @@ class SocialAuth extends HTMLElement {
       .button span {
         flex-grow: 1;
       }
+
+      .loader {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        right: 0;
+        background-color: rgba(0,0,0,0.25);
+        z-index: 50;
+      }
     `;
 
     this.container.appendChild(style);
+  }
+
+  initLoader() {
+    const loader = document.createElement('div');
+    loader.classList.add('loader');
+
+    this.loader = loader;
+
+    this.container.appendChild(loader);
   }
 
   initGoogleButton() {
@@ -159,7 +297,9 @@ class SocialAuth extends HTMLElement {
     button.innerHTML += icon;
   
     const text = document.createElement('span');
-    text.textContent = SocialAuth.content.google.text;
+    text.textContent = this.form.getAttribute('action').includes('login')
+      ? SocialAuth.content.google.textLogin
+      : SocialAuth.content.google.textSign;
     button.appendChild(text);
 
     button.addEventListener('click', this.googleAuthBegin.bind(this));
@@ -169,7 +309,13 @@ class SocialAuth extends HTMLElement {
       redirect_uri: SocialAuth.redirectUrl,
       ux_mode: 'redirect',
       scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.profile openid',
-      state: location.href
+      state: JSON.stringify({
+        redirect: location.href,
+        shop: location.hostname,
+        action: (this.form.getAttribute('action').includes('login')
+          ? 'login'
+          : 'register')
+      })
     });
 
     this.container.appendChild(button);
@@ -187,7 +333,9 @@ class SocialAuth extends HTMLElement {
     button.innerHTML += icon;
 
     const text = document.createElement('span');
-    text.textContent = SocialAuth.content.facebook.text;
+    text.textContent = this.form.getAttribute('action').includes('login')
+    ? SocialAuth.content.facebook.textLogin
+    : SocialAuth.content.facebook.textSign;
     button.appendChild(text);
 
     this.container.appendChild(button);
@@ -203,9 +351,14 @@ class SocialAuth extends HTMLElement {
 }
 customElements.define('social-authorization', SocialAuth);
 
-const form = document.querySelector('form[action*="login"]');
+const formLogin = document.querySelector('form[action*="login"]');
+const formRegister = document.querySelector('form[action="/account"]');
 const socialAuth = document.createElement('social-authorization');
 
-if (form) {
-  form.parentElement.insertBefore(socialAuth, form);
+if (formLogin) {
+  formLogin.parentElement.insertBefore(socialAuth, formLogin);
+}
+
+if (formRegister) {
+  formRegister.parentElement.insertBefore(socialAuth, formRegister);
 }
