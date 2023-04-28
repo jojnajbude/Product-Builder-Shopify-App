@@ -90,7 +90,8 @@ class SocialAuth extends HTMLElement {
     const response = await fetch(SocialAuth.getUserLogin, {
       method: 'POST',
       header: {
-        'Content-Type': 'application-json'
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         code: this.code,
@@ -125,7 +126,8 @@ class SocialAuth extends HTMLElement {
     const response = await fetch(SocialAuth.getUserRegister, {
       method: 'POST',
       header: {
-        'Content-Type': 'application-json'
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         code: this.code,
