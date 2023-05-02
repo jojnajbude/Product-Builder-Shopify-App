@@ -37,11 +37,80 @@ class SocialAuth extends HTMLElement {
     }
   }
 
-  static cliendId = '29293067184-soculp7hd0h4o21a9hp3iju3rhivngoi.apps.googleusercontent.com';
-  static redirectUrl = 'https://product-builder.dev-test.pro/api/googleOAth';
+  static baseUrl = 'https://product-builder.dev-test.pro';
 
-  static getUserLogin = 'https://product-builder.dev-test.pro/api/social/login';
-  static getUserRegister = 'https://product-builder.dev-test.pro/api/social/register';
+  static getIds = SocialAuth.baseUrl + '/api/social/credentials';
+  static redirectGoogleUrl = SocialAuth.baseUrl + '/api/googleOAth';
+  static redirectFaceBookUrl = SocialAuth.baseUrl + '/api/facebookOAth';
+  static handleRegister = SocialAuth.baseUrl + '/api/handle-register';
+  static handleResetPassword = SocialAuth.baseUrl + '/api/resetPassword';
+
+  static getUserLogin = SocialAuth.baseUrl + '/api/social/login';
+  static getUserRegister = SocialAuth.baseUrl + '/api/social/register';
+
+  static AuthElement = () => {
+    customElements.define('social-authorization', SocialAuth);
+
+    const formLogin = document.querySelector('form[action*="login"]');
+    const formRegister = document.querySelector('form[action="/account"]');
+    const socialAuth = document.createElement('social-authorization');
+    
+    if (formLogin) {
+      formLogin.parentElement.insertBefore(socialAuth, formLogin);
+    }
+    
+    if (formRegister) {
+      formRegister.parentElement.insertBefore(socialAuth, formRegister);
+    }
+
+    const resetPassword = document.querySelector('form[action="/account/reset"]');
+    
+    const params = new URLSearchParams(location.search);
+
+    if (params.get('code')) {
+      return;
+    }
+    
+    console.log('here');
+    if (resetPassword) {
+      console.log(resetPassword);
+      if (!Shopify.customerId) {
+        return;
+      }
+
+      const handlePasswordReset = (event) => {
+        event.preventDefault();
+
+        const password = resetPassword.querySelector('input[name="customer[password]"]');
+        const passwordConfirm = resetPassword.querySelector('input[name="customer[password_confirmation]"]');
+
+        console.log(password.value, passwordConfirm.value);
+
+        if (password.value !== passwordConfirm.value && password.value) {
+          return ;
+        }
+
+        console.log(password.value);
+        console.log(SocialAuth.handleResetPassword);
+        fetch(SocialAuth.handleResetPassword, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            password: password.value,
+            customerId: Shopify.customerId
+          })
+        })
+          .then(res => res.json())
+          .catch(res => console.log(res.body.error));
+      }
+
+      resetPassword.addEventListener('submit', handlePasswordReset, true);
+    }
+  }
+
+  static cliendId = '29293067184-soculp7hd0h4o21a9hp3iju3rhivngoi.apps.googleusercontent.com';
 
   constructor() {
     super();
@@ -55,17 +124,102 @@ class SocialAuth extends HTMLElement {
   connectedCallback() {
     this.form = this.nextElementSibling;
 
+    this.form.addEventListener('submit', this.formSubmit.bind(this), true);
+
+    Promise.all([this.onGoogleLoad(), this.onFacebookLoad()])
+      .then(() => {
+        this.onScriptsLoad();
+      })
+
     this.classList.add('social-auth');
-
-    const googleScrpits = document.createElement('script');
-
-    googleScrpits.onload = this.onScriptLoad.bind(this);
-
-    googleScrpits.src = "https://accounts.google.com/gsi/client";
-    this.appendChild(googleScrpits);
   }
 
-  async onScriptLoad() {
+  formSubmit(event) {
+    event.preventDefault();
+    const data = {};
+
+    console.log('here');
+    const inputEmail = this.form.querySelector('input[name="customer[email]"]');
+    const inputPassword = this.form.querySelector('input[name="customer[password]"]');
+
+    if (inputEmail.value === '' || inputPassword.value === '') {
+      return;
+    }
+
+    data.email = inputEmail.value;
+    data.password = inputPassword.value;
+
+    const inputName = this.form.querySelector('input[name="customer[first_name]"]');
+    const inputLastName = this.form.querySelector('input[name="customer[last_name]"]');
+
+    if (inputName && inputLastName) {
+      data.name = inputName.value;
+      data.lastName = inputLastName.value;
+    }
+
+    const response = fetch(SocialAuth.handleRegister, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    }).then(res => console.log(res));
+
+    this.form.removeEventListener('submit', this.formSubmit);
+    // this.form.submit();
+  }
+
+  getClientIds() {
+    return fetch()
+  }
+
+  onGoogleLoad() {
+    return new Promise((res, rej) => {
+      const googleScrpits = document.createElement('script');
+
+      googleScrpits.onload = () => {
+        this.googleClient = google.accounts.oauth2.initCodeClient({
+          client_id: SocialAuth.cliendId,
+          redirect_uri: SocialAuth.redirectGoogleUrl,
+          ux_mode: 'redirect',
+          scope: 'https://www.googleapis.com/auth/userinfo.profile  https://www.googleapis.com/auth/userinfo.email',
+          state: JSON.stringify({
+            redirect: location.href,
+            shop: Shopify.shop,
+            action: (this.form.getAttribute('action').includes('login')
+              ? 'login'
+              : 'register')
+          })
+        });
+        res();
+      };
+      googleScrpits.onerror = () => rej();
+  
+      googleScrpits.src = "https://accounts.google.com/gsi/client";
+      this.appendChild(googleScrpits);
+    })
+  }
+
+  onFacebookLoad() {
+    return new Promise((res, rej) => {
+      const facebookScripts = document.createElement('script');
+
+      facebookScripts.onload = () => {
+        FB.init({
+          appId: '631952522122574',
+          autoLogAppEvent: true,
+          version: 'v16.0'
+        });
+        res();
+      };
+      facebookScripts.onerror = () => rej();
+  
+      facebookScripts.src = "https://connect.facebook.net/en_US/sdk.js";
+      this.appendChild(facebookScripts);
+    })
+  }
+
+  async onScriptsLoad() {
     this.initShadowDom();
 
     this.initGoogleButton();
@@ -75,33 +229,41 @@ class SocialAuth extends HTMLElement {
     if (this.code && this.action) {
       switch(this.action) {
         case 'register':
-          this.registerUser();
+          this.registerUser(this.code);
           break;
         case 'login':
-          this.loginUser();
+          this.loginUser(this.code);
           break;
       }
     } else if (this.code && !this.action) {
       console.log('no action provided');
     }
+
+    FB.getLoginStatus((response) => {
+      if (response.status === 'connected') {
+        FB.logout();
+      }
+    })
   }
 
-  async loginUser() {
+  async loginUser(code) {
+    this.initLoader();
+
     const response = await fetch(SocialAuth.getUserLogin, {
       method: 'POST',
-      header: {
+      headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        code: this.code,
+        code,
         shop: Shopify.shop
       })
     });
 
       const userData = await response.json();
 
-      if (response.status === 200) {
+      if (response.status === 200 && !userData.error) {
         const { email, password } = userData;
 
         const inputEmail = this.form.querySelector('input[name="customer[email]"]');
@@ -110,59 +272,72 @@ class SocialAuth extends HTMLElement {
         inputEmail.value = email;
         inputPassword.value = password;
 
-        console.log(email, password);
-
-        console.log(this.form);
-
+        this.form.removeEventListener('submit', this.formSubmit);
         document.querySelector('form[action="/account/login"').submit();
       } else {
         this.ErrorUser();
       }
-
-      this.initLoader();
   }
 
-  async registerUser() {
+  async registerUser(code) {
+    this.initLoader();
+  
     const response = await fetch(SocialAuth.getUserRegister, {
       method: 'POST',
-      header: {
+      headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        code: this.code,
+        code,
         shop: Shopify.shop
       })
     });
 
     const userData = await response.json();
 
-    if (response.status === 200) {
+    if (response.status === 200 && !userData.error) {
       const { email, password, name, lastName } = userData;
 
 
       const inputEmail = this.form.querySelector('input[name="customer[email]"]');
       const inputPassword = this.form.querySelector('input[name="customer[password]"]');
 
-      inputEmail.value = email;
-      inputPassword.value = password;
-
       const inputName = this.form.querySelector('input[name="customer[first_name]"]');
       const inputLastName = this.form.querySelector('input[name="customer[last_name]"]');
+
+      inputEmail.value = email;
+      inputPassword.value = password;
 
       if (inputName && inputLastName) {
         inputName.value = name;
         inputLastName.value = lastName;
+      } else {
+        const createdInputName = document.createElement('input');
+        createdInputName.type = 'text';
+        createdInputName.name = 'customer[first_name]';
+
+        const createdInputLastName = document.createElement('input');
+        createdInputLastName.type = 'text';
+        createdInputLastName.name = 'customer[last_name]';
+        
+        createdInputName.style.display = 'none';
+        createdInputLastName.style.display = 'none';
+
+        this.form.appendChild(createdInputName)
+        this.form.appendChild(createdInputLastName);
+
+        createdInputName.value = name;
+        createdInputLastName.value = lastName;
       }
 
       console.log(email, password, name, lastName);
 
+      this.form.removeEventListener('submit', this.formSubmit);
       document.querySelector('form[action="/account"]').submit();
     } else {
       this.ErrorUser();
     }
-
-    this.initLoader();
   }
 
   initShadowDom() {
@@ -180,7 +355,7 @@ class SocialAuth extends HTMLElement {
     const error = document.createElement('div');
     error.textContent = 'Error!';
 
-    this.container.append(error)
+    this.container.append(error);
   }
 
   destroyLoader() {
@@ -206,6 +381,7 @@ class SocialAuth extends HTMLElement {
         color: #888;
         font-size: 14px;
         line-height: 17px;
+        margin: 20px 0;
       }
       
       .social-auth .or-text {
@@ -306,24 +482,11 @@ class SocialAuth extends HTMLElement {
 
     button.addEventListener('click', this.googleAuthBegin.bind(this));
 
-    this.googleClient = google.accounts.oauth2.initCodeClient({
-      client_id: SocialAuth.cliendId,
-      redirect_uri: SocialAuth.redirectUrl,
-      ux_mode: 'redirect',
-      scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.profile openid',
-      state: JSON.stringify({
-        redirect: location.href,
-        shop: location.hostname,
-        action: (this.form.getAttribute('action').includes('login')
-          ? 'login'
-          : 'register')
-      })
-    });
-
     this.container.appendChild(button);
   }
 
   googleAuthBegin() {
+    this.form.removeEventListener('submit', this.formSubmit);
     this.googleClient.requestCode();
   }
 
@@ -340,7 +503,47 @@ class SocialAuth extends HTMLElement {
     : SocialAuth.content.facebook.textSign;
     button.appendChild(text);
 
+    button.addEventListener('click', () => {
+      this.form.removeEventListener('submit', this.formSubmit);
+      FB.login(this.faceBookLoginFunc.bind(this), {
+        config_id: '244533718104588'
+      });
+    })
+
     this.container.appendChild(button);
+  }
+
+  faceBookLoginFunc(response) {
+    const { accessToken: token } = response.authResponse;
+    const data = fetch(SocialAuth.redirectFaceBookUrl + `?token=${token}`, {
+      method: 'POST',
+      headers: {
+        'Content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        authResponse: response.authResponse,
+        redirect: location.href,
+        shop: Shopify.shop,
+        action: (this.form.getAttribute('action').includes('login')
+          ? 'login'
+          : 'register')
+      })
+    }).then(res => res.json())
+      .then((data => {
+        const { code, action, error } = data;
+        if (error) {
+          console.log(error);
+          return;
+        }
+
+        if (action === 'register') {
+          this.registerUser(code);
+        } else if (action === 'login') {
+          this.loginUser(code);
+        } else {
+          console.log('no action provided');
+        }
+      }));
   }
 
   initOrUsingText() {
@@ -351,16 +554,5 @@ class SocialAuth extends HTMLElement {
     this.container.appendChild(orText);
   }
 }
-customElements.define('social-authorization', SocialAuth);
 
-const formLogin = document.querySelector('form[action*="login"]');
-const formRegister = document.querySelector('form[action="/account"]');
-const socialAuth = document.createElement('social-authorization');
-
-if (formLogin) {
-  formLogin.parentElement.insertBefore(socialAuth, formLogin);
-}
-
-if (formRegister) {
-  formRegister.parentElement.insertBefore(socialAuth, formRegister);
-}
+SocialAuth.AuthElement();

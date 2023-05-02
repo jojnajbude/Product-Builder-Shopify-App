@@ -16,33 +16,31 @@ import multer from "multer";
 import cors from 'cors';
 
 import GetCode from "./utils/makeCode.js";
+import { encryptPassword, decryptPassword } from "./utils/password_hashing.js";
 
 import { google } from "googleapis";
 import Customer from "./models/Customer.js";
 dotenv.config();
 
-const keys = {
-  cliendId: process.env.CLIEND_ID,
-  client_secret: process.env.CLIENT_SECRET, 
-  redirect_url: process.env.REDIRECT_URL
+const googleKeys = {
+  cliendId: process.env.GOOGLE_CLIENT_ID,
+  client_secret: process.env.GOOGLE_CLIENT_SECRET, 
+  redirect_url: process.env.GOOGLE_REDIRECT_URL
 };
 
 const oauth2Client = new google.auth.OAuth2( 
-  keys.cliendId,
-  keys.client_secret,
-  keys.redirect_url
+  googleKeys.cliendId,
+  googleKeys.client_secret,
+  googleKeys.redirect_url
 );
  
 google.options({
   auth: oauth2Client
-});
+}); 
 
 const people = google.people('v1');
 
-const googleScopes = [
-  'https://www.googleapis.com/auth/calendar.readonly',
-  'profile'
-];
+const googleScopes = 'https://www.googleapis.com/auth/userinfo.profile openid';
 
 const PORT = parseInt(process.env.BACKEND_PORT || process.env.PORT || '', 10);
 
@@ -54,7 +52,7 @@ const STATIC_PATH =
 const PROXY_PATH = `${process.cwd()}/frontend/product-builder/src`;
 
 const imageStorage = multer.diskStorage({
-  destination: './frontend/product-builder/src/uploads',
+  destination: './frontend/product-builder/src/uploads', 
   filename: function (req, file, cb) {
     const { originalname } = file;
 
@@ -78,7 +76,7 @@ app.get(
   shopify.config.auth.callbackPath,
   shopify.auth.callback(),
   async (req, res, next) => {
-                        const shop = new Shop({
+    const shop = new Shop({
       session: res.locals.shopify.session,
       name: res.locals.shopify.session.shop
     });
@@ -88,7 +86,7 @@ app.get(
     if (!shopExists) {
       await shop.save();
     } else {
-      shopExists.set('session', res.locals.shopify.session);
+      shopExists.set('session', res.locals.shopify.session).save();
     }
 
     next();
@@ -161,38 +159,49 @@ app.post('/api/customers/create', express.json(), async (req, res) => {
   res.sendStatus(200);
 });
 
-app.post('/api/social/login', express.json(), async (req, res) => {
+app.use('/api/social/*', express.json());
+
+app.get('/api/social/credentials', (req, res) => {
+  res.send({
+    googleId: process.env.GOOGLE_CLIENT_ID,
+
+  })
+})
+
+app.post('/api/social/login', async (req, res) => {
   const { code, shop: shopName } = req.body;
 
   const customer = await Customer.findOne({ authCode: code });
 
   if (!customer || (customer && customer.authCode === null)) {
-    res.status(200).send('Code has been expired');
+    res.status(400).send({
+      error: 'Code has been expired'
+    });
     return;
   }
 
   const shop = await Shop.findOne({ name: shopName });
 
-
-
-  if (customer) {
+  if (customer) { 
     customer.set('authCode', null);
+    await customer.save();
   }
 
   res.status(200).send({
     email: customer.email,
-    password: customer.password
+    password: decryptPassword(customer.password, process.env.PASSWORD_SECRET)
   });
 });
 
-app.post('/api/social/register', express.json(), async (req, res) => {
-  const { code, shop: shopName } = req.body;
-  console.log(code, req.body);
+app.post('/api/social/register', async (req, res) => {
+  const { code, shop: shopName } = req.body; 
 
   const customer = await Customer.findOne({ authCode: code });
 
   if (!customer || (customer && customer.authCode === null)) {
-    res.status(200).send('Code has been expired');
+    res.status(400).send({
+      error: 'Code has been expired'
+    });
     return;
   }
 
@@ -203,21 +212,77 @@ app.post('/api/social/register', express.json(), async (req, res) => {
     query: `email:${customer.email}`,
   }).then(data => data.customers);
 
-  const password = GetCode(20);
+  const password = encryptPassword(GetCode(20), process.env.PASSWORD_SECRET);
 
   if (customer) {
     customer.set('password', password)
     customer.set('authCode', null);
 
-    await customer?.save();
+    await customer.save();
   }
 
   res.status(200).send({
     email: customer?.email,
-    password: password,
+    password: decryptPassword(password, process.env.PASSWORD_SECRET),
     name: customer.name,
     lastName: customer.lastName
   });
+});
+
+app.use('/api/handle-register', express.json(), async (req, res) => {
+  const { email, password, name, lastName} = req.body;
+
+  if (!email || !password) {
+    res.sendStatus(400);
+    return;
+  }
+
+  const newCustomer = new Customer({
+    authCode: null,
+    email: email,
+    name: name || null,
+    lastName: lastName || null,
+    password: encryptPassword(password, process.env.PASSWORD_SECRET)
+  });
+
+  await newCustomer.save();
+
+  res.sendStatus(200);
+});
+
+app.use('/api/resetPassword', express.json(), async (req, res) => {
+  const { password, customerId } = req.body;
+  console.log(password, customerId);
+
+  if (!customerId) {
+    res.send({
+      error: 'Customer id is not provided' 
+    })
+  }
+
+  if (!password) {
+    res.send({
+      error: "Password can't be empty or passwords do not match"
+    });
+    return;
+  }
+
+  const customer = await Customer.findOne({ shopify_id: customerId });
+
+  if (!customer) {
+    res.send({
+      error: 'Customer not exists'
+    })
+  }
+
+  if (customer) {
+    customer.set('password', encryptPassword(password, process.env.PASSWORD_SECRET));
+    await customer.save();
+
+    console.log(customer.password);
+  }
+
+  res.sendStatus(200);
 });
 
 app.use('/api/googleOAth', async (req, res) => {
@@ -242,13 +307,11 @@ app.use('/api/googleOAth', async (req, res) => {
       personFields: 'emailAddresses,photos,names'
     }).then(res => res.data);
 
-    const shop = await Shop.findOne({ name: shopName });
+    const shop = await Shop.findOne({ name: shopName }); 
 
     const personEmail = person.emailAddresses?.find(email => {
       return email.metadata?.primary
     });
-
-    console.log(`email:${personEmail?.value}`, action);
 
     const customers = await shopify.api.rest.Customer.search({
       session: shop?.session,
@@ -258,6 +321,8 @@ app.use('/api/googleOAth', async (req, res) => {
 
     const isExists = await Customer.findOne({ email: personEmail?.value });
 
+    const isGoogleLinked = isExists?.socials.some(social => social.name === 'google');
+
     const id = GetCode(150);
 
     if (customers.length === 0 && !isExists && action === 'register') {
@@ -266,24 +331,38 @@ app.use('/api/googleOAth', async (req, res) => {
       if (person.names) {
         personName = person.names[0].givenName;
         personLastName = person.names[0].familyName;
-      }
+      };
+
+      console.log(person);
 
       const newCustomer = new Customer({
         authCode: id,
         email: personEmail?.value,
         name: personName,
         lastName: personLastName,
+        socials: [{
+          name: 'google',
+          credentionals: oauth2Client.credentials
+        }]
       });
 
       await newCustomer.save();
-    } else if (isExists && action === 'login') {
+    } else if (isExists && isGoogleLinked && action === 'login') {
       isExists.set('authCode', id);
       await isExists.save();
     } else if (isExists && action === 'register') {
-      if (redirect.includes('?')) {
+      if (redirect.includes('?')) { 
         res.redirect(redirect + `&error=userExists`);
       } else {
         res.redirect(redirect + `?error=userExists`);
+      }
+
+      return;
+    } else if (isExists && !isGoogleLinked && action === 'login') {
+      if (redirect.includes('?')) {
+        res.redirect(redirect + `&error=userNotLinked`);
+      } else {
+        res.redirect(redirect + `?error=userNotLinked`);
       }
 
       return;
@@ -302,11 +381,98 @@ app.use('/api/googleOAth', async (req, res) => {
   }
 
   res.sendStatus(400); 
-})
+});
+
+app.post('/api/facebookOAth', express.json(), async (req, res) => {
+  const { authResponse, redirect, shop: shopName, action } = req.body;
+
+  const shop = await Shop.findOne({ name: shopName }); 
+
+  if (!shop) {
+    res.send({
+      error: 'No shop provided'
+    });
+    return;
+  }
+
+  if (!redirect) {
+    res.send({
+      error: 'No valid redirect URL'
+    });
+    return;
+  }
+
+  if (!action) {
+    res.send({
+      error: 'No action provided'
+    });
+    return;
+  }
+
+  try {
+    const user = await fetch(`https://graph.facebook.com/v16.0/me?fields=id,first_name,email,last_name&access_token=${authResponse.accessToken}`)
+      .then(res => res.json());
+
+
+    const id = GetCode(150);
+
+    if (!user.error) {
+      const customers = await shopify.api.rest.Customer.search({
+        session: shop?.session,
+        query: `email:${user.email}`,
+        fields: 'email, id'
+      }).then(data => data.customers);
+
+      const isExists = await Customer.findOne({ email: user.email });
+
+      const isFacebookLinked = isExists?.socials.some(social => social.name === 'facebook');
+
+      if (customers.length === 0 && !isExists && action === 'register') {
+        const newCustomer = new Customer({
+          authCode: id,
+          email: user.email,
+          name: user.first_name,
+          lastName: user.last_name,
+          socials: [{
+            name: 'facebook',
+            credentionals: authResponse
+          }]
+        });
+  
+        await newCustomer.save();
+      } else if (customers.length > 0 && isExists && isFacebookLinked && action === 'login') {
+        isExists.set('authCode', id);
+        await isExists.save();
+      } else if (isExists && action === 'register') {
+        res.send({
+          error: 'user Exists'
+        });
+        return;
+      } else if (isExists && !isFacebookLinked && customers.length > 0 && action === 'login') {
+        res.send({
+          error: 'User exists, but not linked with Facebook'
+        });
+        return;
+      }
+
+      res.send({
+        code: id,
+        action: action
+      });
+      return;
+    }
+  } catch(e) {
+    console.log(e);
+  }
+
+  res.status(400).send({
+    error: 'Unknown error'
+  });
+});
 
 app.use("/api/*", shopify.validateAuthenticatedSession());
 
-app.use(express.json()); 
+app.use(express.json());
 
 app.get('/api/shopify/products', async (req, res) => {
   const { query, noRelated } = req.query;  
