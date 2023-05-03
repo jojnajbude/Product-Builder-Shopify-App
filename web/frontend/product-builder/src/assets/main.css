@@ -178,6 +178,7 @@ button:hover .button__tooltip {
 /* Product builder */
 product-builder {
   display: flex;
+  position: relative;
   gap: 15px;
 }
 
@@ -1008,4 +1009,71 @@ error-toast {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+/* Image chooser */
+image-chooser {
+  display: block;
+}
+
+.image-chooser {
+  position: absolute;
+  display: none;
+  padding: 10px;
+  top: 30px;
+  left: 30px;
+  right: 30px;
+  bottom: 30px;
+  background-color: #fff;
+  opacity: 0;
+  transition: opacity .3s;
+  border-radius: 20px;
+  z-index: 10;
+}
+
+.image-chooser.is-open {
+  opacity: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.image-chooser .images-list-container {
+  flex-grow: 1;
+  position: relative;
+}
+
+.image-chooser .images-list {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+}
+
+.image-chooser .button-group {
+  display: flex;
+  justify-content: flex-end;
+  padding: 15px;
+  padding-top: 0;
+  gap: 15px;
+}
+
+.image-chooser .image-container {
+  position: relative;
+  aspect-ratio: 1 / 1;
+}
+
+.image-chooser .image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 1;
+  transition: opacity .3s;
 }

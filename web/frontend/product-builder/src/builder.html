@@ -295,11 +295,11 @@
                       From PC
                     </label>
                   </div>
-                  <div class="upload__variant">
+                  <div class="upload__variant" data-from-instagram>
                     <span>From Instagram</span>
                   </div>
-                  <div class="upload__variant">
-                    <span>From Google Photos</span>
+                  <div class="upload__variant" data-from-facebook>
+                    <span>From Facebook</span>
                   </div>
                 </div>
               </div>
@@ -321,6 +321,22 @@
         <div class="studio-view__container" data-studio-view-container>
         </div>
       </studio-view>
+
+
+      <image-chooser class="image-chooser">
+        <div class="images-list-container">
+          <div class="images-list" data-images-list>
+          </div>  
+        </div>
+        <div class="button-group">
+          <button class="button" data-cancel>
+            Cancel
+          </button>
+          <button class="button button--primary" data-validate>
+            Validate
+          </button>
+        </div>
+      </image-chooser>
     </product-builder>
 
     <error-toast

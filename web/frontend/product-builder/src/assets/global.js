@@ -1704,6 +1704,114 @@ class StudioView extends HTMLElement {
 }
 customElements.define('studio-view', StudioView);
 
+class ImageChooser extends HTMLElement {
+  static selectors = {
+    imageList: '[data-images-list]',
+    validateButton: '[data-validate]',
+    cancel: '[data-cancel]',
+    openButtons: {
+      instagram: '[data-from-instagram]',
+      facebook: '[data-from-facebook]',
+    }
+  }
+  
+  constructor() {
+    super();
+
+    const cancelButton = this.querySelector(ImageChooser.selectors.cancel)
+    cancelButton.addEventListener('click', this.close.bind(this));
+
+    const instButton = document.querySelector(ImageChooser.selectors.openButtons.instagram);
+    const facebookButton = document.querySelector(ImageChooser.selectors.openButtons.facebook);
+
+    this.imageList = this.querySelector(ImageChooser.selectors.imageList);
+    
+    instButton.addEventListener('click', this.open.bind(this, 'instagram'));
+    facebookButton.addEventListener('click', this.open.bind(this, 'facebook'));
+  }
+
+  close() {
+    this.style.opacity = 1;
+
+    setTimeout(() => {
+      this.style.opacity = 0; 
+    }, 0);
+
+    setTimeout(() => {
+      this.style.opacity = null; 
+      this.classList.remove('is-open');
+    }, 300);
+
+    this.imageList.innerHTML = '';
+  }
+
+  open(from) {
+    this.style.opacity = 0;
+    this.classList.add('is-open');
+
+    setTimeout(() => {
+      this.style.opacity = 1;
+    }, 0);
+  
+    setTimeout(() => {
+      this.style.opacity = null; 
+    }, 300);
+
+    switch(from) {
+      case 'facebook':
+        this.getFacebookPhotos();
+        break;
+      case 'instagram':
+        break;
+    }
+  }
+
+  imageTemplate(source) {
+    const container = document.createElement('div');
+    container.classList.add('image-container');
+
+    const image = new Image;
+    image.style.opacity = 0;
+    image.classList.add('image');
+
+    image.onload = () => {
+      image.style.opacity = null;
+    };
+
+    image.src = source;
+
+    container.append(image);
+
+    return container;
+  }
+
+  getFacebookPhotos() {
+    FB.getLoginStatus((response) => {
+      console.log(response)
+      if (response.status === 'connected') {
+        const { userID, accessToken: token } = response.authResponse;
+
+        console.log(token);
+
+        fetch(`https://graph.facebook.com/v16.0/${userID}/photos/uploaded?fields=id,images&access_token=${token}`)
+          .then(res => res.json())
+          .then(data => {
+            const photos = data.data.map(photo => {
+              return {
+                id: photo.id,
+                image: photo.images[0]
+              }
+            });
+
+            photos
+              .map(photo => photo.image.source)
+              .forEach(photo => this.imageList.append(this.imageTemplate(photo)));
+          });
+      }
+    });
+  }
+}
+
 class ProductBuilder extends HTMLElement {
   static selectors = {
     panel: '[customization-panel]',
@@ -1719,8 +1827,28 @@ class ProductBuilder extends HTMLElement {
     this.init();
   }
 
+  downloadFacebookAPI() {
+    return new Promise((res, rej) => {
+      const facebookScripts = document.createElement('script');
+
+      facebookScripts.onload = () => {
+        FB.init({
+          appId: '535186395254481',
+          autoLogAppEvent: true,
+          version: 'v16.0'
+        });
+        res();
+      };
+      facebookScripts.onerror = () => rej();
+  
+      facebookScripts.src = "https://connect.facebook.net/en_US/sdk.js";
+      this.appendChild(facebookScripts);
+    })
+  }
+
   async init() {
     const productId = productParams.get('id');
+    const customerId = productParams.get('customer-id');
 
     if (!productId) {
       return;
@@ -1729,7 +1857,21 @@ class ProductBuilder extends HTMLElement {
     const product = await fetch(`product-builder/product?id=${productId}`)
       .then(res => res.json());
 
+    const customer = customerId
+      ? await fetch(`product-builder/customer?id=${customerId}`)
+        .then(res => res.json())
+      : null;
+
+    Promise.all([this.downloadFacebookAPI()]).then(_ => {
+      customElements.define('image-chooser', ImageChooser);
+    });
+
     this.product = product;
+    this.customer = customer;
+
+
+
+    console.log(this.customer);
 
     this.panel.init(product);
     this.studioView.init(product);

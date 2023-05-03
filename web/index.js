@@ -25,7 +25,8 @@ dotenv.config();
 const googleKeys = {
   cliendId: process.env.GOOGLE_CLIENT_ID,
   client_secret: process.env.GOOGLE_CLIENT_SECRET, 
-  redirect_url: process.env.GOOGLE_REDIRECT_URL
+  redirect_url: process.env.GOOGLE_REDIRECT_URL,
+  scopes: process.env.GOOGLE_SCOPES
 };
 
 const oauth2Client = new google.auth.OAuth2( 
@@ -39,8 +40,6 @@ google.options({
 }); 
 
 const people = google.people('v1');
-
-const googleScopes = 'https://www.googleapis.com/auth/userinfo.profile openid';
 
 const PORT = parseInt(process.env.BACKEND_PORT || process.env.PORT || '', 10);
 
@@ -92,15 +91,27 @@ app.get(
     next();
   },
   async (req, res, next) => {
-    const webhook = new shopify.api.rest.Webhook({
+    const webhookToCreate = new shopify.api.rest.Webhook({
       session: res.locals.shopify.session
     });
-      webhook.address = "https://product-builder.dev-test.pro/api/customers/create";
-      webhook.topic = "customers/create";
-      webhook.format = "json";
-      await webhook.save({
-        update: true,
-      });
+
+    webhookToCreate.address = "https://product-builder.dev-test.pro/api/customers/create";
+    webhookToCreate.topic = "customers/create";
+    webhookToCreate.format = "json";
+    await webhookToCreate.save({
+      update: true,
+    });
+
+    const webhookToDelete = new shopify.api.rest.Webhook({
+      session: res.locals.shopify.session
+    });
+
+    webhookToDelete.address = "https://product-builder.dev-test.pro/api/customers/delete";
+    webhookToDelete.topic = "customers/delete";
+    webhookToDelete.format = "json";
+    await webhookToDelete.save({
+      update: true,
+    });
 
     next();
   },
@@ -142,6 +153,30 @@ app.post('/product-builder/uploads', imageUpload.single('images') ,async (req, r
     res.send(file.originalname);
   }  
 });
+
+app.get('/product-builder/customer', async (req, res) => {
+  const { id } = req.query;
+
+  console.log(id);
+
+  if (!id) { 
+    res.send({
+      error: 'customer id has not provided'
+    });
+    return;
+  }
+
+  const customer = await Customer.findOne({ shopify_id: id });
+
+  if (customer) {
+    res.send(customer);
+    return;
+  } else {
+    res.send({
+      error: 'Customer do not exist'
+    })
+  }
+});
  
 app.use('/product-builder', express.static(PROXY_PATH));
 
@@ -159,12 +194,26 @@ app.post('/api/customers/create', express.json(), async (req, res) => {
   res.sendStatus(200);
 });
 
+app.post('/api/customers/delete', express.json(), async (req, res) => {
+  const { email, id } = req.body;
+  
+  await Customer.deleteOne({ email: email });
+
+  res.sendStatus(200);
+});
+
 app.use('/api/social/*', express.json());
 
-app.get('/api/social/credentials', (req, res) => {
+app.get('/api/social/credentials', (req, res) => { 
   res.send({
-    googleId: process.env.GOOGLE_CLIENT_ID,
-
+    google: {
+      id: googleKeys.cliendId,
+      redirect: googleKeys.redirect_url,
+      scopes: googleKeys.scopes,
+    },
+    facebook: {
+      id: process.env.FACEBOOK_APP_ID
+    }
   })
 })
 
@@ -250,39 +299,25 @@ app.use('/api/handle-register', express.json(), async (req, res) => {
   res.sendStatus(200);
 });
 
-app.use('/api/resetPassword', express.json(), async (req, res) => {
-  const { password, customerId } = req.body;
-  console.log(password, customerId);
+app.use('/api/recover', express.json(), async (req, res) => {
+  const { email } = req.body;
 
-  if (!customerId) {
-    res.send({
-      error: 'Customer id is not provided' 
-    })
+  console.log(email);
+
+  if (!email) {
+    res.sendStatus(400);
   }
 
-  if (!password) {
-    res.send({
-      error: "Password can't be empty or passwords do not match"
-    });
+  const customer = await Customer.findOne({ email: email });
+
+  if (customer) {
+    await customer.set('socials', []).save();
+
+    res.sendStatus(200);
     return;
   }
 
-  const customer = await Customer.findOne({ shopify_id: customerId });
-
-  if (!customer) {
-    res.send({
-      error: 'Customer not exists'
-    })
-  }
-
-  if (customer) {
-    customer.set('password', encryptPassword(password, process.env.PASSWORD_SECRET));
-    await customer.save();
-
-    console.log(customer.password);
-  }
-
-  res.sendStatus(200);
+  res.sendStatus(400);
 });
 
 app.use('/api/googleOAth', async (req, res) => {
@@ -422,6 +457,14 @@ app.post('/api/facebookOAth', express.json(), async (req, res) => {
         query: `email:${user.email}`,
         fields: 'email, id'
       }).then(data => data.customers);
+
+      if (!user.email) {
+        res.send({
+          error: 'Email has not provided'
+        });
+        return;
+      }
+        
 
       const isExists = await Customer.findOne({ email: user.email });
 
