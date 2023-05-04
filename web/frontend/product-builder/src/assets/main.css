@@ -37,6 +37,25 @@ img[src=""], img:not([src]) {
   flex-shrink: 0;
 }
 
+.load-container {
+  position: relative;
+}
+
+.load-container.is-loading::before {
+  content: '';
+  height: 0;
+  width: 0;
+  padding: 15px;
+  border: 6px solid #f8f8f8;
+  border-right-color: #888;
+  border-radius: 22px;
+  animation: rotate 1s infinite linear;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+}
+
 
 /* Button */
 button {
@@ -1051,21 +1070,29 @@ image-chooser {
   height: 100%;
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(8, 1fr);
+  padding: 20px;
   gap: 15px;
 }
 
 .image-chooser .button-group {
   display: flex;
   justify-content: flex-end;
-  padding: 15px;
-  padding-top: 0;
+  padding: 10px 15px;
   gap: 15px;
+  border-top: 2px solid #efefef;
+}
+
+.image-chooser .button-group .button--primary {
+  min-width: 200px;
 }
 
 .image-chooser .image-container {
   position: relative;
   aspect-ratio: 1 / 1;
+  background-color: #efefef;
+  border-radius: 20px;
+  transition: background-color 0.3s .3s;
 }
 
 .image-chooser .image {
@@ -1075,5 +1102,31 @@ image-chooser {
   width: 100%;
   height: 100%;
   opacity: 1;
+  border-radius: 20px;
   transition: opacity .3s;
+}
+
+.image-chooser .image-container.is-selected {
+  background-color: #000;
+  transition: background-color 0s;
+}
+
+.image-chooser .image-container.is-selected .image {
+  opacity: 0.75;
+}
+
+.image-chooser .image-container span.select-tag {
+  display: none;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+}
+
+.image-chooser .image-container.is-selected span.select-tag {
+  display: block;
+}
+
+.image-chooser:hover {
+  cursor: pointer;
 }

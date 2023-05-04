@@ -29,6 +29,16 @@ const googleKeys = {
   scopes: process.env.GOOGLE_SCOPES
 };
 
+const metaKeys = {
+  facebook: {
+    client_id: process.env.FACEBOOK_APP_ID
+  },
+  instagram: {
+    client_id: process.env.INSTAGRAM_APP_ID,
+    client_secret: process.env.INSTAGRAM_APP_SECRET
+  }
+}
+
 const oauth2Client = new google.auth.OAuth2( 
   googleKeys.cliendId,
   googleKeys.client_secret,
@@ -417,6 +427,50 @@ app.use('/api/googleOAth', async (req, res) => {
 
   res.sendStatus(400); 
 });
+
+app.use('/api/instagram/base_template', express.json(), async (req, res) => {
+  const { code } = req.query;
+  const { access_token, user_id } = req.body;
+
+  if (code) {
+    const { client_id, client_secret } = metaKeys.instagram;
+    
+    const formdata = new FormData();
+
+    
+    if (client_id && client_secret && typeof code === 'string') {
+      formdata.append('client_id', client_id);
+      formdata.append('client_secret', client_secret);
+      formdata.append('grant_type', 'authorization_code');
+      formdata.append('redirect_uri', 'https://product-builder.dev-test.pro/api/instagram/base_template');
+      formdata.append('code', code);
+    }
+
+    const response = await fetch('https://api.instagram.com/oauth/access_token', {
+      method: 'POST',
+      body: formdata
+    }).then(res => res.json());
+
+    console.log('here', response); 
+
+    res.send(req.query);
+    return;
+  }
+
+  if (access_token) {
+    console.log(access_token);
+
+    res.send(access_token);
+    return;
+  }
+
+  res.sendStatus(200);
+});
+
+app.use('/api/instagram/access_token', express.json(), async (req, res) => {
+  console.log(req.body);
+  res.send(req.body);
+})
 
 app.post('/api/facebookOAth', express.json(), async (req, res) => {
   const { authResponse, redirect, shop: shopName, action } = req.body;

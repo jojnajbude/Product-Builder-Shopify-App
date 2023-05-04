@@ -533,6 +533,8 @@ class ErrorToast extends HTMLElement {
     errorsContainer: '[data-errors]'
   }
 
+  static timeOut = 10000;
+
   constructor() {
     super();
 
@@ -556,7 +558,7 @@ class ErrorToast extends HTMLElement {
       this.toggleAttribute('show');
 
       this.errorContainer.innerHTML = '';
-    }, 5000);
+    }, ErrorToast.timeOut);
   }
 
   createError(text) {
@@ -750,7 +752,6 @@ class OptionSelector extends HTMLElement {
       .map(variant => this.optionTemplate(variant));
   }
 }
-
 customElements.define('product-option-selector', OptionSelector);
 
 class ProductInfo extends HTMLElement {
@@ -1141,6 +1142,8 @@ class Tools extends HTMLElement {
         } else {
           formData.append(this.inputFromPC.name, imageFile);
 
+          console.log('to download');
+
           const response = await fetch('product-builder/uploads', {
             method: 'POST',
             body: formData
@@ -1265,6 +1268,7 @@ class EditablePicture extends HTMLElement {
     this.image = new Image();
     this.image.classList.add('editable-picture__image');
     this.image.style.opacity = 0;
+    this.image.draggable = false;
     
     this.image.onload = () => {
       this.image.style.opacity = null;
@@ -1712,14 +1716,27 @@ class ImageChooser extends HTMLElement {
     openButtons: {
       instagram: '[data-from-instagram]',
       facebook: '[data-from-facebook]',
-    }
-  }
+    },
+    selectedImage: '[data-image].is-selected .image',
+    tools: 'customization-tools'
+  };
+
+  static ImageCheckedSVG = `
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="12" cy="12.0156" r="11" fill="#FF8714"/>
+      <circle cx="12.0193" cy="12.035" r="10.1014" stroke="white" stroke-width="2.44882"/>
+      <path d="M9.26562 11.9902L11.2136 13.9383L15.1097 10.0422" stroke="white" stroke-width="2.44882" stroke-linecap="round"/>
+    </svg>
+  `;
   
   constructor() {
     super();
 
     const cancelButton = this.querySelector(ImageChooser.selectors.cancel)
     cancelButton.addEventListener('click', this.close.bind(this));
+
+    const validateButton = this.querySelector(ImageChooser.selectors.validateButton);
+    validateButton.addEventListener('click', this.validateImages.bind(this));
 
     const instButton = document.querySelector(ImageChooser.selectors.openButtons.instagram);
     const facebookButton = document.querySelector(ImageChooser.selectors.openButtons.facebook);
@@ -1728,6 +1745,8 @@ class ImageChooser extends HTMLElement {
     
     instButton.addEventListener('click', this.open.bind(this, 'instagram'));
     facebookButton.addEventListener('click', this.open.bind(this, 'facebook'));
+
+    this.tools = document.querySelector(ImageChooser.selectors.tools);
   }
 
   close() {
@@ -1766,23 +1785,73 @@ class ImageChooser extends HTMLElement {
     }
   }
 
+  async validateImages() {
+    const imagesWrapper = document.querySelector(Tools.selectors.pages.images.imagesWrapper)
+
+    const selectedImages = [...this.querySelectorAll(ImageChooser.selectors.selectedImage)];
+
+    const FilesFromImages = await Promise.all(selectedImages
+      .map((image) => new Promise(async (res, rej) => {
+        const url = new URL(image.src);
+        console.log(url);
+  
+        const blob = await fetch(image.src)
+          .then(res => res.blob())
+          .catch(res => rej(res));
+        console.log(blob);
+
+        const file = new File([blob], url.pathname, blob);
+  
+        res(file);
+    })))
+
+    console.log(FilesFromImages);
+
+    FilesFromImages
+      .forEach(file => {
+        const imageContainer = this.tools.createNewImage(file);
+
+        if (imageContainer) {
+          imagesWrapper.append(imageContainer);
+        }
+      });
+    this.close();
+  }
+
   imageTemplate(source) {
     const container = document.createElement('div');
-    container.classList.add('image-container');
+    container.classList.add('image-container', 'load-container','is-loading');
+    container.toggleAttribute('data-image');
+
+    const selectTag = document.createElement('span');
+    selectTag.classList.add('select-tag');
+    selectTag.innerHTML = ImageChooser.ImageCheckedSVG;
+
+    container.append(selectTag);
 
     const image = new Image;
     image.style.opacity = 0;
     image.classList.add('image');
+    image.draggable = false;
 
     image.onload = () => {
       image.style.opacity = null;
+      container.classList.remove('is-loading');
     };
+
+    container.addEventListener('click', () => {
+      container.classList.toggle('is-selected');
+    });
 
     image.src = source;
 
     container.append(image);
 
     return container;
+  }
+
+  loginInstagram() {
+    
   }
 
   getFacebookPhotos() {
@@ -1793,15 +1862,20 @@ class ImageChooser extends HTMLElement {
 
         console.log(token);
 
-        fetch(`https://graph.facebook.com/v16.0/${userID}/photos/uploaded?fields=id,images&access_token=${token}`)
+        this.classList.add('is-loading');
+
+        fetch(`https://graph.facebook.com/v16.0/${userID}/photos/uploaded?fields=id,name,images,created_time&access_token=${token}`)
           .then(res => res.json())
           .then(data => {
             const photos = data.data.map(photo => {
               return {
                 id: photo.id,
-                image: photo.images[0]
+                image: photo.images[0],
+                name: photo.name ? photo.name : photo.created_time
               }
             });
+
+            this.classList.remove('is-loading');
 
             photos
               .map(photo => photo.image.source)
