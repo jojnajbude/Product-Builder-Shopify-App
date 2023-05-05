@@ -1085,13 +1085,39 @@ class Tools extends HTMLElement {
     imageWrapper.classList.add('page__image-wrapper', 'is-loading');
     imageWrapper.toggleAttribute('data-image');
 
-    imageWrapper.addEventListener('click', () => {
-      this.playground.dispatchEvent(new CustomEvent('image:selected', {
-        detail: {
-          imageSrc: image.src
-        }
-      }));
-    })
+    imageWrapper.addEventListener('click', (event) => {
+      const toDeleteBtn = imageWrapper.querySelector('[data-delete]');
+
+      if (event.target !== toDeleteBtn && !toDeleteBtn.contains(event.target)) {
+        this.playground.dispatchEvent(new CustomEvent('image:selected', {
+          detail: {
+            imageSrc: image.src
+          }
+        }));
+      }
+    });
+
+    const deleteBtn = document.createElement('span');
+    deleteBtn.toggleAttribute('data-delete');
+    deleteBtn.classList.add('page__image-deleter');
+
+    const deleteIcon = document.createElement('span');
+    deleteIcon.classList.add('page__image-deleter-icon');
+    deleteIcon.innerHTML = `
+        <svg width="23" height="23" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M7.44531 7.01562L16.1551 15.7254" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M7.44531 15.7266L16.1551 7.01681" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    `;
+    deleteBtn.append(deleteIcon);
+
+    const deleteImage = () => {
+      imageWrapper.remove();
+    }
+
+    deleteBtn.addEventListener('click', deleteImage, true);
+
+    imageWrapper.append(deleteBtn);
 
     const setImage = (imageName) => {
       image.src = 'product-builder/uploads/' + imageName;
@@ -1717,8 +1743,10 @@ class ImageChooser extends HTMLElement {
       instagram: '[data-from-instagram]',
       facebook: '[data-from-facebook]',
     },
+    image: '[data-image]',
     selectedImage: '[data-image].is-selected .image',
-    tools: 'customization-tools'
+    tools: 'customization-tools',
+    buttonsGroup: '[data-button-group]'
   };
 
   static ImageCheckedSVG = `
@@ -1747,6 +1775,10 @@ class ImageChooser extends HTMLElement {
     facebookButton.addEventListener('click', this.open.bind(this, 'facebook'));
 
     this.tools = document.querySelector(ImageChooser.selectors.tools);
+
+    this.instLogin = this.initInstLogin();
+    this.metaLogin = this.initMetaButton();
+    this.logoutBtn = this.initLogoutButton();
   }
 
   close() {
@@ -1762,7 +1794,12 @@ class ImageChooser extends HTMLElement {
     }, 300);
 
     this.imageList.innerHTML = '';
+
+    this.instLogin.remove();
+    this.metaLogin.remove();
+    this.logoutBtn.remove();
   }
+
 
   open(from) {
     this.style.opacity = 0;
@@ -1776,11 +1813,50 @@ class ImageChooser extends HTMLElement {
       this.style.opacity = null; 
     }, 300);
 
+    const { customer } = Studio;
+
+    this.logoutBtn.create(from);
+
     switch(from) {
       case 'facebook':
-        this.getFacebookPhotos();
+        if (this.instLogin.isExists()) {
+          this.instLogin.remove();
+        }
+
+        let connectedFB, customerLinkedFB;
+
+        FB.getLoginStatus(res => {
+          if (res.status === 'connected') {
+            connectedFB  = true;
+          }
+        })
+
+        if (customer) {
+          customerLinkedFB = customer.socials.find(social => social.name === 'facebook');
+        }
+
+        if (connectedFB) {
+          this.getFacebookPhotos();
+          break;
+        }
+
+        if (!customer || customer && !customerLinkedFB || !connectedFB) {
+          this.metaLogin.create();
+        } else if (customer && customerLinkedFB) {
+          this.getFacebookPhotos();
+        }
         break;
+
       case 'instagram':
+        if (this.metaLogin.isExists()) {
+          this.metaLogin.remove();
+        }
+
+        if (!window.oauthInstagram) {
+          this.instLogin.create();
+        } else {
+          this.getInstagramPhotos();
+        }
         break;
     }
   }
@@ -1793,12 +1869,10 @@ class ImageChooser extends HTMLElement {
     const FilesFromImages = await Promise.all(selectedImages
       .map((image) => new Promise(async (res, rej) => {
         const url = new URL(image.src);
-        console.log(url);
   
         const blob = await fetch(image.src)
           .then(res => res.blob())
           .catch(res => rej(res));
-        console.log(blob);
 
         const file = new File([blob], url.pathname, blob);
   
@@ -1850,17 +1924,143 @@ class ImageChooser extends HTMLElement {
     return container;
   }
 
-  loginInstagram() {
-    
+  initInstLogin() {
+    const container = document.createElement('div');
+    container.classList.add('instagram-login', 'image-chooser__login');
+
+    const button = document.createElement('button');
+    button.classList.add('instagram-login__button', 'button', 'button--primary-action');
+    button.addEventListener('click', this.loginInst.bind(this));
+    button.textContent = 'Sign up with Instagram';
+
+    container.append(button);
+
+    return {
+      remove: () => { container.remove() },
+      create: () => { this.imageList.append(container) },
+      isExists: () => this.imageList.contains(container)
+    }
+  }
+
+  initMetaButton() {
+    const container = document.createElement('div');
+    container.classList.add('login', 'image-chooser__login');
+
+    const button = document.createElement('button');
+    button.classList.add('button', 'button--facebook');
+
+    const icon = `
+      <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <g clip-path="url(#clip0_805_16765)">
+        <path d="M18.7333 9.55722C18.7333 4.35253 14.5397 0.133301 9.36667 0.133301C4.1936 0.133301 0 4.35253 0 9.55722C0 14.2609 3.42524 18.1597 7.90313 18.8666V12.2813H5.52487V9.55722H7.90313V7.48101C7.90313 5.11914 9.30155 3.81452 11.4411 3.81452C12.4655 3.81452 13.5378 3.99858 13.5378 3.99858V6.31775H12.3567C11.1932 6.31775 10.8302 7.04423 10.8302 7.79023V9.55722H13.428L13.0127 12.2813H10.8302V18.8666C15.3081 18.1597 18.7333 14.2609 18.7333 9.55722Z" fill="white"/>
+        </g>
+        <defs>
+        <clipPath id="clip0_805_16765">
+        <rect width="18.7333" height="18.7333" fill="white" transform="translate(0 0.133301)"/>
+        </clipPath>
+        </defs>
+      </svg>
+    `;
+    button.innerHTML += icon;
+
+    const text = document.createElement('span');
+    text.textContent = 'Log in with Facebook';
+    button.appendChild(text);
+
+    button.addEventListener('click', () => {
+      FB.login(this.faceBookLoginFunc.bind(this), {
+        scope: 'public_profile email user_photos'
+      });
+    })
+
+    container.append(button);
+
+    return {
+      create: () => { this.imageList.appendChild(container)},
+      remove: () => { container.remove() },
+      isExists: () => this.imageList.contains(container)
+    }
+  }
+
+  faceBookLoginFunc(response) {
+    if (response.status === 'connected') {
+      this.metaLogin.remove();
+
+      this.getFacebookPhotos();
+    }
+  }
+
+  async loginInst() {
+    const instToRedirect = {
+      id: productParams.get('id'),
+      size: productParams.get('size')
+    }
+
+    localStorage.setItem('instToRedirect', JSON.stringify(instToRedirect));
+
+    const state = JSON.stringify({
+      shop: location.origin,
+      customerId: window.customerId
+    });
+
+    const url = `https://api.instagram.com/oauth/authorize?client_id=${223768276958680}&redirect_uri=https://product-builder.dev-test.pro/api/instagram/oauth&scope=user_profile,user_media&response_type=code&state=${state}`;
+
+    window.location = url;
+  }
+
+  clearImages() {
+    this.imageList.querySelectorAll(ImageChooser.selectors.image)
+      .forEach(image => image.remove());
+  }
+
+  initLogoutButton() {
+    const buttonGroup = this.querySelector(ImageChooser.selectors.buttonsGroup);
+
+    const button = document.createElement('button');
+    button.classList.add('button', 'button--primary-action', 'image-chooser__logout');
+
+    const faceBookLogout = () => {
+      FB.logout(_ => {
+        this.clearImages();
+        this.metaLogin.create();
+      })
+    }
+
+    const instagramLogout = () => {
+      this.clearImages();
+
+      window.oauthInstagram = null;
+      localStorage.removeItem('oauthInstagram');
+
+      this.instLogin.create();
+    }
+
+    const create = (from) => {    
+      button.textContent = 'Logout from ' + from;
+
+      if (from === 'facebook') {
+        button.removeEventListener('click', instagramLogout);
+
+        button.addEventListener('click', faceBookLogout)
+      } else if (from === 'instagram') {
+        button.removeEventListener('click', faceBookLogout);
+
+        button.addEventListener('click', instagramLogout)
+      }
+
+      buttonGroup.append(button);
+    }
+
+    return {
+      create,
+      remove: () => { button.remove() }
+    }
   }
 
   getFacebookPhotos() {
     FB.getLoginStatus((response) => {
-      console.log(response)
       if (response.status === 'connected') {
         const { userID, accessToken: token } = response.authResponse;
-
-        console.log(token);
 
         this.classList.add('is-loading');
 
@@ -1884,6 +2084,34 @@ class ImageChooser extends HTMLElement {
       }
     });
   }
+
+  async getInstagramPhotos() {
+    this.classList.add('is-loading');
+
+    const { access_token, user_id } = window.oauthInstagram;
+
+    const photos = await fetch(`https://graph.instagram.com/${user_id}/media?fields=media_url,id,name,craeted_time&access_token=${access_token}`)
+      .then(res => res.json())
+      .then(res => {
+        if (res.data) {
+          return res.data.map(photo => {
+            return {
+              id: photo.id,
+              image: photo.media_url,
+              name: photo.name ? photo.name : photo.create_time
+            }
+          })
+        }
+      });
+
+      this.classList.remove('is-loading');
+
+      photos
+        .map(photo => photo.image)
+        .forEach(photo => {
+          this.imageList.append(this.imageTemplate(photo))
+        });
+  }
 }
 
 class ProductBuilder extends HTMLElement {
@@ -1894,6 +2122,12 @@ class ProductBuilder extends HTMLElement {
   
   constructor() {
     super();
+
+    const instToRedirect = localStorage.getItem('instToRedirect');
+
+    if (instToRedirect) {
+      return this.redirectFromInst(instToRedirect);
+    }
 
     this.panel = this.querySelector(ProductBuilder.selectors.panel);
     this.studioView = this.querySelector(ProductBuilder.selectors.studioView);
@@ -1920,9 +2154,31 @@ class ProductBuilder extends HTMLElement {
     })
   }
 
+  redirectFromInst(instToRedirect) {
+    const newQuery = JSON.parse(instToRedirect);
+
+      localStorage.removeItem('instToRedirect');
+
+      const redirectParams = new URLSearchParams(location.search);
+      const access_token = redirectParams.get('access_token');
+      const user_id = redirectParams.get('user_id');
+
+      localStorage.setItem('oauthInstagram', JSON.stringify({
+        access_token,
+        user_id
+      }));
+
+      const url = new URL(location.pathname, location.origin);
+      for (const key in newQuery) {
+        url.searchParams.append(key, newQuery[key]);
+      }
+
+      location.href = url.href;
+  }
+
   async init() {
     const productId = productParams.get('id');
-    const customerId = productParams.get('customer-id');
+    const customerId = window.customerId;
 
     if (!productId) {
       return;
@@ -1943,7 +2199,7 @@ class ProductBuilder extends HTMLElement {
     this.product = product;
     this.customer = customer;
 
-
+    window.oauthInstagram = JSON.parse(localStorage.getItem('oauthInstagram'));
 
     console.log(this.customer);
 

@@ -571,9 +571,40 @@ product-builder {
   left: 8px;
   width: 20px;
   height: 20px;
-  background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='12.0193' cy='12.0193' r='10.1014' stroke='white' stroke-width='2.44882'/%3E%3Cpath d='M9.26562 11.9727L11.2136 13.9207L15.1097 10.0246' stroke='white' stroke-width='2.44882' stroke-linecap='round'/%3E%3C/svg%3E%0A");
+  background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='12' cy='12.0156' r='11' fill='%23FF8714'/%3E%3Ccircle cx='12.0193' cy='12.035' r='10.1014' stroke='white' stroke-width='2.44882'/%3E%3Cpath d='M9.26562 11.9902L11.2136 13.9383L15.1097 10.0422' stroke='white' stroke-width='2.44882' stroke-linecap='round'/%3E%3C/svg%3E%0A");
   background-size: contain;
   z-index: 2;
+}
+
+.page__image-wrapper.is-selected .page__image-deleter,
+.page__image-wrapper .page__image-deleter {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.page__image-wrapper:not(.is-selected):hover .page__image-deleter {
+  pointer-events: all;
+  position: absolute;
+  padding: 20px;
+  right: -10px;
+  top: -10px;
+  z-index: 5;
+  opacity: 1;
+  transition: opacity .3s;
+}
+
+.page__image-wrapper .page__image-deleter .page__image-deleter-icon {
+  width: 22px;
+  height: 22px;
+  background-color: rgba(0,0,0,0.5);
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.page__image-wrapper .page__image-deleter .page__image-deleter-icon svg {
+  display: block;
 }
 
 /* .page__image-wrapper.is-selected::after {
@@ -1077,10 +1108,18 @@ image-chooser {
 
 .image-chooser .button-group {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding: 10px 15px;
-  gap: 15px;
   border-top: 2px solid #efefef;
+}
+
+.image-chooser .button-group .button-group__action {
+  display: flex;
+  gap: 15px;
+}
+
+.image-chooser .image-chooser__logout {
+  order: -1;
 }
 
 .image-chooser .button-group .button--primary {
@@ -1129,4 +1168,35 @@ image-chooser {
 
 .image-chooser:hover {
   cursor: pointer;
+}
+
+.image-chooser .image-chooser__login {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.image-chooser .button.button--facebook {
+  background-color: #4674DC;
+  border: 1px solid #4674DC;
+  color: #fff;
+  position: relative;
+}
+
+.image-chooser .button.button--facebook.button::before {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: transparent;
+  border-radius: 50px;
+  transition: background-color .3s;
+}
+
+.image-chooser .button.button--facebook.button:hover::before {
+  background-color: rgba(0,0,0,0.05);
 }

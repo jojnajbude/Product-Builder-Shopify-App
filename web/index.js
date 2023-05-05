@@ -137,7 +137,9 @@ app.post(
 // also add a proxy rule for them in web/frontend/vite.config.js
 
 app.get("/product-builder", (req, res) => {
-  res.sendFile(join(PROXY_PATH, 'builder.html')); 
+  res.setHeader('Content-Type', 'application/liquid');
+
+  res.sendFile(join(PROXY_PATH, 'builder.liquid')); 
 });
 
 app.get('/product-builder/product', async (req, res) => {
@@ -159,7 +161,7 @@ app.post('/product-builder/uploads', imageUpload.single('images') ,async (req, r
 
   if (!file) {
     res.send(400);
-  } else {
+  } else { 
     res.send(file.originalname);
   }  
 });
@@ -428,9 +430,10 @@ app.use('/api/googleOAth', async (req, res) => {
   res.sendStatus(400); 
 });
 
-app.use('/api/instagram/base_template', express.json(), async (req, res) => {
-  const { code } = req.query;
-  const { access_token, user_id } = req.body;
+app.use('/api/instagram/oauth', express.json(), async (req, res) => {
+  const { code, state } = req.query;
+
+  console.log(state, req.query)
 
   if (code) {
     const { client_id, client_secret } = metaKeys.instagram;
@@ -442,7 +445,7 @@ app.use('/api/instagram/base_template', express.json(), async (req, res) => {
       formdata.append('client_id', client_id);
       formdata.append('client_secret', client_secret);
       formdata.append('grant_type', 'authorization_code');
-      formdata.append('redirect_uri', 'https://product-builder.dev-test.pro/api/instagram/base_template');
+      formdata.append('redirect_uri', 'https://product-builder.dev-test.pro/api/instagram/oauth');
       formdata.append('code', code);
     }
 
@@ -451,26 +454,28 @@ app.use('/api/instagram/base_template', express.json(), async (req, res) => {
       body: formdata
     }).then(res => res.json());
 
-    console.log('here', response); 
+    console.log('here', response);
 
-    res.send(req.query);
+    const { user_id, access_token } = response;
+
+    if (access_token) {
+      res.redirect(`https://hladkevych-dev.myshopify.com/apps/product-builder?access_token=${access_token}&user_id=${user_id}`);
+    }
+
     return;
   }
 
-  if (access_token) {
-    console.log(access_token);
-
-    res.send(access_token);
-    return;
-  }
-
-  res.sendStatus(200);
+  res.status(404).send({
+    error: {
+      message: 'Code or request body not provided'
+    }
+  });
 });
 
 app.use('/api/instagram/access_token', express.json(), async (req, res) => {
   console.log(req.body);
   res.send(req.body);
-})
+});
 
 app.post('/api/facebookOAth', express.json(), async (req, res) => {
   const { authResponse, redirect, shop: shopName, action } = req.body;

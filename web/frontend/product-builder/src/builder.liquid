@@ -1,3 +1,5 @@
+{% layout none %}
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,6 +16,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Tomorrow:ital,wght@1,200&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="./product-builder/assets/main.css">
+
+  <script>
+    window.customerId = {% if customer %} {{ customer.id }} {% else %} null {% endif %};
+  </script>
+
   <script src="./product-builder/assets/global.js" defer></script>
 </head>
   <body>
@@ -328,14 +335,16 @@
           <div class="images-list" data-images-list>
           </div>  
         </div>
-        <div class="button-group">
-          <button class="button" data-cancel>
-            Cancel
-          </button>
-          <button class="button button--primary" data-validate>
-            Validate
-          </button>
-        </div>
+        <div class="button-group" data-button-group>
+          <div class="button-group__action">
+            <button class="button" data-cancel>
+              Cancel
+            </button>
+            <button class="button button--primary" data-validate>
+              Validate
+            </button>
+          </div>
+          </div>
       </image-chooser>
     </product-builder>
 
