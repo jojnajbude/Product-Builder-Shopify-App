@@ -1,462 +1,3 @@
-// import EditablePicture from './Elements/EditablePicture';
-// console.log(EditablePicture);
-
-// class ImageCropper {
-//   constructor(mockup) {
-//     this.container = document.createElement('div');
-//     this.container.id = mockup.getId();
-//     this.container.className = 'image-cropper';
-
-//     this.mockup = mockup;
-
-//     this.transform = {};
-
-//     this.cropButton = document.querySelector('[data-tool-crop]');
-//     this.cropButton.addEventListener('click', this.openCropPopup.bind(this));
-
-//     this.createPopupContainer.apply(this);
-//     this.createCloseAreaButton.apply(this);
-
-//     document.body.append(this.container);
-//   }
-
-//   createPopupContainer() {
-//     const popupHTML = `
-//       <div class="popup-wrapper">
-//         <div class="popup__header">
-//           <span class="popup__title">Adjust Crop</span>
-//           <span class="popup__info">Scroll to zoom, drag to move</span>
-//         </div>
-//         <div class="popup__image-wrapper">
-//           <img class="popup__image" src="${this.mockup.image.src}">
-//         </div>
-//         <button>Done</button>
-//       </div>
-//     `;
-//     const popup = document.createElement('div');
-//     popup.classList.add('popup-wrapper');
-
-    
-//     this.container.innerHTML = popupHTML;
-//     this.initImage.apply(this);
-//   }
-
-//   initImage() {
-//     this.image = this.container.querySelector('.popup__image');
-
-//     let scale = 1;
-//     this.image.style.transform = `scale(${scale})`;
-
-//     const minScale = 1;
-//     const maxScale = 4;
-
-//     this.image.addEventListener('wheel', (event) => {
-//       scale += event.deltaY * -0.01;
-//       scale = Math.min(Math.max(minScale, scale), maxScale);
-
-//       this.transform.scale = `scale(${scale})`;
-//       this.changeImageTransform.apply(this);
-//     });
-
-//     let isDown = false;
-//     this.x = window.offsetWidth;
-//     this.y = window.offsetHeight;
-
-//     this.image.ondragstart = (event) => {
-//       event.preventDefault();
-//     };
-
-//     this.image.addEventListener('mousedown', (event) => {
-//       event.preventDefault();
-//       isDown = true;
-//     });
-
-//     this.image.addEventListener('mouseup', (event) => {
-//       event.preventDefault();
-//       isDown = false;
-//     });
-
-//     this.image.addEventListener('mouseleave', (event) => {
-//       isDown = false;
-//     });
-
-//     this.image.addEventListener('mousemove', (event) => {
-//       if (!isDown) return;
-
-//       console.log(this.x, event.offsetX, this.y, event.offsetY);
-//       // this.transform.translate = `translate(${event.x - x}px, ${event.y - y}px)`;
-//       // this.changeImageTransform();
-//     })
-//   }
-
-//   changeImageTransform() {
-//     this.image.style.transform = Object.keys(this.transform)
-//     .reduce((trs, option) => {
-//       trs += this.transform[option] + ' ';
-
-//       return trs;
-//     }, '');;
-//   }
-
-//   createCloseAreaButton() {
-//     const button = document.createElement('div');
-//     button.classList.add('image-cropper__close-toggler');
-//     button.onclick = this.closeCropPopup.bind(this);
-
-//     this.container.append(button);
-//   }
-
-//   openCropPopup() {
-//     document.body.style.overflow = 'hidden';
-//     this.container.classList.add('is-open');
-//   }
-
-//   closeCropPopup() {
-//     document.body.style.overflow = null;
-//     this.container.classList.remove('is-open');
-//   }
-// }
-
-// class ProductMockup {
-//   constructor(container, imageUrl) {
-//     this.container = container;
-
-//     this.filters = Object.keys(Caman.prototype).slice(75, 93);
-
-//     this.image = new Image();
-//     this.fileName = 'https://picsum.photos/600';
-
-//     this.image.src = this.fileName;
-//     this.image.setAttribute('Crossorigin', '');
-
-//     this.canvas = this.container.querySelector('canvas');
-//     this.ctx = this.canvas.getContext('2d');
-
-//     this.canvas.style.opacity = 0;
-
-//     this.canvasId = `#${this.canvas.id}`;
-
-//     this.options = {};
-
-//     this.image.onload = this.imageOnload.bind(this);
-
-//     this.imageCropper = new ImageCropper(this);
-//   }
-
-//   getId() {
-//     return +this.canvas.dataset.id;
-//   }
-
-//   imageOnload() {
-//     this.container.style.width = `${this.image.width / 2}px`;
-//     this.container.style.height = `${this.image.height / 2}px`;
-
-//     this.canvas.setAttribute('width', this.image.width);
-//     this.canvas.setAttribute('height', this.image.height);
-
-//     this.ctx.drawImage(this.image, 0, 0, this.canvas.width, this.canvas.height);
-
-//     this.width = this.canvas.width;
-//     this.height = this.canvas.height;
-//     this.widthPadding = 0;
-//     this.heightPadding = 0;
-
-//     this.canvas.style.opacity = 1;
-//   }
-
-//   changeMat(option) {
-//     this.ctx.reset();
-//     this.options.mat = option;
-
-//     const scale = {
-//       'none': 1,
-//       'shallow': 0.8,
-//       'medium': 0.6,
-//       'deep': 0.4
-//     };
-
-//     this.width = this.canvas.width * scale[option.toLowerCase()];
-//     this.height = this.canvas.height * scale[option.toLowerCase()];
-//     this.widthPadding = (this.canvas.width - this.width) / 2;
-//     this.heightPadding = (this.canvas.height - this.height) / 2;
-
-//     this.ctx.drawImage(this.image, this.widthPadding, this.heightPadding, this.width, this.height);
-
-//     this.changeEffect(this.options.effect);
-//   }
-
-//   changeFrame(option) {
-//     this.options.frame = option;
-
-//     switch (option) {
-//       case 'black':
-//         this.container.style.border = '10px solid #000';
-//         break;
-//       case 'white':
-//         this.container.style.border = '10px solid #fff';
-//         break;
-//       case 'frameless':
-//         this.container.style.border = '0px solid transparent';
-//         break;
-//     }
-//   }
-
-//   changeEffect(option) {
-//     if (!option) {
-//       return;
-//     }
-
-//     this.options.effect = option;
-
-//     switch (option) {
-//       case 'original':
-//         Caman(this.canvasId, function() {
-//           this.revert(false);
-
-//           this.render();
-//         })
-//         break;
-//       case 'silver':
-//         Caman(this.canvasId, function() {
-//           this.revert(false);
-//           this.sinCity().render();
-//         });
-//         break;
-//       case 'noir':
-//         Caman(this.canvasId, function() {
-//           this.revert(false);
-//           this.hemingway().render();
-//         });
-//         break;
-//       case 'vivid':
-//         Caman(this.canvasId, function() {
-//           this.revert(false);
-//           this.nostalgia().render();
-//         });
-//         break;
-//       case 'dramatic':
-//         Caman(this.canvasId, function() {
-//           this.revert(false);
-//           this.love().render();
-//         });
-//         break;
-//     }
-//   }
-// }
-
-// class BuilderTool {
-//   constructor(container) {
-//     this.container = container;
-
-//     this.isOpen = this.container.dataset.isOpen === 'true' ? true : false;
-
-//     this.closeButton = this.container.querySelector(`[data-toggler]`);
-
-//     this.options = [...this.container.querySelectorAll('[data-tool-option]')];
-
-//     this.options.forEach(option => {
-//       option.addEventListener('click', this.selectOption.bind(this, option));
-//     })
-
-//     this.selectedOption = this.options
-//       .find(option => option.classList.contains('is-selected'))
-//       ?? this.options[0];
-
-//     if (this.selectedOption && !this.selectedOption.classList.contains('is-selected')) {
-//       this.selectedOption.classList.add('is-selected');
-//     }
-
-//     if (this.closeButton) {
-//       this.closeButton.addEventListener('click', this.close.bind(this));
-//     }
-
-//     if (this.isOpen) {
-//       this.open();
-//     }
-//   }
-
-//   open() {
-//     this.isOpen = true;
-//     this.container.classList.add('is-open');
-//   }
-
-//   close() {
-//     this.isOpen = false;
-//     this.container.classList.remove('is-open');
-//   }
-
-//   tool() {
-//     return this.container.dataset.tool;
-//   }
-
-//   optionsValue() {
-//     return this.options.map(option => option.dataset.toolOption);
-//   }
-
-//   selectOption(option) {
-//     option.classList.add('is-selected');
-
-//     this.options.filter(unselected => unselected !== option)
-//       .forEach(unselected => unselected.classList.remove('is-selected'));
-
-//     this.selectedOption = option;
-
-//     document.dispatchEvent(new CustomEvent('product-builder:option-changed', {
-//       detail: {
-//         tool: this.tool.apply(this),
-//         option: this.selectedOption.dataset.toolOption
-//       }
-//     }))
-//   }
-
-//   selected() {
-//     return this.selectedOption.dataset.toolOption;
-//   }
-// }
-
-// class ProductBuilder extends HTMLElement {
-//   static MockupHTML = (id) => {
-//     const newMockup = document.createElement('div');
-//     newMockup.className = 'product-builder__item product-mockup';
-//     newMockup.dataset.builderMockup = '';
-
-//     const newCanvas = document.createElement('canvas');
-//     newCanvas.id = `mockup-${id}`;
-//     newCanvas.dataset.id = id;
-
-//     newMockup.append(newCanvas);
-
-//     return newMockup
-//   };
-
-//   constructor() {
-//     super();
-
-//     this.builderToolsContainer = document.querySelector('[data-builder-tools');
-
-//     this.viewport = this.querySelector('[data-builder-viewport]');
-
-//     this.mockups = [...this.querySelectorAll('[data-builder-mockup]')]
-//       .map(mockup => {
-//         return new ProductMockup(mockup);
-//       });
-
-//     this.mockups.forEach(mockup => {
-//       mockup.container.addEventListener('click', this.selectFocusedMockups.bind(this, mockup));
-//     });
-
-//     this.focusedMockups = this.mockups;
-
-//     this.tools = [...document.querySelectorAll('[data-tool]')]
-//       .map(mockup => {
-//         const tool = new BuilderTool(mockup);
-
-//         const openButton = document.querySelector(`[data-toggler="${tool.tool()}"]`);
-//         openButton.addEventListener('click', () => {
-//           tool.open();
-
-//           this.tools.filter(toClose => toClose != tool)
-//             .forEach(toClose => toClose.close());
-//         })
-
-//         return tool;
-//       });
-
-//     this.currentOptions = this.tools.reduce((obj, curr) => {
-//       obj[curr.tool()] = curr.selected();
-
-//       return obj;
-//     }, {});
-
-//     this.addMockupButton = this.querySelector('[data-product-builder-add-button]');
-//     this.addMockupButton.addEventListener('click', this.addMockup.bind(this));
-
-//     document.addEventListener('product-builder:option-changed', (event) => {
-//       const { tool, option } = event.detail;
-//       this.currentOptions[tool] = option;
-
-//       switch (tool) {
-//         case 'mat':
-//           this.focusedMockups.forEach(mockup => mockup.changeMat(this.currentOptions[tool]));
-//           break;
-//         case 'frame':
-//           this.focusedMockups.forEach(mockup => mockup.changeFrame(this.currentOptions[tool]));
-//           break;
-//         case 'effect':
-//           this.focusedMockups.forEach(mockup => mockup.changeEffect(this.currentOptions[tool]));
-//           break;
-//       }
-//     });
-
-//     this.unfocusButton = this.querySelector('[data-unfocus-button]');
-//     this.unfocusButton.addEventListener('click', this.unfocus.bind(this));
-//   }
-
-//   unfocus() {
-//     if (this.tools.some(tool => tool.isOpen)) {
-//       this.tools.forEach(tool => {
-//         tool.close();
-//       })
-//     } else {
-//       this.classList.remove('is-focused');
-//       this.builderToolsContainer.classList.remove('is-fixed');
-  
-//       this.focusedMockups.forEach(mockup => {
-//         mockup.container.classList.remove('is-focused');
-//       })
-  
-//       this.focusedMockups = this.mockups;
-//       this.closeCropButton.apply(this);
-//     }
-//   }
-
-//   addMockup() {
-//     const newId = Math.max(...this.mockups.map(mockup => mockup.getId())) + 1;
-//     const newMockupHTML = ProductBuilder.MockupHTML(newId);
-
-//     this.viewport.append(newMockupHTML);
-
-//     const newMockup = new ProductMockup(newMockupHTML);
-
-//     this.mockups.push(newMockup);
-//     newMockup.container.addEventListener('click', this.selectFocusedMockups.bind(this, newMockup));
-//   }
-
-//   openCropButton() {
-//     const cropButton = this.builderToolsContainer.querySelector('[data-tool-crop]');
-//     cropButton.classList.remove('hidden');
-//   }
-
-//   closeCropButton() {
-//     const cropButton = this.builderToolsContainer.querySelector('[data-tool-crop]');
-//     cropButton.classList.add('hidden');
-//   }
-
-//   selectFocusedMockups(targetMockup) {
-//     this.focusedMockups = this.mockups.filter(mockup => {
-//       return mockup === targetMockup;
-//     });
-
-//     this.focusedMockups.forEach(mockup => {
-//       mockup.container.classList.add('is-focused');
-      
-//       this.tools.forEach(tool => {
-//         const option = tool.options
-//           .find(finded => finded.dataset.toolOption === mockup.options[tool.tool()])
-//             ?? tool.options[0];
-
-//         tool.selectOption(option);
-//       })
-//     });
-
-//     this.classList.add('is-focused');
-//     this.builderToolsContainer.classList.add('is-fixed');
-//     this.openCropButton.apply(this);
-//   }
-// }
-
-// customElements.define('product-builder', ProductBuilder);
-
 const backButton = document.querySelector('[data-back-button]');
 if (backButton) {
   backButton.addEventListener('click', () => {
@@ -554,8 +95,8 @@ const layouts = {
       `,
     types: ['photobook']
   },
-  leftImageWithText: {
-    id: 'leftImageWithText',
+  rightImageWithText: {
+    id: 'rightImageWithText',
     icon: `
       <svg width="45" height="23" viewBox="0 0 45 23" fill="none" xmlns="http://www.w3.org/2000/svg">
         <g filter="url(#filter0_d_806_20395)">
@@ -575,6 +116,33 @@ const layouts = {
             <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
             <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_806_20395"/>
             <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_806_20395" result="shape"/>
+          </filter>
+        </defs>
+      </svg>
+      `,
+    types: ['photobook']
+  },
+  leftImageWithText: {
+    id: 'leftImageWithText',
+    icon: `
+      <svg width="45" height="23" viewBox="0 0 45 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <g filter="url(#filter0_d_806_20403)">
+          <rect x="1" y="1" width="43" height="21" fill="white"/>
+        </g>
+        <rect x="1" y="1" width="21" height="21" fill="#D9D9D9"/>
+        <rect x="28" y="9" width="9" height="1" rx="0.5" fill="#FF8714"/>
+        <rect x="30" y="11" width="5" height="1" rx="0.5" fill="#FF8714"/>
+        <rect x="28" y="13" width="9" height="1" rx="0.5" fill="#FF8714"/>
+        <defs>
+          <filter id="filter0_d_806_20403" x="0" y="0" width="45" height="23" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+          <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+          <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+          <feMorphology radius="1" operator="dilate" in="SourceAlpha" result="effect1_dropShadow_806_20403"/>
+          <feOffset/>
+          <feComposite in2="hardAlpha" operator="out"/>
+          <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+          <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_806_20403"/>
+          <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_806_20403" result="shape"/>
           </filter>
         </defs>
       </svg>
@@ -607,11 +175,38 @@ const layouts = {
       </svg>
     `,
     types: ['photobook']
+  },
+  twoRectangleImagesWithText: {
+    id: 'twoRectangleImagesWithText',
+    icon: `
+      <svg width="45" height="23" viewBox="0 0 45 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <g filter="url(#filter0_d_806_20443)">
+          <rect x="44" y="22" width="43" height="21" transform="rotate(-180 44 22)" fill="white"/>
+        </g>
+        <rect x="20" y="5" width="11" height="16" transform="rotate(90 20 5)" fill="#D9D9D9"/>
+        <rect x="41" y="5" width="11" height="16" transform="rotate(90 41 5)" fill="#D9D9D9"/>
+        <rect x="17" y="19" width="10" height="1" rx="0.5" transform="rotate(-180 17 19)" fill="#FF8714"/>
+        <rect x="38" y="19" width="10" height="1" rx="0.5" transform="rotate(-180 38 19)" fill="#FF8714"/>
+        <defs>
+          <filter id="filter0_d_806_20443" x="0" y="0" width="45" height="23" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+          <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+          <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+          <feMorphology radius="1" operator="dilate" in="SourceAlpha" result="effect1_dropShadow_806_20443"/>
+          <feOffset/>
+          <feComposite in2="hardAlpha" operator="out"/>
+          <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+          <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_806_20443"/>
+          <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_806_20443" result="shape"/>
+          </filter>
+        </defs>
+      </svg>
+    `,
+    types: ['photobook']
   }
 }
 
 const ImageLimits = {
-  size: 3 * 1048576,
+  size: 10 * 1048576,
   resolution: {
     width: 200,
     height: 200
@@ -632,14 +227,60 @@ const sizes = {
   '48 pages': 24
 }
 
-const productParams = new URLSearchParams(location.search);
+const globalState = {
+  product: null,
+  customer: null,
+  view: {
 
+  },
+  panel: {
+    productInfo: {
+      product: null
+    },
+    tools: {
+      tabs: {
+        selected: null,
+        list: [],
+        disabled: []
+      },
+      pages: {
+        products: {
+          gridType: '',
+          selected: null
+        },
+        images: {
+          list: [],
+        },
+        edit: {
+          tools: {
+            layout: ''
+          }
+        },
+        selected: null,
+      }
+    }
+  },
+  imageChooser: {
+    instagramLogin: {},
+    FacebookLogin: {}
+  },
+  errors: {
+    list: [],
+    show: new Boolean()
+  }
+}
+
+const productParams = new URLSearchParams(location.search);
 
 class ProductBuilder extends HTMLElement {
   static selectors = {
     panel: '[customization-panel]',
     studioView: '[studio-view]'
   };
+
+  static get observedAttributes() {
+    return ['state']
+  }
   
   constructor() {
     super();
@@ -653,7 +294,21 @@ class ProductBuilder extends HTMLElement {
     this.panel = this.querySelector(ProductBuilder.selectors.panel);
     this.studioView = this.querySelector(ProductBuilder.selectors.studioView);
 
+    this.addEventListener('studio:change', (event) => {
+      const { state } =  event.detail;
+
+      if (!state) {
+        return;
+      }
+
+      console.log(JSON.parse(this.getAttribute('state')))
+    })
+
     this.init();
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    console.log(name);
   }
 
   downloadFacebookAPI() {
@@ -697,7 +352,23 @@ class ProductBuilder extends HTMLElement {
       location.href = url.href;
   }
 
+  setState(state) {
+    this.setAttribute('state', JSON.stringify(state));
+  }
+
+  onStateChange() {
+
+  }
+
   async init() {
+    this.setState(globalState);
+
+    this.addEventListener('studio:change', (event) => {
+      const { state } = event.detail;
+
+      console.log(state);
+    })
+
     const productId = productParams.get('id');
     const customerId = window.customerId;
 
@@ -739,7 +410,24 @@ class ProductBuilder extends HTMLElement {
 }
 customElements.define('product-builder', ProductBuilder);
 
+const StudioChange = () => {
+  const change = (state) => {
+    const changeEvent = new CustomEvent('studio:change', {
+      detail: {
+        state
+      }
+    });
+
+    Studio.dispatchEvent(changeEvent);
+  }
+
+  return {
+    change
+  };
+}
+
 window.Studio = document.querySelector('product-builder');
+window.Studio.state = StudioChange();
 
 class ErrorToast extends HTMLElement {
   static selectors = {
@@ -863,7 +551,6 @@ class Switch extends HTMLElement {
     return this.selected.dataset.value;
   }
 }
-
 customElements.define('custom-switch', Switch);
 
 class OptionSelector extends HTMLElement {
@@ -980,6 +667,10 @@ class ProductInfo extends HTMLElement {
     }  
   };
 
+  static get observedAttributes() {
+    return ['state']
+  }
+
   constructor() {
     super();
 
@@ -1000,6 +691,18 @@ class ProductInfo extends HTMLElement {
     }).bind(this));
 
     this.addEventListener('check-images', this.checkOnEvent.bind(this));
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    switch(name) {
+      case 'state':
+        this.onStateChange(newValue);
+        break;
+    }
+  }
+
+  onStateChange(state) {
+    const { image, title, options } = JSON.parse(state);
   }
 
   setProduct(product) {
@@ -1141,21 +844,30 @@ class Tool {
 
     this.setContent();
   }
-
-  __initTriggerContent(icon) {
-    
-  }
   
   open() {
     this.collapsible.container.style.height = this.collapsible.container.scrollHeight + 'px';
+
+    clearTimeout(this.timer.in);
+    clearTimeout(this.timer.out);
+    
+    this.timer.in = setTimeout(() => {
+      this.collapsible.container.style.height = 'auto';
+    }, 500);
 
     this.container.toggleAttribute('data-open');
   }
 
   close() {
-    this.collapsible.container.style.height = null;
+    this.collapsible.container.style.height = this.collapsible.container.scrollHeight + 'px';
 
-    this.container.removeAttribute('data-open');
+    clearTimeout(this.timer.in);
+    clearTimeout(this.timer.out);
+
+    this.timer.out = setTimeout(() => {
+      this.collapsible.container.style.height = null;
+      this.container.removeAttribute('data-open');
+    }, 10);
   }
 
   toggle() {
@@ -1186,8 +898,13 @@ class Tool {
     };
   }
 
-  create() {
+  setOnCreate(state) {
+    return;
+  } 
+
+  create(state) {
     this.container.style.opacity = 0;
+    this.setOnCreate(state);
 
     this.editList.append(this.container);
 
@@ -1237,6 +954,21 @@ class LayoutTool extends Tool {
     this.layouts[0].select();
   }
 
+  setOnCreate(state) {
+    const { selected } = state;
+
+    const newSelected = this.layouts
+      .find(layout => layout.layoutId === selected);
+
+    if (newSelected) {
+      this.selected.unselect();
+
+      newSelected.select();
+
+      this.selected = newSelected;
+    }
+  }
+
   layoutIconTemplate(layout) {
     const { icon: iconSVG } = layouts[layout];
 
@@ -1247,6 +979,8 @@ class LayoutTool extends Tool {
     const border = document.createElement('span');
     border.classList.add('layout__border');
 
+    let layoutIcon = {};
+
     const select = () => {
       const selected = this.collapsible.inner.querySelector('.layout-icon.is-selected')
 
@@ -1256,11 +990,17 @@ class LayoutTool extends Tool {
 
       icon.classList.toggle('is-selected');
 
+      this.selected = layoutIcon;
+
       Studio.studioView.dispatchEvent(new CustomEvent('change:layout', {
         detail: {
           layout: icon.dataset.layout
         }
       }))
+    }
+
+    const unselect = () => {
+      icon.classList.toggle('is-selected');
     }
 
     icon.addEventListener('click', select);
@@ -1269,11 +1009,99 @@ class LayoutTool extends Tool {
 
     icon.append(border);
 
-    return {
+    layoutIcon = Object.assign(layoutIcon, {
       append: () => { this.collapsible.inner.append(icon) },
       icon,
-      select
+      select,
+      unselect,
+      layoutId: layout
+    })
+
+    return layoutIcon
+  }
+}
+
+class TextTool extends Tool {
+  constructor() {
+    super();
+
+    this.label.setLabel('Text');
+
+    const icon = `
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M3.95078 2.9498L3.95078 4.49977C3.95078 4.74829 3.74931 4.94977 3.50078 4.94977C3.25225 4.94977 3.05078 4.74829 3.05078 4.49977V2.49982C3.05078 2.45225 3.05816 2.4064 3.07185 2.36336C3.12963 2.18154 3.29983 2.0498 3.50079 2.0498H11.5008C11.6561 2.0498 11.7931 2.1285 11.8739 2.24821C11.9225 2.32003 11.9508 2.40661 11.9508 2.4998L11.9508 2.49982V4.49977C11.9508 4.74829 11.7493 4.94977 11.5008 4.94977C11.2523 4.94977 11.0508 4.74829 11.0508 4.49977V2.9498H8.05079V12.0498H9.25513C9.50366 12.0498 9.70513 12.2513 9.70513 12.4998C9.70513 12.7483 9.50366 12.9498 9.25513 12.9498H5.75513C5.50661 12.9498 5.30513 12.7483 5.30513 12.4998C5.30513 12.2513 5.50661 12.0498 5.75513 12.0498H6.95079V2.9498H3.95078Z" fill="black"/>
+      </svg>
+    `;
+
+    this.icon.setIcon(icon);
+  }
+
+  selectorTemplate(data) {
+    if (!data && !data.options) {
+      return;
     }
+
+    const wrapper = document.createElement('div');
+    wrapper.classList.add('text-tool__selector-wrapper');
+
+    const selector = document.createElement('select');
+    selector.classList.add('text-tool__selector');
+
+    data.options
+      .map(option => {
+        const container = document.createElement('option');
+
+        container.value = option;
+        container.textContent = option;
+
+        selector.append(container);
+
+        return container;
+      });
+
+    wrapper.append(selector);
+
+    const icon = `
+      <svg width="6" height="4" viewBox="0 0 6 4" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3.01493 3.57255L0.359375 0.916992H5.67049L3.01493 3.57255Z" fill="#888888"/>
+      </svg>
+    `;
+
+    wrapper.innerHTML += icon;
+
+    return wrapper;
+  }
+
+  setContent() {
+    const container = document.createElement('div');
+    container.classList.add('text-tool')
+
+    const header = document.createElement('div');
+    header.classList.add('text-tool__header');
+
+    const selectType = this.selectorTemplate({ options: [
+      'Paragraph',
+      'Line'
+    ]});
+
+    const selectFont = this.selectorTemplate({ options: [
+      'Times New Roman',
+      'Arial',
+      'Calibri'
+    ]});
+
+    header.append(selectType, selectFont);
+
+    const tools = document.createElement('div');
+    tools.classList.add('text-tool__tools');
+
+    const text = document.createElement('span');
+    text.classList.add('text-tool__text');
+    text.toggleAttribute('contenteditable');
+
+    container.append(header, tools, text);
+
+    this.collapsible.inner.append(container);
   }
 }
 
@@ -1311,10 +1139,25 @@ class Tools extends HTMLElement {
     errorToast: 'error-toast'
   }
 
+  static get observedAttributes() {
+    return ['state'];
+  }
+
   constructor() {
     super();
 
+    this.setAttribute('state', '');
+
     this.init();
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    console.log(name, newValue);
+    switch (name) {
+      case 'state':
+        this.state = JSON.parse(newValue);
+        break;
+    }
   }
 
   init() {
@@ -1328,15 +1171,18 @@ class Tools extends HTMLElement {
     this.initEventListeners();
   }
 
+  setState(state) {
+    this.setAttribute('state', JSON.stringify(state));
+  }
+
+  onStateChange() {
+    const { tabs, products, images, edit } = this.state;
+
+
+    console.log(tabs, products, images, edit);
+  }
+
   initEventListeners() {
-    this.addEventListener('selected:changed', (event) => {
-      console.log(event);
-
-      event.detail.type === 'photobook'
-        ? this.edit.tools.layout.create()
-        : this.edit.tools.layout.remove();
-
-    });
   }
 
   moveRunner() {
@@ -1348,7 +1194,7 @@ class Tools extends HTMLElement {
       .querySelector(Tools.selectors.tabs.wrapper)
       .querySelectorAll(Tools.selectors.tabs.tab)
     ].map(tab => {
-        tab.addEventListener('click', this.selectTab.bind(this))
+        tab.addEventListener('click', this.handleSelectTab.bind(this))
 
         return tab;
       });
@@ -1363,6 +1209,29 @@ class Tools extends HTMLElement {
     }
 
     this.moveRunner();
+  }
+
+  handleSelectTab(event) {
+    if (event.currentTarget.classList.contains('is-disable')) {
+      return;
+    }
+
+    this.tabs.selected.classList.remove('is-selected');
+    
+    event.currentTarget.classList.add('is-selected');
+
+    this.tabs.selected = event.currentTarget;
+  
+    this.moveRunner();
+    this.changePage();
+
+    Studio.dispatchEvent(new CustomEvent('change', {
+      detail: {
+        tabs: {
+          selected: this.tabs.selected
+        }
+      }
+    }));
   }
 
   initPages() {
@@ -1458,27 +1327,6 @@ class Tools extends HTMLElement {
     container.addEventListener('click', this.selectProduct.bind(this));
 
     return container;
-  }
-
-  selectTab(event) {
-    if (event.currentTarget.classList.contains('is-disable')) {
-      return;
-    }
-
-    this.tabs.selected.classList.remove('is-selected');
-    
-    event.currentTarget.classList.add('is-selected');
-
-    this.tabs.selected = event.currentTarget;
-  
-    this.moveRunner();
-    this.changePage();
-
-    this.dispatchEvent(new CustomEvent('tab:changed', {
-      detail: {
-        tab: this.tabs.selected 
-      }
-    }));
   }
 
   changePage() {
@@ -1705,7 +1553,7 @@ class Tools extends HTMLElement {
       container: this.querySelector(Tools.selectors.pages.edit.container),
       tools: {
         layout: new LayoutTool(),
-        tool: new Tool(),
+        text: new TextTool(),
         tool1: new Tool('Tool 1'),
         tool2: new Tool('Tool 2'),
         tool3: new Tool('Tool 3'),
@@ -1713,6 +1561,20 @@ class Tools extends HTMLElement {
     }
   }
 
+  setTools(tools) {
+    for (const tool in tools) {
+      switch (tool) {
+        case 'layout':
+          const { selected } = tools[tool];
+
+          this.edit.tools.layout.create({ selected });
+          break;
+
+        case 'text':
+          this.edit.tools.text.create();
+      }
+    }
+  }
 }
 customElements.define('customization-tools', Tools);
 
@@ -1722,19 +1584,46 @@ class Panel extends HTMLElement {
     tools: '[data-customization-tools]'
   };
 
+  static get observedAttributes() {
+    return ['state'];
+  }
+
   constructor() {
     super();
 
     this.productInfo = this.querySelector(Panel.selectors.productInfo);
     this.tools = this.querySelector(Panel.selectors.tools);
 
+    this.setAttribute('state', '');
+
     this.tools.addEventListener('tab:changed', (event) => {
       console.log('current tab: ' + event.detail.tab.dataset.tab);
     });
   }
 
+  attributeChangedCallback(name, oldValue, newValue) {
+    console.log(name, newValue);
+    switch (name) {
+      case 'state':
+        this.state = JSON.parse(newValue);
+        this.onStateChange();
+        break;
+    }
+  }
+
   init(product) {
     this.productInfo.setProduct(product);
+  }
+
+  setState(state) {
+    this.setAttribute('state', JSON.stringify(state));
+  }
+
+  onStateChange() {
+    const { productInfo, tools } = this.state;
+
+    this.tools.setState(tools);
+    this.productInfo.setState(productInfo);
   }
 
   getImages() {
@@ -2046,7 +1935,9 @@ customElements.define('product-element', ProductElement);
 
 class PhotobookPage extends HTMLElement {
   static selectors = {
-    picture: 'editable-picture'
+    picture: 'editable-picture',
+    text: '[data-textarea]',
+    child: 'photobook-page > [data-child]'
   }
 
   static get observedAttributes() {
@@ -2136,6 +2027,24 @@ class PhotobookPage extends HTMLElement {
     return picture;
   }
 
+  getText() {
+    const container = document.createElement('div');
+    container.classList.add('product-element__text', 'textarea-container');
+      container.toggleAttribute('data-textarea', 'is-empty');
+
+    const text = document.createElement('span');
+    text.toggleAttribute('contenteditable');
+    text.classList.add(
+      'textarea',
+    );
+
+    text.textContent = 'Add your description here';
+
+    container.append(text);
+
+    return container;
+  }
+
   select() {
     this.classList.add('is-selected');
   }
@@ -2145,47 +2054,78 @@ class PhotobookPage extends HTMLElement {
   }
 
   clearLayout() {
-    return new Promise((res) => {
-      this.style.opacity = 0;
-    
-      setTimeout(() => {
-        this.querySelectorAll(PhotobookPage.selectors.picture)
-            .forEach(picture => picture.destroy());
-            res();
-      }, 150);
-    })
+    this.querySelectorAll(PhotobookPage.selectors.picture)
+      .forEach(picture => picture.destroy());
+
+    this.querySelectorAll(PhotobookPage.selectors.text)
+      .forEach(text => text.remove());
+
+    this.querySelectorAll(PhotobookPage.selectors.child)
+      .forEach(item => item.remove());
   }
 
-  async wholeLayout() {
-    await this.clearLayout();
+  wholeLayout() {
+    this.clearLayout();
 
     const bigImage = this.getEditable();
 
     this.append(bigImage);
 
-    this.style.opacity = null;
   }
 
-  async bigWithThreeSquareLayout() {
-    await this.clearLayout();
+  bigWithThreeSquareLayout() {
+    this.clearLayout();
 
     const bigImage = this.getEditable();
 
-    let small;
+    const small = [this.getEditable(), this.getEditable(), this.getEditable()];
 
-    const [smallOne, smallTwo, smallThree] = small = [this.getEditable(), this.getEditable(), this.getEditable()];
+    this.append(bigImage, ...small);
 
-    this.append(bigImage, smallOne, smallTwo, smallThree);
-
-    this.style.opacity = null;
   }
 
-  async wholeFramelessLayout() {
-    await this.clearLayout();
+  wholeFramelessLayout() {
+    this.clearLayout();
 
     this.append(this.getEditable());
 
-    this.style.opacity = null;
+  }
+
+  rightImageWithTextLayout() {
+    this.clearLayout();
+
+    const text = this.getText();
+
+    const image = this.getEditable();
+
+    this.append(text, image);
+
+  }
+
+  leftImageWithTextLayout() {
+    this.clearLayout();
+
+    const text = this.getText();
+
+    const image = this.getEditable();
+
+    this.append(image, text);
+
+  }
+
+  twoRectangleImagesWithTextLayout() {
+    this.clearLayout();
+
+    const [leftWrap, rightWrap] = [document.createElement('div'), document.createElement('div')];
+
+    leftWrap.toggleAttribute('data-child');
+    rightWrap.toggleAttribute('data-child');
+
+    leftWrap.append(this.getEditable(), this.getText());
+    rightWrap.append(this.getEditable(), this.getText());
+
+    this.append(leftWrap, rightWrap);
+
   }
 }
 customElements.define('photobook-page', PhotobookPage);
@@ -2232,6 +2172,7 @@ class StudioView extends HTMLElement {
 
     this.state = {
       selected: [],
+      selectedEditable: null,
       images: []
     };
 
@@ -2356,12 +2297,15 @@ class StudioView extends HTMLElement {
       this.state.selected = [page.getAttribute('product-element')];
       page.classList.add('is-selected');
 
-      this.tools.dispatchEvent(new CustomEvent('selected:changed', {
-        detail: {
-          type: 'photobook',
-          element: page
+      this.tools.setTools({
+        layout: {
+          selected: page.getAttribute('photobook-page')
+        },
+        text: {
+          text: '',
+          fontSize: ''
         }
-      }));
+      });
     })
 
     this.elements.container.append(page);
@@ -2478,7 +2422,6 @@ class ImageChooser extends HTMLElement {
     this.metaLogin.remove();
     this.logoutBtn.remove();
   }
-
 
   open(from) {
     this.style.opacity = 0;
@@ -2768,6 +2711,10 @@ class ImageChooser extends HTMLElement {
     this.classList.add('is-loading');
 
     const { access_token, user_id } = window.oauthInstagram;
+
+    if (!access_token || !user_id) {
+      return;
+    }
 
     const photos = await fetch(`https://graph.instagram.com/${user_id}/media?fields=media_url,id,name,craeted_time&access_token=${access_token}`)
       .then(res => res.json())
