@@ -42,8 +42,17 @@ const subsctibeToActionController = ActiveActionsController();
 (function() {
   let counter = 0;
 
-  window.uniqueId = () => {
-    return 'id-' + counter++;
+  const childBlock = () => {
+    return 'childBlock-' + counter++;
+  }
+
+  const block = () => {
+    return 'block-' + counter++;
+  }
+
+  window.uniqueID = {
+    childBlock,
+    block
   }
 })();
 
@@ -228,46 +237,29 @@ const sizes = {
 }
 
 const globalState = {
+  productId: null,
   product: null,
-  customer: null,
   view: {
-
+    product: null,
+    blocks: [],
+    blockCount: 0
   },
   panel: {
-    productInfo: {
-      product: null
-    },
+    product: null,
+    blockCount: 0,
     tools: {
-      tabs: {
-        selected: null,
-        list: [],
-        disabled: []
+      layout: {
+        show: true,
       },
-      pages: {
-        products: {
-          gridType: '',
-          selected: null
-        },
-        images: {
-          list: [],
-        },
-        edit: {
-          tools: {
-            layout: ''
-          }
-        },
-        selected: null,
+      text: {
+        show: false
       }
     }
   },
-  imageChooser: {
-    instagramLogin: {},
-    FacebookLogin: {}
-  },
-  errors: {
-    list: [],
-    show: new Boolean()
-  }
+}
+
+const compareObjects = (obj1, obj2) => {
+  return JSON.stringify(obj1) === JSON.stringify(obj2);
 }
 
 const productParams = new URLSearchParams(location.search);
@@ -294,21 +286,43 @@ class ProductBuilder extends HTMLElement {
     this.panel = this.querySelector(ProductBuilder.selectors.panel);
     this.studioView = this.querySelector(ProductBuilder.selectors.studioView);
 
-    this.addEventListener('studio:change', (event) => {
-      const { state } =  event.detail;
-
-      if (!state) {
-        return;
-      }
-
-      console.log(JSON.parse(this.getAttribute('state')))
-    })
-
     this.init();
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
-    console.log(name);
+    const prevState = JSON.parse(oldValue);
+    const currState = JSON.parse(newValue);
+
+    if (compareObjects(prevState, currState)) {
+      return;
+    }
+
+    if (prevState.productId !== currState.productId) {
+      this.getProduct(currState.productId)
+        .then(data => Studio.utils.change({ product: data }));
+      return;
+    }
+
+    if (!compareObjects(prevState.product, currState.product) && currState.product) {
+      this.product = currState.product; 
+
+      this.panel.setState({ product: currState.product });
+
+      const { type, settings, shopify_id } = currState.product;
+      this.studioView.setState({ product: { type, settings, shopify_id }});
+    }
+
+    if (!compareObjects(prevState.panel, currState.panel)) {
+      this.panel.setState(currState.panel);
+    }
+
+    if (!compareObjects(prevState.view, currState.view)) {
+      this.studioView.setState(currState.view);
+    }
+
+    if (prevState.panel.blockCount !== currState.panel.blockCount) {
+      this.studioView.setState({ blockCount: currState.panel.blockCount });
+    }
   }
 
   downloadFacebookAPI() {
@@ -366,39 +380,60 @@ class ProductBuilder extends HTMLElement {
     this.addEventListener('studio:change', (event) => {
       const { state } = event.detail;
 
-      console.log(state);
+      const currState = JSON.parse(this.getAttribute('state'));
+
+      if (!state) {
+        return;
+      }
+
+      // console.log(currState, state);
+      
+      this.setState({
+        ...currState,
+        ...state
+      });
     })
 
-    const productId = productParams.get('id');
-    const customerId = window.customerId;
+    const customer = await this.getCustomer();
 
-    if (!productId) {
-      return;
-    }
-
-    const product = await fetch(`product-builder/product?id=${productId}`)
-      .then(res => res.json());
-
-    const customer = customerId
-      ? await fetch(`product-builder/customer?id=${customerId}`)
-        .then(res => res.json())
-      : null;
+    this.setState({
+      ...JSON.parse(this.getAttribute('state')),
+      productId: productParams.get('id') || null,
+    })
 
     Promise.all([this.downloadFacebookAPI()]).then(_ => {
       customElements.define('image-chooser', ImageChooser);
     });
 
-    this.product = product;
     this.customer = customer;
 
     window.oauthInstagram = JSON.parse(localStorage.getItem('oauthInstagram'));
 
-    this.panel.init(product);
-    this.studioView.init(product);
+    // this.panel.init(product);
 
     this.addEventListener('image:check', this.checkImages.bind(this));
 
-    window.dispatchEvent(new CustomEvent('studio:inited'));
+    this.dispatchEvent(new CustomEvent('studio:inited'));
+  }
+
+  getProduct(id) {
+    let productId = productParams.get('id');
+
+    if (id) {
+      productId = id;
+    }
+
+    return fetch(`product-builder/product?id=${productId}`)
+      .then(res => res.json());
+  }
+
+  getCustomer() {
+    const customerId = window.customerId;
+
+    return customerId
+      ? fetch(`product-builder/customer?id=${customerId}`)
+        .then(res => res.json())
+      : null
   }
 
   checkImages() {
@@ -421,13 +456,13 @@ const StudioChange = () => {
     Studio.dispatchEvent(changeEvent);
   }
 
-  return {
-    change
-  };
+  return change;
 }
 
 window.Studio = document.querySelector('product-builder');
-window.Studio.state = StudioChange();
+window.Studio.utils = {
+  change: StudioChange()
+};
 
 class ErrorToast extends HTMLElement {
   static selectors = {
@@ -536,7 +571,7 @@ class Switch extends HTMLElement {
 
     this.setAttribute('value', event.currentTarget.dataset.value);
 
-    this.dispatchEvent(new CustomEvent('page:product:grid:changed', {
+    this.dispatchEvent(new CustomEvent('switch:changed', {
       detail: {
         value: this.getValue()
       }
@@ -620,7 +655,7 @@ class OptionSelector extends HTMLElement {
   }
 
   getValue() {
-    return this.elements.selected.dataset.settedValue;
+    return +this.elements.selected.dataset.settedValue;
   }
 
   optionTemplate = (variant) => {
@@ -674,6 +709,8 @@ class ProductInfo extends HTMLElement {
   constructor() {
     super();
 
+    this.setAttribute('state', JSON.stringify({}));
+
     this.elements = {
       image: this.querySelector(ProductInfo.selectors.image),
       title: this.querySelector(ProductInfo.selectors.title),
@@ -688,21 +725,55 @@ class ProductInfo extends HTMLElement {
     this.elements.selector.addEventListener('product-option:changed', ((event) => {
       this.checkDoneProduct();
       this.setQuantity(event.detail.value);
+
+      Studio.utils.change({
+        panel: {
+          ...JSON.parse(Studio.panel.getAttribute('state')),
+          blockCount: event.detail.value
+        }
+      });
     }).bind(this));
 
     this.addEventListener('check-images', this.checkOnEvent.bind(this));
+    this.parent = this.parentNode;
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
-    switch(name) {
-      case 'state':
-        this.onStateChange(newValue);
-        break;
+    const prevState = JSON.parse(oldValue);
+    const currState = JSON.parse(newValue);
+
+    if (compareObjects(prevState, currState)) {
+      return;
     }
+
+    const { product } = currState;
+
+    this.setProduct(product);
+
+    if (!this.elements.selector.style.display === 'none') {
+      this.showSelector();
+    }
+  }
+
+  setState(state) {
+    const newState = {
+      ...JSON.parse(this.getAttribute('state')),
+      ...state
+    };
+
+    this.setAttribute('state', JSON.stringify(newState));
   }
 
   onStateChange(state) {
     const { image, title, options } = JSON.parse(state);
+  }
+
+  destroySelector() {
+    this.elements.selector.style.display = 'none';
+  }
+
+  showSelector() {
+    this.elements.selector.style.display = null;
   }
 
   setProduct(product) {
@@ -710,9 +781,28 @@ class ProductInfo extends HTMLElement {
     this.elements.title.textContent = product.title;
 
     const sizeOptions = product.options.find(option => option.name === 'Size');
-    
-    this.elements.selector.setData(sizeOptions, productParams.get('size'));
 
+    let selectedValue = productParams.get('size');
+
+    if (sizeOptions && !sizeOptions.values.includes(productParams.get('size'))) {
+      selectedValue = sizeOptions.values[0];
+    }
+
+    if (!sizeOptions) {
+      this.destroySelector();
+      return;
+    }
+    
+    this.elements.selector.setData(sizeOptions, selectedValue);
+
+    Studio.utils.change({
+      panel: {
+        ...JSON.parse(Studio.panel.getAttribute('state')),
+        blockCount: sizes[selectedValue]
+      }
+    });
+
+    this.setQuantity(sizes[selectedValue]);
   }
 
   checkOnEvent(event) {
@@ -900,7 +990,13 @@ class Tool {
 
   setOnCreate(state) {
     return;
-  } 
+  }
+
+  getValue() {
+    return {
+      value: 'Content'
+    }
+  }
 
   create(state) {
     this.container.style.opacity = 0;
@@ -955,6 +1051,10 @@ class LayoutTool extends Tool {
   }
 
   setOnCreate(state) {
+    if (!state) {
+      return;
+    }
+
     const { selected } = state;
 
     const newSelected = this.layouts
@@ -966,6 +1066,12 @@ class LayoutTool extends Tool {
       newSelected.select();
 
       this.selected = newSelected;
+    }
+  }
+
+  getValue() {
+    return {
+      layout: this.selected.layoutId
     }
   }
 
@@ -1120,7 +1226,8 @@ class Tools extends HTMLElement {
       products: {
         container: '[data-products-list]',
         product: '[data-product]',
-        switch: '[data-product-switch-grid]'
+        switch: '[data-product-switch-grid]',
+        openProduct: '[data-product-button]'
       },
       images: {
         imageHide: '[data-image-hide]',
@@ -1146,21 +1253,29 @@ class Tools extends HTMLElement {
   constructor() {
     super();
 
-    this.setAttribute('state', '');
-
-    this.init();
+    this.setAttribute('state', JSON.stringify(globalState.panel.tools));
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
-    console.log(name, newValue);
-    switch (name) {
-      case 'state':
-        this.state = JSON.parse(newValue);
-        break;
+    const prevState = JSON.parse(oldValue);
+    const currState = JSON.parse(newValue);
+
+    if (!compareObjects(prevState, currState)) {
+      for (const tool in currState) {
+        const { show } = currState[tool];
+  
+        if (show && this.edit.tools[tool]) {
+          this.edit.tools[tool].create();
+        } else {
+          this.edit.tools[tool].remove();
+        }
+      }
     }
   }
 
   init() {
+    this.setAttribute('state', JSON.stringify(globalState.panel.tools));
+
     this.errorToast = document.querySelector(Tools.selectors.errorToast);
     this.playground = document.querySelector(Tools.selectors.playground);
 
@@ -1169,10 +1284,17 @@ class Tools extends HTMLElement {
     this.initEditPage();
 
     this.initEventListeners();
+
+    this.inited = true;
   }
 
   setState(state) {
-    this.setAttribute('state', JSON.stringify(state));
+    const newState = {
+      ...JSON.parse(this.getAttribute('state')),
+      ...state
+    };
+
+    this.setAttribute('state', JSON.stringify(newState));
   }
 
   onStateChange() {
@@ -1269,7 +1391,7 @@ class Tools extends HTMLElement {
 
     const gridSwitch = this.querySelector(Tools.selectors.pages.products.switch);
     this.classList.add('product-grid--' + gridSwitch.getValue());
-    gridSwitch.addEventListener('page:product:grid:changed', (event) => {
+    gridSwitch.addEventListener('switch:changed', (event) => {
       this.pages.products.grid.value = event.detail.value;
 
       if (event.detail.value === 'line') {
@@ -1283,12 +1405,20 @@ class Tools extends HTMLElement {
       .then(res => res.json());
 
     const products = productsData
-      .filter(product => !product.shopify_id.includes(productParams.get('id')))
       .map(item => {
         productsContainer.appendChild(this.productTemplate.call(this, item));
 
         return item;
       });
+
+    const openProductBtn = this.querySelector(Tools.selectors.pages.products.openProduct);
+    openProductBtn.addEventListener('click', () => {
+      if (this.pages.products.selected) {
+        Studio.utils.change({
+          productId: this.pages.products.selected.dataset.id
+        })
+      }
+    })
 
     this.pages.products = {
       list: products,
@@ -1303,7 +1433,7 @@ class Tools extends HTMLElement {
   productTemplate(product) {
     const container = document.createElement('div');
     container.classList.add('page__product');
-    container.dataset.id = product._id;
+    container.dataset.id = product.shopify_id.split('/').pop();
     
     const productInner = `
       <img
@@ -1314,6 +1444,7 @@ class Tools extends HTMLElement {
         height="140"
         alt="product image"
         class="page__product-image"
+        draggable="false"
       >
 
       <div class="page__product-info">
@@ -1559,6 +1690,32 @@ class Tools extends HTMLElement {
         tool3: new Tool('Tool 3'),
       }
     }
+
+    Studio.utils.change({ panel: {
+      ...JSON.parse(Studio.panel.getAttribute('state')),
+      tools: {
+        layout: {
+          show: false,
+          value: this.edit.tools.layout.getValue()
+        },
+        text: {
+          show: false,
+          value: this.edit.tools.text.getValue()
+        }
+      }
+    }})
+  }
+
+  setToolsState(tools) {
+    const state = JSON.parse(this.getAttribute('state'));
+
+    for (const tool in tools) {
+      state[tool] = {
+        ...state[tool],
+        ...tools[tool]
+      };
+    }
+    this.setAttribute('state', JSON.stringify(state));
   }
 
   setTools(tools) {
@@ -1594,29 +1751,59 @@ class Panel extends HTMLElement {
     this.productInfo = this.querySelector(Panel.selectors.productInfo);
     this.tools = this.querySelector(Panel.selectors.tools);
 
-    this.setAttribute('state', '');
+    this.setAttribute('state', JSON.stringify(globalState.panel));
 
     this.tools.addEventListener('tab:changed', (event) => {
       console.log('current tab: ' + event.detail.tab.dataset.tab);
     });
+
+    this.tools.init();
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
-    console.log(name, newValue);
-    switch (name) {
-      case 'state':
-        this.state = JSON.parse(newValue);
-        this.onStateChange();
-        break;
-    }
-  }
+    const prevState = JSON.parse(oldValue);
+    const currState = JSON.parse(newValue);
 
-  init(product) {
-    this.productInfo.setProduct(product);
+    if (compareObjects(prevState, currState)) {
+      return;
+    }
+
+    if (!compareObjects(prevState.product, currState.product)) {
+      this.productInfo.setState({
+        product: currState.product
+      });
+
+      const { hasLayout, hasText } = currState.product.settings;
+
+      this.tools.setToolsState({
+        layout: {
+          show: hasLayout
+        },
+        text: {
+          show: hasText
+        }
+      })
+    }
+
+    const { layout, text } = currState.tools;
+
+    this.tools.setToolsState({
+      layout: {
+        ...layout
+      },
+      text: {
+        ...text
+      }
+    })
   }
 
   setState(state) {
-    this.setAttribute('state', JSON.stringify(state));
+    const newState = {
+      ...JSON.parse(this.getAttribute('state')),
+      ...state
+    }
+
+    this.setAttribute('state', JSON.stringify(newState));
   }
 
   onStateChange() {
@@ -1648,12 +1835,26 @@ class EditablePicture extends HTMLElement {
     super();
 
     this.initImage();
+
+    this.addEventListener('click', () => {
+      Studio.studioView.setSelectedChild(this);
+    })
   }
 
   connectedCallback() {
+    this.toggleAttribute('editable-picture');
+    this.setAttribute('child-block', window.uniqueID.childBlock());
   }
 
   initImage() {
+  }
+
+  select() {
+    this.classList.add('is-selected');
+  }
+
+  unselect() {
+    this.classList.remove('is-selected');
   }
   
   setImage(imageUrl) {
@@ -1851,6 +2052,8 @@ class ProductElement extends HTMLElement {
     this.setAttribute('required-count-of-images', 1);
     this.setAttribute('count-of-images', 0);
 
+    this.setAttribute('block', uniqueID.block());
+
     this.initControls();
   }
 
@@ -1899,16 +2102,12 @@ class ProductElement extends HTMLElement {
     this.dispatchEvent(new CustomEvent('select', {
       detail: {
         element: this,
-        id: this.getId()
+        id: this.getAttribute('block')
       }
     }))
   }
 
-  unselect(target) {
-    if (target !== this) {
-      return;
-    }
-
+  unselect() {
     this.classList.remove('is-selected');
 
     this.dispatchEvent(new CustomEvent('unselect', {
@@ -1949,6 +2148,7 @@ class PhotobookPage extends HTMLElement {
   }
 
   connectedCallback() {
+    this.setAttribute('block', uniqueID.block());
     this.init();
   }
 
@@ -2027,7 +2227,11 @@ class PhotobookPage extends HTMLElement {
     return picture;
   }
 
-  getText() {
+  getText(options = {
+    line: false
+  }) {
+    const { line } = options;
+
     const container = document.createElement('div');
     container.classList.add('product-element__text', 'textarea-container');
       container.toggleAttribute('data-textarea', 'is-empty');
@@ -2037,6 +2241,10 @@ class PhotobookPage extends HTMLElement {
     text.classList.add(
       'textarea',
     );
+
+    if (line) {
+      text.classList.add('line');
+    }
 
     text.textContent = 'Add your description here';
 
@@ -2121,11 +2329,10 @@ class PhotobookPage extends HTMLElement {
     leftWrap.toggleAttribute('data-child');
     rightWrap.toggleAttribute('data-child');
 
-    leftWrap.append(this.getEditable(), this.getText());
-    rightWrap.append(this.getEditable(), this.getText());
+    leftWrap.append(this.getEditable(), this.getText({ line: true }));
+    rightWrap.append(this.getEditable(), this.getText({ line: true }));
 
     this.append(leftWrap, rightWrap);
-
   }
 }
 customElements.define('photobook-page', PhotobookPage);
@@ -2143,11 +2350,79 @@ class StudioView extends HTMLElement {
     container: '[data-studio-view-container]',
     productElement: '[product-element]',
     productInfo: 'product-info',
-    tools: 'customization-tools'
+    tools: 'customization-tools',
+    block: '[block]',
+    blockId: (id) => `[block="${id}"]`,
+    editableById: (id) => `[editable-picture="${id}"]`,
+    childBlock: '[child-block]',
+    childBlockById: (id) => `[child-block="${id}"]`
   };
+
+  static get observedAttributes() {
+    return ['state']
+  }
 
   constructor() {
     super();
+    this.setAttribute('state', JSON.stringify(globalState.view));
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    const prevState = JSON.parse(oldValue);
+    const currState = JSON.parse(newValue);
+
+    if (!prevState || !currState) {
+      return;
+    }
+
+    if (compareObjects(prevState, currState)) {
+      return;
+    }
+
+    if (!compareObjects(prevState.product, currState.product)) {
+      const { type } = currState.product;
+
+      this.init(currState.product);
+      this.setProductElements(currState.blockCount, { clearAll: true });
+    }
+
+    if (!compareObjects(prevState.blocks, currState.blocks)) {
+      const selectedBlock = prevState.blocks.find(block => block.selected || block.activeChild);
+      const toSelectBlock = currState.blocks.find(block => block.selected || block.activeChild);
+
+      if (compareObjects(selectedBlock, toSelectBlock)) {
+        return;
+      }
+
+      const selected = this.querySelector(
+        StudioView.selectors.blockId(selectedBlock?.id)
+      );
+
+      if (selected) {
+        selected.unselect();
+      }
+      
+      const toSelect = this.querySelector(
+        StudioView.selectors.blockId(toSelectBlock?.id)
+      );
+
+      if (toSelect) {
+        toSelect.select();
+      }
+    }
+
+    if (currState.product && prevState.blockCount !== currState.blockCount) {
+      this.setProductElements(currState.blockCount);
+    }
+  }
+
+  setState(state) {
+    const newState = {
+      ...JSON.parse(this.getAttribute('state')),
+      ...state
+    };
+
+    this.setAttribute('state', JSON.stringify(newState));
   }
 
   init(product) {
@@ -2160,9 +2435,6 @@ class StudioView extends HTMLElement {
     const container = this.querySelector(StudioView.selectors.container);
 
     const sizeSelector = document.querySelector(StudioView.selectors.sizeSelector);
-    sizeSelector.addEventListener('product-option:changed', ((event) => {
-      this.setProductElements(event.detail.value);
-    }).bind(this));
     
     this.elements = {
       sizeSelector: sizeSelector,
@@ -2176,9 +2448,9 @@ class StudioView extends HTMLElement {
       images: []
     };
 
-    this.setProductElements(+sizeSelector.querySelector('[data-setted-value]').dataset.settedValue);
-
     this.initEventListeners();
+
+    this.inited = true;
   }
 
   initEventListeners() {
@@ -2231,10 +2503,9 @@ class StudioView extends HTMLElement {
     }));
   }
 
-  createDefaultProductElement(id) {
+  createDefaultProductElement() {
     const productElement = document.createElement('product-element');
     productElement.classList.add('product-builder__element', 'product-element', 'is-default');
-    productElement.setAttribute('product-element', id || '');
     productElement.setAttribute('quantity', 1);
 
     const picture = document.createElement('editable-picture');
@@ -2256,74 +2527,126 @@ class StudioView extends HTMLElement {
       console.log(event.detail.value);
     });
 
-    productElement.addEventListener('select', (event) => {
-      this.state.selected.forEach(item => {
-        if (event.currentTarget.getAttribute('product-element') === item) {
-          return;
-        }
-
-        const toRemove = this.querySelector(`[product-element="${item}"]`)
-        if (toRemove) {
-          toRemove.classList.remove('is-selected');
-        }
-      })
-
-      this.state.selected = [event.detail.id];
-      console.log(this.state.selected);
+    productElement.addEventListener('click', (event) => {
+      this.setSelectedBlock(productElement);
     });
-
-    productElement.addEventListener('unselect', (event) => {
-      this.state.selected = this.state.selected.filter(item => item !== event.detail.id);
-    })
 
     productElement.innerHTML += ProductControls.template;
 
     this.elements.container.appendChild(productElement);
   }
 
-  createPhotobookPage(id, layout) {
+  createPhotobookPage(layout) {
     const page = document.createElement('photobook-page');
     page.classList.add('photobook-page', 'product-builder__element');
-    page.setAttribute('product-element', id);
     page.setAttribute('photobook-page', layout);
 
     page.addEventListener('click', () => {
-      const selected = this.querySelector(StudioView.selectors.productElement + '.is-selected');
-      if (selected) {
-        selected.classList.remove('is-selected');
-      }
-
-
-      this.state.selected = [page.getAttribute('product-element')];
-      page.classList.add('is-selected');
-
-      this.tools.setTools({
-        layout: {
-          selected: page.getAttribute('photobook-page')
-        },
-        text: {
-          text: '',
-          fontSize: ''
-        }
-      });
+      this.setSelectedBlock(page);
     })
 
     this.elements.container.append(page);
   }
 
-  clearView(size) {
-    this.elements.container.querySelectorAll(StudioView.selectors.productElement)
-      .forEach((item, idx) => {
-        if (idx >= size) {
-          item.style.opacity = 0;
-          item.setAttribute('quantity', 0);
-          setTimeout(() => {
-            this.elements.container.removeChild(item)
-          }, 300);
-        }
-      });
+  setSelectedBlock(block) {
+    const selectedBlock = this.getBlockJSON(block);
+    const { blocks } = JSON.parse(this.getAttribute('state'));
 
-      this.checkProductsReady();
+    const newBlocks = blocks
+      .map(sBlock => {
+        if (sBlock.id !== selectedBlock.id) {
+          return {
+            ...sBlock,
+            selected: false
+          }
+        }
+
+        return {
+          ...sBlock,
+          selected: true
+        }
+      })
+
+    Studio.utils.change({
+      view: {
+        ...JSON.parse(this.getAttribute('state')),
+        blocks: newBlocks
+      }
+    });
+  }
+
+  setSelectedChild(child) {
+    const childID = child.getAttribute('child-block');
+
+    const { blocks } = JSON.parse(this.getAttribute('state'));
+
+    let childJSON;
+
+    const blockJSON = blocks.find(block => {
+      childJSON = block.childBlocks.find(item => item.id === childID);
+
+      if (childJSON) {
+        return true;
+      }
+
+      return false;
+    });
+
+    childJSON = {
+      ...childJSON,
+      selected: true
+    }
+
+    console.log(childJSON, blockJSON);
+  }
+
+  clearView(size) {
+    const blocks =  this.elements.container.querySelectorAll(StudioView.selectors.block);
+
+    if (!size) {
+      return new Promise((res, rej) => {
+        if (blocks.length === 0) {
+          res();
+        }
+
+        blocks
+          .forEach((item, idx) => {
+            item.style.opacity = 0;
+            item.setAttribute('quantity', 0);
+
+            setTimeout(() => {
+              item.remove();
+
+              if (idx === blocks.length - 1) {
+                res();
+              }
+            }, 300);
+          })
+      });
+    }
+
+    this.checkProductsReady();
+
+    return new Promise((res, rej) => {
+      if (blocks.length === 0) {
+        res();
+      }
+
+      blocks
+        .forEach((item, idx) => {
+          if (idx >= size) {
+            item.style.opacity = 0;
+            item.setAttribute('quantity', 0);
+            setTimeout(() => {
+              item.remove();
+
+              if (idx === blocks.length - 1) {
+                res();
+              }
+            }, 300);
+          }
+        });
+    })
   }
 
   getQuantity() {
@@ -2334,19 +2657,85 @@ class StudioView extends HTMLElement {
       }, 0) || 0;
   }
 
-  setProductElements(size) {
-    if (size > this.elements.container.children.length) {
-      const nowLength = this.elements.container.children.length;
+  setProductElements(size, options = {
+    clearAll: false
+  }) {
+    const { product } = JSON.parse(this.getAttribute('state'));
 
-      for (let i = 0; i < size - nowLength; i++) {
-        if (Studio.product.type && Studio.product.type.id === 'photobook') {
-          this.createPhotobookPage(uniqueId(), 'whole');
-        } else {
-          this.createDefaultProductElement(uniqueId());
+    const waitToClear = [];
+
+    if (!product) {
+      return;
+    }
+
+    if (!options.clearAll) {
+      if (size > this.elements.container.children.length) {
+        const nowLength = this.elements.container.children.length;
+  
+        for (let i = 0; i < size - nowLength; i++) {
+          switch(product.type.id) {
+            case 'photobook':
+              this.createPhotobookPage('whole');
+              break;
+            default:
+              this.createDefaultProductElement();
+              break;
+          }
+        }
+      } else if (size < this.elements.container.children.length) {
+        waitToClear.push(this.clearView(size));
+      }
+    } else {
+      waitToClear.push(this.clearView());
+
+      for (let i = 0; i < size; i++) {
+        switch(product.type.id) {
+          case 'photobook':
+            this.createPhotobookPage('whole');
+            break;
+          default:
+            this.createDefaultProductElement();
+            break;
         }
       }
-    } else if (size < this.elements.container.children.length) {
-      this.clearView(size);
+    }
+
+    Promise.all(waitToClear).then(_ => {
+        const blocksJSON = [...this.querySelectorAll(StudioView.selectors.block)]
+          .map(block => this.getBlockJSON(block));
+
+        Studio.utils.change({ view: {
+          ...JSON.parse(this.getAttribute('state')),
+          blocks: blocksJSON
+        }});
+      });
+  }
+
+  getBlockJSON(block) {
+    const id = block.getAttribute('block');
+
+    const childBlocks = [...block.querySelectorAll(StudioView.selectors.childBlock)];
+
+    const blockJSON = {
+      id,
+      selected: block.classList.contains('is-selected'),
+      activeChild: childBlocks.some(child => child.classList.contains('is-selected')),
+      childBlocks: [
+        ...childBlocks
+          .map(child => this.getChildJSON(child))
+      ]
+    }
+
+    return blockJSON
+  }
+
+  getChildJSON(child) {
+    const key = child.getAttribute('child-block');
+
+    return {
+      type: child.hasAttribute('editable-picture') ? 'editable-picture' : 'text',
+      id: key,
+      selected: false
     }
   }
 
@@ -2717,9 +3106,18 @@ class ImageChooser extends HTMLElement {
     }
 
     const photos = await fetch(`https://graph.instagram.com/${user_id}/media?fields=media_url,id,name,craeted_time&access_token=${access_token}`)
-      .then(res => res.json())
       .then(res => {
-        if (res.data) {
+        console.log(res);
+        if (!res.ok) {
+          this.instLogin.create();
+          
+          return;
+        }
+
+        return res.json()
+      })
+      .then(res => {
+        if (res && res.data) {
           return res.data.map(photo => {
             return {
               id: photo.id,
@@ -2732,15 +3130,12 @@ class ImageChooser extends HTMLElement {
 
       this.classList.remove('is-loading');
 
-      photos
-        .map(photo => photo.image)
-        .forEach(photo => {
-          this.imageList.append(this.imageTemplate(photo))
-        });
+      if (photos) {
+        photos
+          .map(photo => photo.image)
+          .forEach(photo => {
+            this.imageList.append(this.imageTemplate(photo))
+          });
+      }
   }
 }
-
-
-document.addEventListener('page:product:grid:changed', (event) => {
-  console.log('grid changed: ' + event.detail.value );
-});
