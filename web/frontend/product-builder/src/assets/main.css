@@ -1425,6 +1425,16 @@ photobook-page {
   opacity: 1;
   transition: border-color .3s, opacity .15s;
   --textarea-font-size: 16px;
+  cursor: pointer;
+}
+
+.photobook-page::before {
+  content: '';
+  position: absolute;
+  top: -30px;
+  left: -30px;
+  right: -30px;
+  bottom: -30px;
 }
 
 .photobook-page.is-selected {

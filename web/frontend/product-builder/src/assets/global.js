@@ -318,11 +318,126 @@ class ProductBuilder extends HTMLElement {
 
     if (!compareObjects(prevState.view, currState.view)) {
       this.studioView.setState(currState.view);
+
+      if (this.product && !compareObjects(prevState.view.blocks, currState.view.blocks)) {
+        const { blocks } =  currState.view;
+
+        const selectedBlock = blocks.find(block => block.selected);
+
+        if (!selectedBlock) {
+          const blockWithActiveChild = blocks.find(block => block.activeChild);
+
+          if (blockWithActiveChild) {
+            const selectedChild = blockWithActiveChild.childBlocks.find(child => child.selected);
+
+            if (selectedChild) {
+              this.setTools(selectedChild.tools);
+            }
+          }
+        }
+
+        if (selectedBlock) {
+          this.setTools();
+        }
+      }
+    }
+
+    if (this.product && !compareObjects(prevState.panel.tools, currState.panel.tools)) {
+      const { tools } = currState.panel;
+
+      const { blocks } = currState.view;
+
+      const isSelectedBlocks = blocks.some(block => block.selected);
+
+      if (!isSelectedBlocks) {
+        const blockWithActiveChild = blocks.find(block => block.activeChild);
+
+        if (blockWithActiveChild) {
+          const selectedChilds = blockWithActiveChild.childBlocks
+            .filter(child => child.selected);
+
+          console.log(selectedChilds);
+        }
+      } else {
+        const newSelectedBlocks = blocks
+          .map(block => {
+            if (block.selected) {
+              const { settings } = block;
+
+              const newSettings = {};
+  
+              for (const tool in settings) {
+                newSettings[tool] = tools[tool].value;
+              }
+  
+              return {
+                ...block,
+                settings: newSettings
+              };
+            }
+
+            return block;            
+          });
+        
+        console.log(newSelectedBlocks);
+        
+        this.studioView.setState({ blocks: newSelectedBlocks });
+      }
     }
 
     if (prevState.panel.blockCount !== currState.panel.blockCount) {
       this.studioView.setState({ blockCount: currState.panel.blockCount });
     }
+  }
+
+  setTools(toolsList) {
+    const { tools } = JSON.parse(Studio.panel.getAttribute('state'));
+
+    const updatedTools = { ...tools };
+
+    if (!toolsList) {
+      const { settings } = this.product;
+
+      for (const tool in updatedTools) {
+        switch(tool) {
+          case 'layout':
+            updatedTools[tool] = {
+              ...updatedTools[tool],
+              show: settings.hasLayout
+            }
+            break;
+          case 'text':
+            updatedTools[tool] = {
+              ...updatedTools[tool],
+              show: settings.hasText
+            }
+            break;
+        }
+      }
+
+      Studio.utils.change({
+        panel: {
+          ...JSON.parse(Studio.panel.getAttribute('state')),
+          tools: updatedTools
+        }
+      });
+
+      return;
+    }
+
+    for (const tool in updatedTools) {
+      updatedTools[tool] = {
+        ...updatedTools[tool],
+        show: toolsList.includes(tool)
+      } 
+    }
+
+    Studio.utils.change({
+      panel: {
+        ...JSON.parse(Studio.panel.getAttribute('state')),
+        tools: updatedTools
+      }
+    });
   }
 
   downloadFacebookAPI() {
@@ -370,10 +485,6 @@ class ProductBuilder extends HTMLElement {
     this.setAttribute('state', JSON.stringify(state));
   }
 
-  onStateChange() {
-
-  }
-
   async init() {
     this.setState(globalState);
 
@@ -385,8 +496,6 @@ class ProductBuilder extends HTMLElement {
       if (!state) {
         return;
       }
-
-      // console.log(currState, state);
       
       this.setState({
         ...currState,
@@ -408,8 +517,6 @@ class ProductBuilder extends HTMLElement {
     this.customer = customer;
 
     window.oauthInstagram = JSON.parse(localStorage.getItem('oauthInstagram'));
-
-    // this.panel.init(product);
 
     this.addEventListener('image:check', this.checkImages.bind(this));
 
@@ -445,23 +552,19 @@ class ProductBuilder extends HTMLElement {
 }
 customElements.define('product-builder', ProductBuilder);
 
-const StudioChange = () => {
-  const change = (state) => {
-    const changeEvent = new CustomEvent('studio:change', {
-      detail: {
-        state
-      }
-    });
+const change = (state) => {
+  const changeEvent = new CustomEvent('studio:change', {
+    detail: {
+      state
+    }
+  });
 
-    Studio.dispatchEvent(changeEvent);
-  }
-
-  return change;
+  Studio.dispatchEvent(changeEvent);
 }
 
 window.Studio = document.querySelector('product-builder');
 window.Studio.utils = {
-  change: StudioChange()
+  change
 };
 
 class ErrorToast extends HTMLElement {
@@ -992,10 +1095,18 @@ class Tool {
     return;
   }
 
+  setValue(value) {
+    return value;
+  }
+
   getValue() {
     return {
       value: 'Content'
     }
+  }
+
+  isExists() {
+    return document.contains(this.container);
   }
 
   create(state) {
@@ -1075,6 +1186,23 @@ class LayoutTool extends Tool {
     }
   }
 
+  setValue(state) {
+    this.selected.unselect();
+
+    if (!state || !state.layout) {
+      return;
+    }
+
+    const { layout } = state;
+
+    const toSelect = this.layouts.find(variant => variant.layoutId === layout);
+
+    console.log(toSelect, layout);
+    if (toSelect) {
+      toSelect.select();
+    }
+  }
+
   layoutIconTemplate(layout) {
     const { icon: iconSVG } = layouts[layout];
 
@@ -1098,11 +1226,20 @@ class LayoutTool extends Tool {
 
       this.selected = layoutIcon;
 
-      Studio.studioView.dispatchEvent(new CustomEvent('change:layout', {
-        detail: {
-          layout: icon.dataset.layout
+      const panelState = JSON.parse(Studio.panel.getAttribute('state'));
+
+      Studio.utils.change({
+        panel: {
+          ...panelState,
+          tools: {
+            ...panelState.tools,
+            layout: {
+              ...panelState.tools.layout,
+              value: this.getValue()
+            }
+          }
         }
-      }))
+      });
     }
 
     const unselect = () => {
@@ -1260,12 +1397,18 @@ class Tools extends HTMLElement {
     const prevState = JSON.parse(oldValue);
     const currState = JSON.parse(newValue);
 
+    console.log(currState);
+
     if (!compareObjects(prevState, currState)) {
       for (const tool in currState) {
         const { show } = currState[tool];
   
         if (show && this.edit.tools[tool]) {
-          this.edit.tools[tool].create();
+          if (this.edit.tools[tool].isExists()) {
+            this.edit.tools[tool].setValue();
+          } else {
+            this.edit.tools[tool].create();
+          }
         } else {
           this.edit.tools[tool].remove();
         }
@@ -1295,13 +1438,6 @@ class Tools extends HTMLElement {
     };
 
     this.setAttribute('state', JSON.stringify(newState));
-  }
-
-  onStateChange() {
-    const { tabs, products, images, edit } = this.state;
-
-
-    console.log(tabs, products, images, edit);
   }
 
   initEventListeners() {
@@ -1715,6 +1851,7 @@ class Tools extends HTMLElement {
         ...tools[tool]
       };
     }
+
     this.setAttribute('state', JSON.stringify(state));
   }
 
@@ -1752,10 +1889,6 @@ class Panel extends HTMLElement {
     this.tools = this.querySelector(Panel.selectors.tools);
 
     this.setAttribute('state', JSON.stringify(globalState.panel));
-
-    this.tools.addEventListener('tab:changed', (event) => {
-      console.log('current tab: ' + event.detail.tab.dataset.tab);
-    });
 
     this.tools.init();
   }
@@ -1795,6 +1928,19 @@ class Panel extends HTMLElement {
         ...text
       }
     })
+
+    if (!compareObjects(prevState.tools, currState.tools)) {
+      const { layout, text } = currState.tools;
+
+      this.tools.setToolsState({
+        layout: {
+          ...layout
+        },
+        text: {
+          ...text
+        }
+      })
+    }
   }
 
   setState(state) {
@@ -1855,6 +2001,10 @@ class EditablePicture extends HTMLElement {
 
   unselect() {
     this.classList.remove('is-selected');
+  }
+
+  getToolsList() {
+    return ['rotate', 'crop', 'filter'];
   }
   
   setImage(imageUrl) {
@@ -2053,6 +2203,7 @@ class ProductElement extends HTMLElement {
     this.setAttribute('count-of-images', 0);
 
     this.setAttribute('block', uniqueID.block());
+    this.setAttribute('block-type', 'default-product');
 
     this.initControls();
   }
@@ -2149,6 +2300,7 @@ class PhotobookPage extends HTMLElement {
 
   connectedCallback() {
     this.setAttribute('block', uniqueID.block());
+    this.setAttribute('block-type', 'photobook-page');
     this.init();
   }
 
@@ -2183,6 +2335,10 @@ class PhotobookPage extends HTMLElement {
     if (callback) {
       callback.apply(this);
     }
+  }
+
+  setLayout(layout) {
+    this.setAttribute('photobook-page', layout);
   }
 
   initMiddleGradient() {
@@ -2352,7 +2508,7 @@ class StudioView extends HTMLElement {
     productInfo: 'product-info',
     tools: 'customization-tools',
     block: '[block]',
-    blockId: (id) => `[block="${id}"]`,
+    blockById: (id) => `[block="${id}"]`,
     editableById: (id) => `[editable-picture="${id}"]`,
     childBlock: '[child-block]',
     childBlockById: (id) => `[child-block="${id}"]`
@@ -2380,35 +2536,16 @@ class StudioView extends HTMLElement {
     }
 
     if (!compareObjects(prevState.product, currState.product)) {
-      const { type } = currState.product;
-
       this.init(currState.product);
       this.setProductElements(currState.blockCount, { clearAll: true });
     }
 
     if (!compareObjects(prevState.blocks, currState.blocks)) {
-      const selectedBlock = prevState.blocks.find(block => block.selected || block.activeChild);
-      const toSelectBlock = currState.blocks.find(block => block.selected || block.activeChild);
+      this.toggleSelected(prevState.blocks, currState.blocks);
 
-      if (compareObjects(selectedBlock, toSelectBlock)) {
-        return;
-      }
+      // console.log(prevState.blocks, currState.blocks);
 
-      const selected = this.querySelector(
-        StudioView.selectors.blockId(selectedBlock?.id)
-      );
-
-      if (selected) {
-        selected.unselect();
-      }
-      
-      const toSelect = this.querySelector(
-        StudioView.selectors.blockId(toSelectBlock?.id)
-      );
-
-      if (toSelect) {
-        toSelect.select();
-      }
+      this.setBlocksValue(prevState.blocks, currState.blocks);
     }
 
     if (currState.product && prevState.blockCount !== currState.blockCount) {
@@ -2451,6 +2588,108 @@ class StudioView extends HTMLElement {
     this.initEventListeners();
 
     this.inited = true;
+  }
+
+  toggleSelected(prevBlocks, currBlocks) {
+    const selectedBlock = prevBlocks.find(block => block.selected || block.activeChild);
+    const toSelectBlock = currBlocks.find(block => block.selected || block.activeChild);
+
+    if (compareObjects(selectedBlock, toSelectBlock)) {
+      return;
+    }
+
+    const selected = this.querySelector(
+      StudioView.selectors.blockById(selectedBlock?.id)
+    );
+
+    if (selected) {
+      if (selectedBlock.id !== toSelectBlock.id) {
+        selected.unselect();
+      }
+
+      if (selectedBlock.activeChild && !selectedBlock.selected) {
+        const childJSON = selectedBlock.childBlocks.find(child => child.selected);
+
+        if (childJSON) {
+          const child = this.querySelector(StudioView.selectors.childBlockById(childJSON.id));
+          
+          if (child) {
+            child.unselect();
+          }
+        }
+      }
+    }
+    
+    const toSelect = this.querySelector(
+      StudioView.selectors.blockById(toSelectBlock?.id)
+    );
+
+    if (toSelect) {
+      toSelect.select();
+
+      if (toSelectBlock.activeChild && !toSelectBlock.selected) {
+        const childJSON = toSelectBlock.childBlocks.find(child => child.selected);
+
+        console.log(toSelectBlock.childBlocks)
+
+        if (childJSON) {
+          const child = this.querySelector(StudioView.selectors.childBlockById(childJSON.id));
+
+          if (child) {
+            child.select();
+          }
+        }
+      }
+    }
+  }
+
+  setBlocksValue(prevBlocks, currBlocks) {
+    const newBlocks = currBlocks
+      .map(block => {
+        const element = this.querySelector(StudioView.selectors.blockById(block.id));
+
+        let prevSettings = {};
+
+        const selectedChildrenIds = block.childBlocks
+          .filter(child => child.selected)
+          .map(child => child.id);
+
+        const prevBlock = prevBlocks.find(prevB => prevB.id === block.id);
+        
+        if (prevBlock) {
+          prevSettings = prevBlock.settings;
+        }
+
+        const { layout, text } = block.settings;
+
+        switch(block.type) {
+          case 'photobook-page':
+            if (!compareObjects(prevSettings.layout, layout)) {
+              console.log(layout.layout);
+              element.setLayout(layout.layout);
+            }
+            break;
+        }
+
+        const children = [...element.querySelectorAll(StudioView.selectors.childBlock)]
+          .map(child => {
+            const childID = child.getAttribute('child-block');
+
+            return this.getChildJSON(child, selectedChildrenIds.includes(childID));
+          });
+
+        return {
+          ...block,
+          childBlocks: children
+        };
+      });
+
+    Studio.utils.change({
+      view: {
+        ...JSON.parse(this.getAttribute('state')),
+        blocks: newBlocks
+      }
+    })
   }
 
   initEventListeners() {
@@ -2541,14 +2780,19 @@ class StudioView extends HTMLElement {
     page.classList.add('photobook-page', 'product-builder__element');
     page.setAttribute('photobook-page', layout);
 
-    page.addEventListener('click', () => {
-      this.setSelectedBlock(page);
+    page.addEventListener('click', (event) => {
+      const childs = [...page.querySelectorAll(StudioView.selectors.childBlock)];
+
+      const someIsChild = childs.includes(event.target)
+        || childs.some(child => child.contains(event.target));
+
+      this.setSelectedBlock(page, someIsChild);
     })
 
     this.elements.container.append(page);
   }
 
-  setSelectedBlock(block) {
+  setSelectedBlock(block, activeChild) {
     const selectedBlock = this.getBlockJSON(block);
     const { blocks } = JSON.parse(this.getAttribute('state'));
 
@@ -2563,7 +2807,7 @@ class StudioView extends HTMLElement {
 
         return {
           ...sBlock,
-          selected: true
+          selected: !activeChild
         }
       })
 
@@ -2597,7 +2841,41 @@ class StudioView extends HTMLElement {
       selected: true
     }
 
-    console.log(childJSON, blockJSON);
+    const newChildBlocks = blockJSON.childBlocks.map(block => {
+      if (block.id === childID) {
+        return childJSON
+      }
+
+      return block;
+    })
+
+    const isActiveChild = newChildBlocks.some(children => children.selected);
+
+    const newBlock = {
+      ...blockJSON,
+      selected: !isActiveChild,
+      activeChild: isActiveChild,
+      childBlocks: newChildBlocks
+    }
+
+    const newBlocksList = blocks
+      .map(block => {
+        if (block.id === newBlock.id) {
+          return newBlock
+        }
+
+        return {
+          ...block,
+          activeChild: false
+        }
+      });
+
+    Studio.utils.change({
+      view: {
+        ...JSON.parse(this.getAttribute('state')),
+        blocks: newBlocksList
+      }
+    })
   }
 
   clearView(size) {
@@ -2716,26 +2994,53 @@ class StudioView extends HTMLElement {
 
     const childBlocks = [...block.querySelectorAll(StudioView.selectors.childBlock)];
 
+    const { settings } = Studio.product;
+
+    const { tools } = JSON.parse(Studio.panel.getAttribute('state'));
+
+    const blockSettings = Object.keys(settings)
+      .reduce((obj, tool) => {
+        switch(tool) {
+          case 'hasLayout':
+            if (settings[tool]) {
+              obj.layout = tools.layout.value;
+            }
+            break;
+          case 'hasText':
+            if (settings[tool]) {
+              obj.text = tools.text.value;
+            }
+            break;
+        }
+
+        return obj;
+      }, {});
+
+    const childrenJSON = childBlocks
+      .map(child => this.getChildJSON(child));
+
     const blockJSON = {
       id,
+      type: block.getAttribute('block-type'),
       selected: block.classList.contains('is-selected'),
-      activeChild: childBlocks.some(child => child.classList.contains('is-selected')),
+      activeChild: childrenJSON.some(child => child.selected),
       childBlocks: [
-        ...childBlocks
-          .map(child => this.getChildJSON(child))
-      ]
+        ...childrenJSON
+      ],
+      settings: blockSettings
     }
 
     return blockJSON
   }
 
-  getChildJSON(child) {
+  getChildJSON(child, isSelected = false) {
     const key = child.getAttribute('child-block');
 
     return {
       type: child.hasAttribute('editable-picture') ? 'editable-picture' : 'text',
       id: key,
-      selected: false
+      selected: isSelected,
+      tools: child.getToolsList()
     }
   }
 
@@ -2889,8 +3194,6 @@ class ImageChooser extends HTMLElement {
   
         res(file);
     })))
-
-    console.log(FilesFromImages);
 
     FilesFromImages
       .forEach(file => {
