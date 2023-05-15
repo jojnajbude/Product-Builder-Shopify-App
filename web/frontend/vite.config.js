@@ -42,8 +42,6 @@ if (host === "localhost") {
   };
 }
 
-console.log(); 
-
 export default defineConfig({
   root: dirname(fileURLToPath(import.meta.url)),
   plugins: [react()],
@@ -54,13 +52,12 @@ export default defineConfig({
     preserveSymlinks: true,
   },
   build: {
-    lib: {
-      entry: resolve(dirname(fileURLToPath(import.meta.url)), 'product-builder', 'src', 'builder.html'),
-      name: 'studio',
-      fileName: 'dist'
-    },
     rollupOptions: {
-      
+      output: {
+        manualChunks: {
+          globalDist: ['product-builder/src/**/*.js']
+        }
+      }
     }
   },
   server: {

@@ -293,6 +293,8 @@ class ProductBuilder extends HTMLElement {
     const prevState = JSON.parse(oldValue);
     const currState = JSON.parse(newValue);
 
+    this.state = currState;
+
     if (compareObjects(prevState, currState)) {
       return;
     }
@@ -316,30 +318,39 @@ class ProductBuilder extends HTMLElement {
       this.panel.setState(currState.panel);
     }
 
-    if (!compareObjects(prevState.view, currState.view)) {
-      this.studioView.setState(currState.view);
+    if (!compareObjects(prevState.imagesToDownload, currState.imagesToDownload) && currState.imagesToDownload) {
+      if (typeof currState.imagesToDownload === 'string') {
+        const imagesFromUrl = currState.view.blocks
+          .filter(block => block.activeChild)
+          .map((block, idx) => {
+            const selectedChildren = block.childBlocks
+              .filter(child => child.selected)
+              .map(child => child.id);
 
-      if (this.product && !compareObjects(prevState.view.blocks, currState.view.blocks)) {
-        const { blocks } =  currState.view;
+            const image = currState.imagesToDownload;
 
-        const selectedBlock = blocks.find(block => block.selected);
-
-        if (!selectedBlock) {
-          const blockWithActiveChild = blocks.find(block => block.activeChild);
-
-          if (blockWithActiveChild) {
-            const selectedChild = blockWithActiveChild.childBlocks.find(child => child.selected);
-
-            if (selectedChild) {
-              this.setTools(selectedChild.tools);
+            if (typeof image === 'string') {
+              return {
+                pictureIds: selectedChildren,
+                imageUrl: image
+              }
             }
-          }
-        }
 
-        if (selectedBlock) {
-          this.setTools();
-        }
+            return null;
+          })
+          .filter(item => item);
+
+        this.studioView.setState({ imagesToDownload: imagesFromUrl });
+      } else {
+        const imageFromObj = currState.imagesToDownload
+          .filter(item => typeof item !== 'string' && typeof item === 'object');
+
+        this.studioView.setState({ imagesToDownload: imageFromObj });
       }
+    }
+
+    if (!compareObjects(prevState.view, currState.view)) {
+      this.onViewChange(prevState, currState);
     }
 
     if (this.product && !compareObjects(prevState.panel.tools, currState.panel.tools)) {
@@ -355,8 +366,6 @@ class ProductBuilder extends HTMLElement {
         if (blockWithActiveChild) {
           const selectedChilds = blockWithActiveChild.childBlocks
             .filter(child => child.selected);
-
-          console.log(selectedChilds);
         }
       } else {
         const newSelectedBlocks = blocks
@@ -378,9 +387,7 @@ class ProductBuilder extends HTMLElement {
 
             return block;            
           });
-        
-        console.log(newSelectedBlocks);
-        
+
         this.studioView.setState({ blocks: newSelectedBlocks });
       }
     }
@@ -390,9 +397,43 @@ class ProductBuilder extends HTMLElement {
     }
   }
 
-  setTools(toolsList) {
+  onViewChange(prevState, currState) {
+    this.studioView.setState(currState.view);
+
+    if (this.product && !compareObjects(prevState.view.blocks, currState.view.blocks)) {
+      const { blocks } =  currState.view;
+
+      const selectedBlock = blocks.find(block => block.selected);
+      const blockWithActiveChild = blocks.find(block => block.activeChild);
+
+      if (!selectedBlock) {
+        if (blockWithActiveChild) {
+          const selectedChild = blockWithActiveChild.childBlocks.find(child => child.selected);
+
+          if (selectedChild) {
+            this.setTools({
+              toolsList: selectedChild.tools,
+              selected: selectedChild
+            });
+          }
+        }
+      } else if (selectedBlock || blockWithActiveChild) {
+        this.setTools({
+          selected: selectedBlock
+        });
+      }
+
+    }
+  }
+
+  setTools({ toolsList, selected }) {
     const { tools } = JSON.parse(Studio.panel.getAttribute('state'));
 
+    if (!selected) {
+      return;
+    }
+
+    const { settings: selectedSettings } = selected;
     const updatedTools = { ...tools };
 
     if (!toolsList) {
@@ -403,13 +444,15 @@ class ProductBuilder extends HTMLElement {
           case 'layout':
             updatedTools[tool] = {
               ...updatedTools[tool],
-              show: settings.hasLayout
+              show: settings.hasLayout,
+              value: selectedSettings[tool]
             }
             break;
           case 'text':
             updatedTools[tool] = {
               ...updatedTools[tool],
-              show: settings.hasText
+              show: settings.hasText,
+              value: selectedSettings[tool]
             }
             break;
         }
@@ -428,7 +471,8 @@ class ProductBuilder extends HTMLElement {
     for (const tool in updatedTools) {
       updatedTools[tool] = {
         ...updatedTools[tool],
-        show: toolsList.includes(tool)
+        show: toolsList.includes(tool),
+        value: toolsList.includes(tool) ? selectedSettings[tool] : updatedTools[tool].value
       } 
     }
 
@@ -482,7 +526,12 @@ class ProductBuilder extends HTMLElement {
   }
 
   setState(state) {
-    this.setAttribute('state', JSON.stringify(state));
+    const newState = {
+      ...JSON.parse(this.getAttribute('state')),
+      ...state
+    };
+
+    this.setAttribute('state', JSON.stringify(newState));
   }
 
   async init() {
@@ -1397,15 +1446,13 @@ class Tools extends HTMLElement {
     const prevState = JSON.parse(oldValue);
     const currState = JSON.parse(newValue);
 
-    console.log(currState);
-
     if (!compareObjects(prevState, currState)) {
       for (const tool in currState) {
-        const { show } = currState[tool];
+        const { show, value } = currState[tool];
   
         if (show && this.edit.tools[tool]) {
           if (this.edit.tools[tool].isExists()) {
-            this.edit.tools[tool].setValue();
+            this.edit.tools[tool].setValue(value);
           } else {
             this.edit.tools[tool].create();
           }
@@ -1428,6 +1475,9 @@ class Tools extends HTMLElement {
 
     this.initEventListeners();
 
+    this.makeMagicBtn = this.querySelector(Tools.selectors.pages.images.makeMagic);
+    this.makeMagicBtn.addEventListener('click', this.makeMagic.bind(this));
+
     this.inited = true;
   }
 
@@ -1445,6 +1495,14 @@ class Tools extends HTMLElement {
 
   moveRunner() {
     this.tabs.runner.style.transform = `translate(${this.tabs.list.indexOf(this.tabs.selected) * 100}%, -50%)`;
+  }
+
+  focusOnTab(tabId) {
+    const tabToFocus = this.tabs.list.find(tab => tab.dataset.tab === tabId);
+
+    if (tabToFocus) {
+      tabToFocus.click();
+    }
   }
 
   initTabs() {
@@ -1676,11 +1734,10 @@ class Tools extends HTMLElement {
       const toDeleteBtn = imageWrapper.querySelector('[data-delete]');
 
       if (event.target !== toDeleteBtn && !toDeleteBtn.contains(event.target)) {
-        this.playground.dispatchEvent(new CustomEvent('image:selected', {
-          detail: {
-            imageSrc: image.src
-          }
-        }));
+        console.log(image.src);
+        Studio.utils.change({
+          imagesToDownload: image.src
+        })
       }
     });
 
@@ -1869,6 +1926,32 @@ class Tools extends HTMLElement {
       }
     }
   }
+
+  makeMagic() {
+    const { blocks } = Studio.state.view;
+
+    const childs = blocks.reduce((arr, block) => {
+      const editablePictures = block.childBlocks
+        .filter(block => block.type === 'editable-picture' && !block.imageUrl);
+
+      return [...arr, ...editablePictures ];
+    }, [])
+
+    console.log(childs);
+
+    const imagesToSet = [...this.pages.images.imageList]
+      .slice(0, childs.length)
+      .map((image, idx) => {
+        const child = childs[idx];
+
+        return {
+          pictureIds: [child.id],
+          imageUrl: image
+        }
+      });
+
+    Studio.utils.change({ imagesToDownload: imagesToSet })
+  }
 }
 customElements.define('customization-tools', Tools);
 
@@ -1918,17 +2001,6 @@ class Panel extends HTMLElement {
       })
     }
 
-    const { layout, text } = currState.tools;
-
-    this.tools.setToolsState({
-      layout: {
-        ...layout
-      },
-      text: {
-        ...text
-      }
-    })
-
     if (!compareObjects(prevState.tools, currState.tools)) {
       const { layout, text } = currState.tools;
 
@@ -1967,7 +2039,7 @@ customElements.define('customization-panel', Panel);
 
 class EditablePicture extends HTMLElement {
   static emptyState = `
-    <div class="editable-picture__empty-state">
+    <div class="editable-picture__empty-state" data-empty-state>
       <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M1.10156 3.98131C1.10156 3.00356 1.89418 2.21094 2.87193 2.21094H13.9367C14.9145 2.21094 15.7071 3.00356 15.7071 3.98131V12.3906C15.7071 13.3683 14.9145 14.1609 13.9367 14.1609H2.87193C1.89418 14.1609 1.10156 13.3683 1.10156 12.3906V3.98131Z" stroke="#FF0079" stroke-width="1.77037" stroke-linejoin="round"/>
         <path d="M4.08594 14.1618L10.9214 6.7567C11.5568 6.06839 12.6184 5.99415 13.3434 6.58732L15.704 8.51875" stroke="#FF0079" stroke-width="1.77037" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1977,20 +2049,39 @@ class EditablePicture extends HTMLElement {
     </div>
   `;
 
+  static selectors = {
+    emptyState: '[data-empty-state]'
+  }
+
   constructor() {
     super();
 
     this.initImage();
-
-    this.addEventListener('click', () => {
-      Studio.studioView.setSelectedChild(this);
-    })
   }
 
   connectedCallback() {
     this.toggleAttribute('editable-picture');
     this.setAttribute('child-block', window.uniqueID.childBlock());
+
+    
+    this.emptyState = this.querySelector(EditablePicture.selectors.emptyState);
+    if (this.emptyState) {
+      this.emptyState.addEventListener('click', () => {
+        Studio.panel.tools.focusOnTab('images');
+      })
+    }
+
+    this.addEventListener('click', (event) => {
+      Studio.studioView.setSelectedChild(this);
+
+      if (event.target !== this.emptyState && !this.emptyState.contains(event.target)) {
+        console.log(event.target, this.emptyState, this.emptyState.contains(event.target));
+
+        Studio.panel.tools.focusOnTab('edit');
+      }
+    })
   }
+
 
   initImage() {
   }
@@ -2302,6 +2393,13 @@ class PhotobookPage extends HTMLElement {
     this.setAttribute('block', uniqueID.block());
     this.setAttribute('block-type', 'photobook-page');
     this.init();
+
+    this.addEventListener('click', (event) => {
+
+      if (event.target === this) {
+        Studio.panel.tools.focusOnTab('edit');
+      }
+    })
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -2510,6 +2608,7 @@ class StudioView extends HTMLElement {
     block: '[block]',
     blockById: (id) => `[block="${id}"]`,
     editableById: (id) => `[editable-picture="${id}"]`,
+    editablePicture: '[editable-picture]',
     childBlock: '[child-block]',
     childBlockById: (id) => `[child-block="${id}"]`
   };
@@ -2527,6 +2626,8 @@ class StudioView extends HTMLElement {
     const prevState = JSON.parse(oldValue);
     const currState = JSON.parse(newValue);
 
+    this.state = currState;
+
     if (!prevState || !currState) {
       return;
     }
@@ -2543,14 +2644,53 @@ class StudioView extends HTMLElement {
     if (!compareObjects(prevState.blocks, currState.blocks)) {
       this.toggleSelected(prevState.blocks, currState.blocks);
 
-      // console.log(prevState.blocks, currState.blocks);
-
       this.setBlocksValue(prevState.blocks, currState.blocks);
     }
 
     if (currState.product && prevState.blockCount !== currState.blockCount) {
       this.setProductElements(currState.blockCount);
     }
+
+    if (!compareObjects(currState.imagesToDownload, prevState.imagesToDownload) && currState.imagesToDownload) {      
+      currState.imagesToDownload
+        .forEach(imageToSet => this.setImages(imageToSet, currState.blocks));
+    }
+  }
+
+  setImages({ pictureIds, imageUrl }, blocks) {
+    pictureIds.forEach(pictureId => {
+      const picture = this.querySelector(StudioView.selectors.childBlockById(pictureId));
+
+      if (picture) {
+        picture.setImage(imageUrl);
+      }
+    })
+
+    const newBlocks = blocks
+      .map(block => {
+        const childBlocks = block.childBlocks
+          .map(child => {
+            if (pictureIds.includes(child.id)) {
+              console.log(child.id);
+              return {
+                ...child,
+                imageUrl: imageUrl
+              }
+            }
+    
+            return child;
+          });
+
+        return {
+          ...block,
+          childBlocks: childBlocks
+        }
+      });
+
+    Studio.utils.change({ view: {
+      ...this.state,
+      blocks: newBlocks
+    }})
   }
 
   setState(state) {
@@ -2630,8 +2770,6 @@ class StudioView extends HTMLElement {
       if (toSelectBlock.activeChild && !toSelectBlock.selected) {
         const childJSON = toSelectBlock.childBlocks.find(child => child.selected);
 
-        console.log(toSelectBlock.childBlocks)
-
         if (childJSON) {
           const child = this.querySelector(StudioView.selectors.childBlockById(childJSON.id));
 
@@ -2665,7 +2803,6 @@ class StudioView extends HTMLElement {
         switch(block.type) {
           case 'photobook-page':
             if (!compareObjects(prevSettings.layout, layout)) {
-              console.log(layout.layout);
               element.setLayout(layout.layout);
             }
             break;
@@ -2695,24 +2832,6 @@ class StudioView extends HTMLElement {
   initEventListeners() {
     this.addEventListener('image:removed', () => {
       this.checkProductsReady();
-      this.parentElement.dispatchEvent(new CustomEvent('image:check'));
-    });
-
-
-    this.addEventListener('image:selected', (event) => {
-      if (this.state.selected.length === 0) {
-        console.log('error to image set');
-      }
-      this.state.selected.forEach(item => {
-        const toSelect = this.querySelector(`[product-element="${item}"]`);
-
-        if (toSelect) {
-          toSelect.setImage(event.detail.imageSrc);
-        }
-      });
-
-      this.checkProductsReady();
-
       this.parentElement.dispatchEvent(new CustomEvent('image:check'));
     });
 
@@ -2796,18 +2915,28 @@ class StudioView extends HTMLElement {
     const selectedBlock = this.getBlockJSON(block);
     const { blocks } = JSON.parse(this.getAttribute('state'));
 
+    const turnOfChilds = activeChild ? !activeChild : true;
+
     const newBlocks = blocks
       .map(sBlock => {
         if (sBlock.id !== selectedBlock.id) {
           return {
             ...sBlock,
-            selected: false
+            selected: false,
+            activeChild: false,
+            childBlocks: turnOfChilds
+              ? sBlock.childBlocks.map(child => ({ ...child, selected: false }))
+              : sBlock.childBlocks
           }
         }
 
         return {
           ...sBlock,
-          selected: !activeChild
+          selected: activeChild ? !activeChild : true,
+          activeChild: activeChild ? activeChild : false,
+          childBlocks: turnOfChilds
+              ? sBlock.childBlocks.map(child => ({ ...child, selected: false }))
+              : sBlock.childBlocks
         }
       })
 
@@ -2846,7 +2975,10 @@ class StudioView extends HTMLElement {
         return childJSON
       }
 
-      return block;
+      return {
+        ...block,
+        selected: false
+      };
     })
 
     const isActiveChild = newChildBlocks.some(children => children.selected);
@@ -2864,10 +2996,14 @@ class StudioView extends HTMLElement {
           return newBlock
         }
 
-        return {
+        const blockWithNoActiveChild = {
           ...block,
-          activeChild: false
+          activeChild: false,
+          childBlocks: block.childBlocks
+            .map(child => ({ ...child, selected: false }))
         }
+
+        return blockWithNoActiveChild
       });
 
     Studio.utils.change({
@@ -3035,12 +3171,13 @@ class StudioView extends HTMLElement {
 
   getChildJSON(child, isSelected = false) {
     const key = child.getAttribute('child-block');
+    const type = child.hasAttribute('editable-picture') ? 'editable-picture' : 'text';
 
     return {
-      type: child.hasAttribute('editable-picture') ? 'editable-picture' : 'text',
+      type,
       id: key,
       selected: isSelected,
-      tools: child.getToolsList()
+      tools: child.getToolsList(),
     }
   }
 
