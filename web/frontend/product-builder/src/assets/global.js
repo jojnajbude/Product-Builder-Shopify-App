@@ -293,7 +293,7 @@ class ProductBuilder extends HTMLElement {
     const prevState = JSON.parse(oldValue);
     const currState = JSON.parse(newValue);
 
-    this.state = currState;
+    this.state = { ...currState };
 
     if (compareObjects(prevState, currState)) {
       return;
@@ -398,10 +398,10 @@ class ProductBuilder extends HTMLElement {
   }
 
   onViewChange(prevState, currState) {
-    this.studioView.setState(currState.view);
-
     if (this.product && !compareObjects(prevState.view.blocks, currState.view.blocks)) {
       const { blocks } =  currState.view;
+
+      console.log('newBlocks', blocks, currState);
 
       const selectedBlock = blocks.find(block => block.selected);
       const blockWithActiveChild = blocks.find(block => block.activeChild);
@@ -424,6 +424,8 @@ class ProductBuilder extends HTMLElement {
       }
 
     }
+
+    this.studioView.setState(currState.view);
   }
 
   setTools({ toolsList, selected }) {
@@ -601,7 +603,9 @@ class ProductBuilder extends HTMLElement {
 }
 customElements.define('product-builder', ProductBuilder);
 
-const change = (state) => {
+const change = (state, initiator) => {
+  console.log(initiator);
+
   const changeEvent = new CustomEvent('studio:change', {
     detail: {
       state
@@ -1215,18 +1219,7 @@ class LayoutTool extends Tool {
       return;
     }
 
-    const { selected } = state;
-
-    const newSelected = this.layouts
-      .find(layout => layout.layoutId === selected);
-
-    if (newSelected) {
-      this.selected.unselect();
-
-      newSelected.select();
-
-      this.selected = newSelected;
-    }
+    this.setValue(state);
   }
 
   getValue() {
@@ -1246,7 +1239,6 @@ class LayoutTool extends Tool {
 
     const toSelect = this.layouts.find(variant => variant.layoutId === layout);
 
-    console.log(toSelect, layout);
     if (toSelect) {
       toSelect.select();
     }
@@ -1454,7 +1446,7 @@ class Tools extends HTMLElement {
           if (this.edit.tools[tool].isExists()) {
             this.edit.tools[tool].setValue(value);
           } else {
-            this.edit.tools[tool].create();
+            this.edit.tools[tool].create(value);
           }
         } else {
           this.edit.tools[tool].remove();
@@ -1950,7 +1942,7 @@ class Tools extends HTMLElement {
         }
       });
 
-    Studio.utils.change({ imagesToDownload: imagesToSet })
+    Studio.utils.change({ imagesToDownload: imagesToSet }, 'make magic');
   }
 }
 customElements.define('customization-tools', Tools);
@@ -2075,8 +2067,6 @@ class EditablePicture extends HTMLElement {
       Studio.studioView.setSelectedChild(this);
 
       if (event.target !== this.emptyState && !this.emptyState.contains(event.target)) {
-        console.log(event.target, this.emptyState, this.emptyState.contains(event.target));
-
         Studio.panel.tools.focusOnTab('edit');
       }
     })
@@ -2132,7 +2122,58 @@ class EditablePicture extends HTMLElement {
 }
 customElements.define('editable-picture', EditablePicture);
 
+class EditableText extends HTMLElement {
+  constructor() {
+    super();
+
+    this.editableArea = document.createElement('span');
+    this.editableArea.toggleAttribute('contenteditable');
+    this.editableArea.classList.add('textarea');
+  }
+
+  connectedCallback() {
+    this.append(this.editableArea);
+
+    if (this.hasAttribute('line') === 'line') {
+      this.editableArea.classList.add('line');
+    }
+  }
+}
+customElements.define('editable-text', EditableText);
+
 class ProductControls extends HTMLElement {
+  static icons = {
+    remove: `
+      <svg width="19" height="20" viewBox="0 0 19 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3.17499 4.75H16.225L15.8025 13.4914C15.6737 16.1559 13.4759 18.25 10.8083 18.25H8.59166C5.92407 18.25 3.72627 16.1559 3.59749 13.4914L3.17499 4.75Z" stroke="currentColor" stroke-width="2"/>
+        <path d="M6.07501 4.75V4.75C6.07501 3.09315 7.41816 1.75 9.07501 1.75H10.325C11.9819 1.75 13.325 3.09315 13.325 4.75V4.75" stroke="currentColor" stroke-width="2"/>
+        <path d="M11.875 9.25V13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M7.52499 9.25V13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M1.72501 4.75H17.675" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>  
+    `,
+    plus: `
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M6.52499 9.00977C6.52499 9.28591 6.30114 9.50977 6.02499 9.50977H4.75742C4.48127 9.50977 4.25742 9.28591 4.25742 9.00977V6.66113C4.25742 6.38499 4.03356 6.16113 3.75742 6.16113H1.3912C1.11506 6.16113 0.891205 5.93728 0.891205 5.66113V4.3584C0.891205 4.08226 1.11506 3.8584 1.3912 3.8584H3.75742C4.03356 3.8584 4.25742 3.63454 4.25742 3.3584V0.992188C4.25742 0.716045 4.48127 0.492188 4.75742 0.492188H6.02499C6.30114 0.492188 6.52499 0.716045 6.52499 0.992188V3.3584C6.52499 3.63454 6.74885 3.8584 7.02499 3.8584H9.40878C9.68493 3.8584 9.90878 4.08226 9.90878 4.3584V5.66113C9.90878 5.93728 9.68493 6.16113 9.40878 6.16113H7.02499C6.74885 6.16113 6.52499 6.38499 6.52499 6.66113V9.00977Z" fill="black"/>
+      </svg>
+    `,
+    minus: `
+      <svg width="7" height="4" viewBox="0 0 7 4" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4.78867 3.05957H2.01132C1.58945 3.05957 1.26718 2.96289 1.04453 2.76953C0.827728 2.57031 0.71933 2.31543 0.71933 2.00488C0.71933 1.68848 0.824799 1.43359 1.03574 1.24023C1.25253 1.04102 1.57773 0.941406 2.01132 0.941406H4.78867C5.22226 0.941406 5.54453 1.04102 5.75546 1.24023C5.97226 1.43359 6.08066 1.68848 6.08066 2.00488C6.08066 2.31543 5.97519 2.57031 5.76425 2.76953C5.55331 2.96289 5.22812 3.05957 4.78867 3.05957Z" fill="black"/>
+      </svg>
+    `,
+    edit: `
+      <svg width="19" height="18" viewBox="0 0 19 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3.30143 11.8619L13.6969 1.46643C13.7062 1.46378 13.7158 1.4611 13.7258 1.45839C13.8626 1.42133 14.0605 1.38264 14.2925 1.37944C14.7367 1.37331 15.3279 1.49293 15.9134 2.07843C16.4989 2.66392 16.6185 3.25504 16.6123 3.69925C16.6091 3.93131 16.5705 4.1292 16.5334 4.266C16.5307 4.27601 16.528 4.28563 16.5254 4.29486L6.12986 14.6904L2.91574 15.076L3.30143 11.8619Z" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        <path d="M3.30143 11.8619L13.6969 1.46643C13.7062 1.46378 13.7158 1.4611 13.7258 1.45839C13.8626 1.42133 14.0605 1.38264 14.2925 1.37944C14.7367 1.37331 15.3279 1.49293 15.9134 2.07843C16.4989 2.66392 16.6185 3.25504 16.6123 3.69925C16.6091 3.93131 16.5705 4.1292 16.5334 4.266C16.5307 4.27601 16.528 4.28563 16.5254 4.29486L6.12986 14.6904L2.91574 15.076L3.30143 11.8619Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M11.1003 2.64844L15.141 6.68905" stroke="white" stroke-width="2"/>
+        <path d="M11.1003 2.64844L15.141 6.68905" stroke="currentColor" stroke-width="2"/>
+        <path d="M3.90781 1V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M6.39999 3.5L1.39999 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>  
+    `,
+  }
+
   static template = `
     <product-controls
       class="product-element__controls product-controls"
@@ -2182,6 +2223,46 @@ class ProductControls extends HTMLElement {
     </product-controls>
   `;
 
+  static createBlockControls = (productId) => {
+    const productControls = document.createElement('product-controls');
+    productControls.classList.add('product-element__controls', 'product-controls');
+    productControls.setAttribute('block-controls', productId);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.toggleAttribute('data-remove');
+    removeBtn.classList.add('product-controls__button');
+    removeBtn.innerHTML = ProductControls.icons.remove;
+
+    const controlsQuantity = document.createElement('div');
+    controlsQuantity.classList.add('product-controls__quantity');
+    controlsQuantity.toggleAttribute('data-quantity');
+
+    const plus = document.createElement('button');
+    plus.classList.add('product-controls__button');
+    plus.toggleAttribute('data-quantity-add');
+    plus.innerHTML = ProductControls.icons.plus;
+
+    const count = document.createElement('span');
+    count.toggleAttribute('data-quantity-count');
+    count.innerHTML = '1';
+
+    const minus = document.createElement('button');
+    minus.classList.add('product-controls__button');
+    minus.toggleAttribute('data-quantity-remove');
+    minus.innerHTML = ProductControls.icons.minus;
+
+    controlsQuantity.append(plus, count, minus);
+
+    const editBtn = document.createElement('button');
+    editBtn.classList.add('product-controls__button');
+    editBtn.toggleAttribute('data-edit');
+    editBtn.innerHTML = ProductControls.icons.edit;
+
+    productControls.append(removeBtn, controlsQuantity, editBtn);
+
+    return productControls;
+  }
+
   static selectors = {
     remove: '[data-remove]',
     quantity: {
@@ -2195,12 +2276,14 @@ class ProductControls extends HTMLElement {
 
   constructor() {
     super();
+  }
 
+  connectedCallback() {
     this.init();
   }
 
   init() {
-    const parent = this.parentElement;
+    const block = this.parentElement.querySelector('.product-builder__element');
 
     const remove = this.querySelector(ProductControls.selectors.remove);
     const edit = this.querySelector(ProductControls.selectors.edit);
@@ -2209,14 +2292,14 @@ class ProductControls extends HTMLElement {
     const decreaseQuantity = this.querySelector(ProductControls.selectors.quantity.minus);
 
     increaseQuantity.addEventListener('click', () => {
-      parent.setQuantity(parent.getQuantity() + 1);
+      block.setQuantity(block.getQuantity() + 1);
 
       this.setValue();
     });
 
     decreaseQuantity.addEventListener('click', () => {
-      if (parent.getQuantity() > 1) {
-        parent.setQuantity(parent.getQuantity() - 1);
+      if (block.getQuantity() > 1) {
+        block.setQuantity(block.getQuantity() - 1);
       }
 
       this.setValue();
@@ -2225,7 +2308,7 @@ class ProductControls extends HTMLElement {
     const quantity = this.querySelector(ProductControls.selectors.quantity.count);
 
     this.elements = {
-      product: parent,
+      product: block,
       remove,
       edit,
       increaseQuantity,
@@ -2392,6 +2475,9 @@ class PhotobookPage extends HTMLElement {
   connectedCallback() {
     this.setAttribute('block', uniqueID.block());
     this.setAttribute('block-type', 'photobook-page');
+
+    this.controls = ProductControls.createBlockControls(this.getAttribute('block'));
+  
     this.init();
 
     this.addEventListener('click', (event) => {
@@ -2652,45 +2738,58 @@ class StudioView extends HTMLElement {
     }
 
     if (!compareObjects(currState.imagesToDownload, prevState.imagesToDownload) && currState.imagesToDownload) {      
-      currState.imagesToDownload
-        .forEach(imageToSet => this.setImages(imageToSet, currState.blocks));
+      this.setImages(currState)
     }
   }
 
-  setImages({ pictureIds, imageUrl }, blocks) {
-    pictureIds.forEach(pictureId => {
-      const picture = this.querySelector(StudioView.selectors.childBlockById(pictureId));
+  setImages({ blocks, imagesToDownload }) {
+    const changedBlocks = [];
 
-      if (picture) {
-        picture.setImage(imageUrl);
-      }
-    })
+    imagesToDownload
+      .forEach(({ pictureIds, imageUrl }) => {
+        pictureIds.forEach(pictureId => {
+          const picture = this.querySelector(StudioView.selectors.childBlockById(pictureId));
+    
+          if (picture) {
+            picture.setImage(imageUrl);
+          }
+
+          const newBlock = blocks.find(block => block.childBlocks.some(child => child.id === pictureId));
+
+          const newChilds = newBlock.childBlocks.map(child => {
+            if (pictureIds.includes(child.id)) {
+              return {
+                ...child,
+                imageUrl
+              }
+            }
+
+            return child
+          });
+
+          changedBlocks.push({
+            ...newBlock,
+            childBlocks: newChilds
+          });
+
+        })
+      });
 
     const newBlocks = blocks
       .map(block => {
-        const childBlocks = block.childBlocks
-          .map(child => {
-            if (pictureIds.includes(child.id)) {
-              console.log(child.id);
-              return {
-                ...child,
-                imageUrl: imageUrl
-              }
-            }
-    
-            return child;
-          });
+        const findedBlock = changedBlocks.find(finded => finded.id === block.id);
 
-        return {
-          ...block,
-          childBlocks: childBlocks
+        if (findedBlock) {
+          return findedBlock;
         }
+
+        return block;
       });
 
     Studio.utils.change({ view: {
       ...this.state,
       blocks: newBlocks
-    }})
+    }}, 'set images');
   }
 
   setState(state) {
@@ -2782,6 +2881,15 @@ class StudioView extends HTMLElement {
   }
 
   setBlocksValue(prevBlocks, currBlocks) {
+    const initiateNewChildren = (element, selectedChildrenIds) => {
+      return [...element.querySelectorAll(StudioView.selectors.childBlock)]
+        .map(child => {
+          const childID = child.getAttribute('child-block');
+
+          return this.getChildJSON(child, selectedChildrenIds.includes(childID));
+        });
+    }
+
     const newBlocks = currBlocks
       .map(block => {
         const element = this.querySelector(StudioView.selectors.blockById(block.id));
@@ -2800,24 +2908,20 @@ class StudioView extends HTMLElement {
 
         const { layout, text } = block.settings;
 
+        let children = null;
+
         switch(block.type) {
           case 'photobook-page':
             if (!compareObjects(prevSettings.layout, layout)) {
               element.setLayout(layout.layout);
+              children = initiateNewChildren(element, selectedChildrenIds);
             }
             break;
         }
 
-        const children = [...element.querySelectorAll(StudioView.selectors.childBlock)]
-          .map(child => {
-            const childID = child.getAttribute('child-block');
-
-            return this.getChildJSON(child, selectedChildrenIds.includes(childID));
-          });
-
         return {
           ...block,
-          childBlocks: children
+          childBlocks: children ? children : block.childBlocks
         };
       });
 
@@ -2826,7 +2930,7 @@ class StudioView extends HTMLElement {
         ...JSON.parse(this.getAttribute('state')),
         blocks: newBlocks
       }
-    })
+    }, 'set block value')
   }
 
   initEventListeners() {
@@ -2895,6 +2999,9 @@ class StudioView extends HTMLElement {
   }
 
   createPhotobookPage(layout) {
+    const block = document.createElement('div');
+    block.classList.add('studio-view__block', 'block__photobook-page');
+
     const page = document.createElement('photobook-page');
     page.classList.add('photobook-page', 'product-builder__element');
     page.setAttribute('photobook-page', layout);
@@ -2906,9 +3013,15 @@ class StudioView extends HTMLElement {
         || childs.some(child => child.contains(event.target));
 
       this.setSelectedBlock(page, someIsChild);
-    })
+    });
 
-    this.elements.container.append(page);
+    block.append(page);
+    
+    const pageControls = ProductControls.createBlockControls(page.getAttribute('block'));
+
+    block.append(pageControls);
+
+    this.elements.container.append(block);
   }
 
   setSelectedBlock(block, activeChild) {
@@ -3121,7 +3234,7 @@ class StudioView extends HTMLElement {
         Studio.utils.change({ view: {
           ...JSON.parse(this.getAttribute('state')),
           blocks: blocksJSON
-        }});
+        }}, 'set product elements');
       });
   }
 
@@ -3178,6 +3291,7 @@ class StudioView extends HTMLElement {
       id: key,
       selected: isSelected,
       tools: child.getToolsList(),
+      imageUrl: null
     }
   }
 

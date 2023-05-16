@@ -1073,6 +1073,16 @@ product-option-selector {
   overflow-y: scroll;
 }
 
+.studio-view__block {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.studio-view__block.block__photobook-page {
+  width: 100%;
+}
+
 /* Product Element */
 product-element {
   display: block;
@@ -1188,10 +1198,12 @@ product-controls {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s;
+  max-width: 300;
+  width: fit-content
 }
 
-.product-element:hover .product-controls,
-.product-element.is-selected .product-controls {
+.studio-view__block:hover .product-builder__element + .product-controls,
+.studio-view__block > .product-builder__element.is-selected + .product-controls {
   pointer-events: all;
   opacity: 1;
 }
