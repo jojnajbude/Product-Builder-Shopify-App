@@ -5,6 +5,8 @@ if (backButton) {
   })
 }
 
+const domReader = new DOMParser();
+
 function ActiveActionsController() {
   let activeActions = [];
 
@@ -318,8 +320,10 @@ class ProductBuilder extends HTMLElement {
       this.panel.setState(currState.panel);
     }
 
-    if (!compareObjects(prevState.imagesToDownload, currState.imagesToDownload) && currState.imagesToDownload) {
-      if (typeof currState.imagesToDownload === 'string') {
+    if (!compareObjects(prevState.imagesToDownload, currState.imagesToDownload)) {
+      if (!currState.imagesToDownload) {
+        this.studioView.setState({ imagesToDownload: null })
+      } else if (typeof currState.imagesToDownload === 'string') {
         const imagesFromUrl = currState.view.blocks
           .filter(block => block.activeChild)
           .map((block, idx) => {
@@ -361,12 +365,39 @@ class ProductBuilder extends HTMLElement {
       const isSelectedBlocks = blocks.some(block => block.selected);
 
       if (!isSelectedBlocks) {
-        const blockWithActiveChild = blocks.find(block => block.activeChild);
+        const newBlocks = blocks
+          .map(block => {
+            if (block.activeChild) {
+              const newChildren = block.childBlocks
+                .map(child => {
+                  if (child.selected) {
+                    const { settings } = child;
 
-        if (blockWithActiveChild) {
-          const selectedChilds = blockWithActiveChild.childBlocks
-            .filter(child => child.selected);
-        }
+                    const newSettings = {};
+
+                    for (const tool in settings) {
+                      newSettings[tool] = tools[tool].value;
+                    }
+
+                    return {
+                      ...child,
+                      settings: newSettings
+                    }
+                  }
+
+                  return child
+                });
+
+              return {
+                ...block,
+                childBlocks: newChildren
+              }
+            }
+
+            return block;
+          });
+
+        this.studioView.setState({ blocks: newBlocks });
       } else {
         const newSelectedBlocks = blocks
           .map(block => {
@@ -400,8 +431,6 @@ class ProductBuilder extends HTMLElement {
   onViewChange(prevState, currState) {
     if (this.product && !compareObjects(prevState.view.blocks, currState.view.blocks)) {
       const { blocks } =  currState.view;
-
-      console.log('newBlocks', blocks, currState);
 
       const selectedBlock = blocks.find(block => block.selected);
       const blockWithActiveChild = blocks.find(block => block.activeChild);
@@ -441,19 +470,22 @@ class ProductBuilder extends HTMLElement {
     if (!toolsList) {
       const { settings } = this.product;
 
+      const childTools = this.childTools = ['rotate', 'filter', 'crop', 'text'];
+
       for (const tool in updatedTools) {
+        if (childTools.includes(tool)) {
+          updatedTools[tool] = {
+            ...updatedTools[tool],
+            show: false
+          }
+          continue;
+        }
+
         switch(tool) {
           case 'layout':
             updatedTools[tool] = {
               ...updatedTools[tool],
               show: settings.hasLayout,
-              value: selectedSettings[tool]
-            }
-            break;
-          case 'text':
-            updatedTools[tool] = {
-              ...updatedTools[tool],
-              show: settings.hasText,
               value: selectedSettings[tool]
             }
             break;
@@ -604,7 +636,7 @@ class ProductBuilder extends HTMLElement {
 customElements.define('product-builder', ProductBuilder);
 
 const change = (state, initiator) => {
-  console.log(initiator);
+  // console.log(initiator);
 
   const changeEvent = new CustomEvent('studio:change', {
     detail: {
@@ -1145,7 +1177,11 @@ class Tool {
   }
 
   setOnCreate(state) {
-    return;
+    if (!state) {
+      return;
+    }
+
+    this.setValue(state);
   }
 
   setValue(value) {
@@ -1166,11 +1202,13 @@ class Tool {
     this.container.style.opacity = 0;
     this.setOnCreate(state);
 
-    this.editList.append(this.container);
-
     setTimeout(() => {
-      this.container.style.opacity = null;
-    }, 10);
+      this.editList.append(this.container);     
+
+      setTimeout(() => {
+        this.container.style.opacity = null;
+      }, 10);
+    }, 300);
   }
 
   remove() {
@@ -1212,14 +1250,6 @@ class LayoutTool extends Tool {
       }
 
     this.layouts[0].select();
-  }
-
-  setOnCreate(state) {
-    if (!state) {
-      return;
-    }
-
-    this.setValue(state);
   }
 
   getValue() {
@@ -1306,6 +1336,51 @@ class LayoutTool extends Tool {
 }
 
 class TextTool extends Tool {
+  static icons = {
+    bold: `
+      <svg width="9" height="11" viewBox="0 0 9 11" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0.183181 10.8809V0.347155H4.41171C5.50521 0.347155 6.33787 0.602973 6.9097 1.11461C7.49156 1.61622 7.7825 2.26329 7.7825 3.05582C7.7825 3.71794 7.60192 4.24964 7.24076 4.65093C6.88964 5.04218 6.45826 5.30803 5.94662 5.44848C6.54855 5.56886 7.04514 5.86983 7.43639 6.35137C7.82764 6.82288 8.02327 7.37464 8.02327 8.00666C8.02327 8.83933 7.7223 9.52653 7.12038 10.0683C6.51845 10.61 5.66572 10.8809 4.56219 10.8809H0.183181ZM2.10934 4.77131H4.1258C4.66753 4.77131 5.08386 4.64591 5.37479 4.39511C5.66572 4.1443 5.81119 3.78817 5.81119 3.32669C5.81119 2.88528 5.66572 2.53917 5.37479 2.28837C5.09389 2.02753 4.66753 1.89711 4.0957 1.89711H2.10934V4.77131ZM2.10934 9.31585H4.26123C4.83306 9.31585 5.27447 9.18543 5.58547 8.9246C5.90649 8.65373 6.06701 8.27753 6.06701 7.79599C6.06701 7.30442 5.90148 6.91818 5.57042 6.63728C5.23936 6.35638 4.79293 6.21593 4.23113 6.21593H2.10934V9.31585Z" fill="currentColor"/>
+      </svg>
+    `,
+    italic: `
+      <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="7.21094" y="4.57031" width="7.37654" height="1.47531" fill="currentColor"/>
+        <rect x="4.25781" y="12.6836" width="7.37654" height="1.47531" fill="currentColor"/>
+        <rect x="6.47656" y="13.6055" width="9.24965" height="1.47531" transform="rotate(-65 6.47656 13.6055)" fill="currentColor"/>
+      </svg>
+    `,
+    underline: `    
+      <svg width="18" height="18" viewBox="0 0 18 19" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M6 4.57031V10.1027C6 10.1027 6.36883 12.6845 8.95062 12.6845C11.5324 12.6845 11.9012 10.1027 11.9012 10.1027V4.57031" stroke="currentColor" stroke-width="1.77037"/>
+        <rect x="3.05469" y="15.6367" width="11.8025" height="1.47531" fill="currentColor"/>
+      </svg>
+    `,
+    left: `
+      <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0.664062 3.01172H14.827" stroke="currentColor" stroke-width="0.885185" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M0.664062 6.16016H10.9644" stroke="currentColor" stroke-width="0.885185" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M0.664062 9.30859H14.827" stroke="currentColor" stroke-width="0.885185" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M0.664062 12.457H10.9644" stroke="currentColor" stroke-width="0.885185" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `,
+    center: `
+      <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M1.07031 3.01172H15.2333" stroke="currentColor" stroke-width="0.885185" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M3 6.16016H13.3003" stroke="currentColor" stroke-width="0.885185" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M1.07031 9.30859H15.2333" stroke="currentColor" stroke-width="0.885185" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M3 12.457H13.3003" stroke="currentColor" stroke-width="0.885185" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `,
+    right: `
+      <svg width="16" height="16" viewBox="0 0 16 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0.476562 3.01172H14.6395" stroke="currentColor" stroke-width="0.885185" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M4.33594 6.16016H14.6363" stroke="currentColor" stroke-width="0.885185" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M0.476562 9.30859H14.6395" stroke="currentColor" stroke-width="0.885185" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M4.33594 12.457H14.6363" stroke="currentColor" stroke-width="0.885185" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `
+  }
+
   constructor() {
     super();
 
@@ -1345,21 +1420,67 @@ class TextTool extends Tool {
 
     wrapper.append(selector);
 
-    const icon = `
+    const iconHTML = `
       <svg width="6" height="4" viewBox="0 0 6 4" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M3.01493 3.57255L0.359375 0.916992H5.67049L3.01493 3.57255Z" fill="#888888"/>
       </svg>
     `;
 
-    wrapper.innerHTML += icon;
+    const icon = domReader.parseFromString(iconHTML, 'image/svg+xml').querySelector('svg');
 
-    return wrapper;
+    wrapper.append(icon);
+
+    return {
+      wrapper,
+      disable: () => selector.toggleAttribute('disabled'),
+      setValue: (value) => {
+        const toSet = selector.querySelector(`option[value="${value}"]`);
+
+        if (toSet) {
+          selector.value = value;
+        }
+      },
+      getValue: () => selector.value,
+      selector,
+      onChange: (callback) => {
+        selector.addEventListener('change', callback.bind(this));
+      }
+    };
   }
 
   setContent() {
     const container = document.createElement('div');
+    this.contentWrapper = container;
     container.classList.add('text-tool')
 
+
+    const text = document.createElement('textarea');
+    text.classList.add('text-tool__text');
+
+    text.addEventListener('input', this.onTextInput.bind(this));
+
+    const header = this.header = this.headerContent();
+    const tools = this.tools = this.toolsContent();
+
+    container.append(
+      header.wrapper,
+      tools.container,
+      text
+    );
+
+    this.text = text;
+
+    this.values = {
+      font: this.selectFont.getValue(),
+      text: text.value,
+      align: tools.getAlign(),
+      fontStyle: tools.getFontStyle()
+    }
+
+    this.collapsible.inner.append(container);
+  }
+
+  headerContent() {
     const header = document.createElement('div');
     header.classList.add('text-tool__header');
 
@@ -1368,24 +1489,393 @@ class TextTool extends Tool {
       'Line'
     ]});
 
+    selectType.disable();
+
+    this.selectType = selectType;
+
     const selectFont = this.selectorTemplate({ options: [
       'Times New Roman',
       'Arial',
       'Calibri'
     ]});
 
-    header.append(selectType, selectFont);
+    this.selectFont = selectFont;
+
+    header.append(selectType.wrapper, selectFont.wrapper);
+
+    selectFont.onChange(this.onFontChange);
+
+    return {
+      wrapper: header,
+      selectFont: {
+        selector: selectFont.selector,
+        value: selectFont.value
+      }
+    };
+  }
+
+  toolsContent() {
+    this.groupButtons = {
+      align: ['left', 'center', 'right']
+    }
 
     const tools = document.createElement('div');
     tools.classList.add('text-tool__tools');
 
-    const text = document.createElement('span');
-    text.classList.add('text-tool__text');
-    text.toggleAttribute('contenteditable');
+    const textStyle = document.createElement('div');
+    textStyle.classList.add('text-tool__text-style', 'text-tool__item')
 
-    container.append(header, tools, text);
+    const getToolButton = (value, icon, group, isdefault) => {
+      const button = document.createElement('button');
+      button.classList.add('text-tool__button');
+      button.setAttribute('data-button-value', value);
+      button.innerHTML = icon;
 
-    this.collapsible.inner.append(container);
+      if (isdefault) {
+        button.classList.add('is-active');
+      }
+
+      if (group) {
+        button.setAttribute('data-button-group', group);
+      }
+
+      button.addEventListener('click', () => {
+        if (button.hasAttribute('data-button-group')) {
+          const toUnselect = this.contentWrapper.querySelector(`button[data-button-group="${group}"].is-active`);
+
+          if (toUnselect) {
+            toUnselect.classList.remove('is-active');
+          }
+        }
+
+        button.classList.toggle('is-active');
+
+        this.onToolsChange(button);
+      })
+
+      return button
+    }
+
+    const boldStyle = getToolButton('bold', TextTool.icons.bold);
+    const italicStyle = getToolButton('italic', TextTool.icons.italic);
+    const underlineStyle = getToolButton('underline', TextTool.icons.underline);
+
+    textStyle.append(boldStyle, italicStyle, underlineStyle);
+
+    const textAlign = document.createElement('div');
+    textAlign.classList.add('text-tool__text-align', 'text-tool__item');
+
+    const leftAlign = getToolButton('left', TextTool.icons.left, 'align');
+    const centerAlign = getToolButton('center', TextTool.icons.center, 'align', true);
+    const rightAlign = getToolButton('right', TextTool.icons.right, 'align');
+
+    textAlign.append(leftAlign, centerAlign, rightAlign);
+
+    tools.append(textStyle, textAlign);
+
+    return {
+      container: tools,
+      getAlign: () => {
+        const activeAlign = textAlign.querySelector('button.is-active[data-button-group="align"');
+        if (activeAlign) {
+          return activeAlign.dataset.buttonValue;
+        }
+
+        return null;
+      },
+      setAlign: (align) => {
+        const alignToUnset = tools.querySelector('button[data-button-group="align"].is-active');
+
+        if (alignToUnset) {
+          alignToUnset.classList.remove('is-active');
+        }
+
+        const alignToSet = tools.querySelector(`button[data-button-value="${align}"`);
+
+        if (alignToSet) {
+          alignToSet.classList.add('is-active');
+        }
+      },
+      getFontStyle: () => {
+        const isBold = textStyle.querySelector('button.is-active[data-button-value="bold"');
+        const isItalic = textStyle.querySelector('button.is-active[data-button-value="italic"');
+        const isUnderline = textStyle.querySelector('button.is-active[data-button-value="underline"');
+
+        return {
+          bold: isBold ? true : false,
+          italic: isItalic ? true : false,
+          underline: isUnderline ? true : false
+        }
+      },
+      setFontStyle: ({ bold, italic, underline }) => {
+        if (bold) {
+          boldStyle.classList.add('is-active');
+        } else {
+          boldStyle.classList.remove('is-active');
+        }
+
+        if (italic) {
+          italicStyle.classList.add('is-active');
+        } else {
+          italicStyle.classList.remove('is-active');
+        }
+
+        if (underline) {
+          underlineStyle.classList.add('is-active');
+        } else {
+          underlineStyle.classList.remove('is-active');
+        }
+      }
+    }
+  }
+
+  onToolsChange(button) {
+    if (button.hasAttribute('data-button-group')) {
+      switch (button.dataset.buttonGroup) {
+        case 'align':
+          Studio.utils.change({
+            panel: {
+              ...Studio.state.panel,
+              tools: {
+                ...Studio.state.panel.tools,
+                text: {
+                  ...Studio.state.panel.tools.text,
+                  value: this.getStateValue({ align: button.dataset.buttonValue })
+                }
+              }
+            }
+          })
+        break;
+      }
+
+      return;
+    }
+
+    const fontStyle = this.tools.getFontStyle();
+
+    Studio.utils.change({
+      panel: {
+        ...Studio.state.panel,
+        tools: {
+          ...Studio.state.panel.tools,
+          text: {
+            ...Studio.state.panel.tools.text,
+            value: this.getStateValue({ fontStyle })
+          }
+        }
+      }
+    })    
+  }
+
+  onFontChange() {
+    Studio.utils.change({
+      panel: {
+        ...Studio.state.panel,
+        tools: {
+          ...Studio.state.panel.tools,
+          text: {
+            ...Studio.state.panel.tools.text,
+            value: this.getStateValue({ font: this.selectFont.getValue() })
+          }
+        }
+      }
+    })
+  }
+
+  onTextInput() {
+    this.text.style.height = (this.text.scrollHeight) + 'px';
+
+    const isLine = Studio.state.view.blocks
+      .some(block => block.childBlocks.some(child => child.isLine));
+
+    const { value } = this.text;
+
+    if (value.length > 35 && isLine) {
+      this.text.value = value.substring(0, 35);
+      
+      this.text.focus();
+      this.text.setSelectionRange(this.text.value.length, this.text.value.length);
+    } else if (!isLine && value.length > 300) {
+      this.text.value = value.substring(0, 300);
+      
+      this.text.focus();
+      this.text.setSelectionRange(this.text.value.length, this.text.value.length);
+    }
+
+    Studio.utils.change({
+      panel: {
+        ...Studio.state.panel,
+        tools: {
+          ...Studio.state.panel.tools,
+          text: {
+            ...Studio.state.panel.tools.text,
+            value: this.getStateValue({ text: this.text.value })
+          }
+        }
+      }
+    })
+  }
+
+  getStateValue(state) {
+    return {
+      ...Studio.state.panel.tools.text.value,
+      ...state
+    }
+  }
+
+  setValue(value) {
+    const isLine = Studio.state.view.blocks
+      .some(block => block.childBlocks.some(child => child.isLine));
+
+    if (isLine) {
+      this.selectType.setValue('Line');
+    } else {
+      this.selectType.setValue('Paragraph');
+    }
+
+    const { text, fontStyle, align, font } = value;
+
+    if (text) {
+      this.text.value = text;
+    }
+
+    if (align) {
+      this.tools.setAlign(align);
+    }
+
+    if (fontStyle) {
+      this.tools.setFontStyle(fontStyle);
+    }
+
+    if (font) {
+      this.selectFont.setValue(font);
+    }
+  }
+
+  getValue() {
+    return {
+      text: this.values.text,
+      align: this.values.align,
+      fontStyle: this.values.fontStyle,
+      font: this.values.font
+    }
+  }
+}
+
+class RotateTool extends Tool {
+  static icons = {
+    against: `
+      <svg width="17" height="19" viewBox="0 0 17 19" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M7.53034 4.02642C7.72202 4.10729 7.92285 3.93233 7.869 3.73138L7.71656 3.16246C9.98422 2.55486 11.359 2.63675 12.284 3.17081C13.209 3.70488 13.9674 4.85456 14.575 7.1223C14.7179 7.65576 15.2663 7.97235 15.7997 7.8294C16.3332 7.68646 16.6498 7.13813 16.5068 6.60466C15.8605 4.19241 14.9171 2.38164 13.284 1.43876C11.6509 0.495888 9.61111 0.584285 7.19892 1.23061L7.04656 0.661976C6.99271 0.461028 6.73131 0.40992 6.60575 0.575792L5.04378 2.63921C4.94538 2.76919 4.99572 2.95706 5.14593 3.02044L7.53034 4.02642Z" fill="currentColor"/>
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M1.56918 6.88022C0.768976 7.09463 0.294102 7.91714 0.508515 8.71734L2.83789 17.4107C3.0523 18.2109 3.8748 18.6857 4.675 18.4713L13.3683 16.142C14.1685 15.9275 14.6434 15.105 14.429 14.3048L12.0996 5.61151C11.8852 4.81131 11.0627 4.33644 10.2625 4.55085L1.56918 6.88022ZM2.56978 8.68266L4.64033 16.4101L12.3677 14.3395L10.2972 6.61211L2.56978 8.68266Z" fill="currentColor"/>
+      </svg>
+    `,
+    by: `
+      <svg width="17" height="19" viewBox="0 0 17 19" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9.46786 4.02642C9.27618 4.10729 9.07535 3.93233 9.1292 3.73138L9.28164 3.16246C7.01398 2.55486 5.63921 2.63675 4.71419 3.17081C3.78916 3.70488 3.03084 4.85456 2.42321 7.1223C2.28026 7.65576 1.73193 7.97234 1.19846 7.8294C0.664995 7.68646 0.348412 7.13812 0.491354 6.60466C1.13771 4.19241 2.08106 2.38164 3.71419 1.43876C5.34729 0.495888 7.38709 0.584285 9.79927 1.23061L9.95164 0.661976C10.0055 0.461028 10.2669 0.40992 10.3925 0.575792L11.9544 2.63921C12.0528 2.76919 12.0025 2.95706 11.8523 3.02044L9.46786 4.02642Z" fill="currentColor"/>
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M15.429 6.88022C16.2292 7.09463 16.7041 7.91714 16.4897 8.71734L14.1603 17.4107C13.9459 18.2109 13.1234 18.6857 12.3232 18.4713L3.62986 16.142C2.82966 15.9275 2.35479 15.105 2.5692 14.3048L4.89857 5.61151C5.11299 4.81131 5.93549 4.33644 6.73569 4.55085L15.429 6.88022ZM14.4284 8.68266L12.3579 16.4101L4.63046 14.3395L6.70101 6.61211L14.4284 8.68266Z" fill="currentColor"/>
+      </svg>
+    `, 
+  }
+
+  constructor() {
+    super();
+
+    this.label.setLabel('Rotate');
+
+    const icon = `
+      <svg width="15" height="13" viewBox="0 0 15 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M1.90175 6.29659C1.90175 9.34078 4.10895 11.4145 6.58746 11.8437C6.87109 11.8928 7.0612 12.1626 7.01209 12.4462C6.96298 12.7298 6.69324 12.9199 6.40962 12.8708C3.49796 12.3666 0.859375 9.91247 0.859375 6.29659C0.859375 4.75991 1.55849 3.55227 2.37493 2.63358C2.95978 1.97549 3.62888 1.44117 4.16699 1.03184L2.53059 1.03184C2.25444 1.03184 2.03059 0.80798 2.03059 0.531837C2.03059 0.255695 2.25444 0.0318374 2.53059 0.0318374L5.53059 0.0318373C5.80673 0.0318372 6.03059 0.255695 6.03059 0.531837L6.03059 3.53184C6.03059 3.80798 5.80673 4.03184 5.53059 4.03184C5.25444 4.03184 5.03059 3.80798 5.03059 3.53184L5.03059 1.68627L5.02907 1.68741L5.02899 1.68747L5.02898 1.68748L5.02896 1.68749C4.45749 2.11849 3.75912 2.6452 3.15408 3.32602C2.43955 4.13003 1.90175 5.10135 1.90175 6.29659ZM13.0094 6.70302C13.0094 3.69097 10.849 1.62942 8.40237 1.1701C8.11947 1.11699 7.93319 0.844602 7.9863 0.561701C8.03941 0.2788 8.3118 0.0925166 8.5947 0.145627C11.469 0.685223 14.0518 3.12587 14.0518 6.70302C14.0518 8.2397 13.3526 9.44735 12.5362 10.366C11.9514 11.0241 11.2823 11.5584 10.7442 11.9678L12.3806 11.9678C12.6567 11.9678 12.8806 12.1916 12.8806 12.4678C12.8806 12.7439 12.6567 12.9678 12.3806 12.9678L9.38059 12.9678C9.10444 12.9678 8.88059 12.7439 8.88059 12.4678L8.88059 9.46777C8.88059 9.19163 9.10444 8.96777 9.38059 8.96777C9.65673 8.96777 9.88059 9.19163 9.88059 9.46777L9.88059 11.3133L9.88215 11.3121C10.4536 10.8811 11.152 10.3544 11.7571 9.67359C12.4716 8.86958 13.0094 7.89826 13.0094 6.70302Z" fill="black"/>
+      </svg>
+    `
+
+    this.icon.setIcon(icon);
+  }
+
+  setContent() {
+    const wrapper = document.createElement('div');
+    wrapper.classList.add('crop-tool');
+
+    const againstClock = document.createElement('button');
+    againstClock.innerHTML = RotateTool.icons.against;
+    againstClock.classList.add('crop-tool__button');
+
+    const byClock = document.createElement('button');
+    byClock.classList.add('crop-tool__button');
+    byClock.innerHTML = RotateTool.icons.by;
+
+    const slider = this.createSlider();
+
+    wrapper.append(againstClock, slider.container, byClock);
+
+    this.collapsible.inner.append(wrapper);
+  }
+  
+  createSlider() {
+    const slider = document.createElement('div');
+    slider.classList.add('slider');
+
+    const fullBar = document.createElement('div');
+    fullBar.classList.add('slider__full-bar');
+
+    const valueBar = document.createElement('div');
+    valueBar.classList.add('slider__value-bar');
+
+    fullBar.append(valueBar);
+
+    slider.append(fullBar);
+
+    const holder = document.createElement('div');
+    holder.classList.add('slider__holder');
+
+    const holderStrip = document.createElement('span');
+    holderStrip.classList.add('slider__holder-strip');
+    holder.append(holderStrip);
+
+    const sliderMouseMove = (event) => {
+      console.log(event);
+    }
+
+    const sliderMouseDown = (event) => {
+      console.log(event.target === holder, holder.contains(event.target))
+      if (event.target === holder || holder.contains(event.target)) {
+        holder.addEventListener('mousemove', sliderMouseMove);
+      }
+    }
+
+    slider.addEventListener('mousedown', sliderMouseDown);
+
+    slider.addEventListener('mouseup', () => {
+      holder.removeEventListener('mousemove', sliderMouseDown);
+    })
+
+    slider.append(holder);
+
+    const setValue = (value) => {};
+
+    const getValue = () => {};
+
+    return {
+      container: slider,
+      setValue,
+      getValue
+    }
+  }
+}
+
+class CropTool extends Tool {
+  constructor() {
+    super();
+
+    this.label.setLabel('Crop');
+
+    const icon = `
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M3.5 1.75436e-06C3.77614 1.74229e-06 4 0.223859 4 0.500002L4 3.00006L11.5 3.00006C11.7761 3.00006 12 3.22392 12 3.50006L12 11.0001L14.5 11C14.7761 11 15 11.2238 15 11.5C15 11.7761 14.7762 12 14.5 12L12 12.0001L12 14.5C12 14.7761 11.7761 15 11.5 15C11.2239 15 11 14.7761 11 14.5L11 12.0001L3.5 12.0001C3.22386 12.0001 3 11.7762 3 11.5001L3 4.00005L0.499989 4C0.223847 4 -6.10541e-06 3.77613 -5.02576e-07 3.49999C5.13006e-06 3.22385 0.223867 3 0.50001 3L3 3.00005L3 0.500002C3 0.223859 3.22386 1.76643e-06 3.5 1.75436e-06ZM4 4.00006L4 11.0001L11 11.0001L11 4.00006L4 4.00006Z" fill="black"/>
+      </svg>
+    `
+
+    this.icon.setIcon(icon);
   }
 }
 
@@ -1726,7 +2216,6 @@ class Tools extends HTMLElement {
       const toDeleteBtn = imageWrapper.querySelector('[data-delete]');
 
       if (event.target !== toDeleteBtn && !toDeleteBtn.contains(event.target)) {
-        console.log(image.src);
         Studio.utils.change({
           imagesToDownload: image.src
         })
@@ -1804,8 +2293,6 @@ class Tools extends HTMLElement {
         } else {
           formData.append(this.inputFromPC.name, imageFile);
 
-          console.log('to download');
-
           const response = await fetch('product-builder/uploads', {
             method: 'POST',
             body: formData
@@ -1870,24 +2357,27 @@ class Tools extends HTMLElement {
       tools: {
         layout: new LayoutTool(),
         text: new TextTool(),
+        rotate: new RotateTool(),
+        crop: new CropTool(),
         tool1: new Tool('Tool 1'),
         tool2: new Tool('Tool 2'),
         tool3: new Tool('Tool 3'),
       }
     }
 
+    const editStateTools = Object.keys(this.edit.tools)
+      .reduce((obj, tool) => {
+        obj[tool] = {
+          show: false,
+          value: this.edit.tools[tool].getValue()
+        }
+
+        return obj
+      }, {})
+
     Studio.utils.change({ panel: {
       ...JSON.parse(Studio.panel.getAttribute('state')),
-      tools: {
-        layout: {
-          show: false,
-          value: this.edit.tools.layout.getValue()
-        },
-        text: {
-          show: false,
-          value: this.edit.tools.text.getValue()
-        }
-      }
+      tools: editStateTools
     }})
   }
 
@@ -1928,8 +2418,6 @@ class Tools extends HTMLElement {
 
       return [...arr, ...editablePictures ];
     }, [])
-
-    console.log(childs);
 
     const imagesToSet = [...this.pages.images.imageList]
       .slice(0, childs.length)
@@ -1988,22 +2476,24 @@ class Panel extends HTMLElement {
           show: hasLayout
         },
         text: {
-          show: hasText
+          show: false
         }
       })
     }
 
     if (!compareObjects(prevState.tools, currState.tools)) {
-      const { layout, text } = currState.tools;
+      const { layout, text, rotate } = currState.tools;
 
-      this.tools.setToolsState({
-        layout: {
-          ...layout
-        },
-        text: {
-          ...text
-        }
-      })
+      const toSet = Object.keys(currState.tools)
+        .reduce((obj, tool) => {
+          obj[tool] = {
+            ...currState.tools[tool]
+          }
+
+          return obj;
+        }, {});
+
+      this.tools.setToolsState(toSet)
     }
   }
 
@@ -2053,8 +2543,12 @@ class EditablePicture extends HTMLElement {
 
   connectedCallback() {
     this.toggleAttribute('editable-picture');
-    this.setAttribute('child-block', window.uniqueID.childBlock());
 
+    if (!this.getAttribute('child-block')) {
+      this.setAttribute('child-block', window.uniqueID.childBlock());
+    }
+
+    this.controls = ProductControls.createPictureControls(this.getAttribute('child-block'));
     
     this.emptyState = this.querySelector(EditablePicture.selectors.emptyState);
     if (this.emptyState) {
@@ -2064,9 +2558,11 @@ class EditablePicture extends HTMLElement {
     }
 
     this.addEventListener('click', (event) => {
+      const isControlsTarget = event.target === this.controls || this.controls.contains(event.target)
+
       Studio.studioView.setSelectedChild(this);
 
-      if (event.target !== this.emptyState && !this.emptyState.contains(event.target)) {
+      if (event.target !== this.emptyState && !this.emptyState.contains(event.target) && !isControlsTarget) {
         Studio.panel.tools.focusOnTab('edit');
       }
     })
@@ -2078,10 +2574,25 @@ class EditablePicture extends HTMLElement {
 
   select() {
     this.classList.add('is-selected');
+
+    if (!this.classList.contains('is-empty')) {
+      this.appendControls();
+    }
+  }
+
+  appendControls() {
+    this.controls.style.opacity = 0;
+
+    this.append(this.controls);
+    setTimeout(() => {
+      this.controls.style.opacity = null;
+    }, 10);
   }
 
   unselect() {
     this.classList.remove('is-selected');
+
+    this.controls.remove();
   }
 
   getToolsList() {
@@ -2119,6 +2630,14 @@ class EditablePicture extends HTMLElement {
   destroy() {
     this.remove();
   }
+
+  hasImage() {
+    return this.image && this.image.hasAttribute('src');
+  }
+
+  getValue() {
+    return {}
+  }
 }
 customElements.define('editable-picture', EditablePicture);
 
@@ -2127,15 +2646,142 @@ class EditableText extends HTMLElement {
     super();
 
     this.editableArea = document.createElement('span');
-    this.editableArea.toggleAttribute('contenteditable');
+    // this.editableArea.toggleAttribute('contenteditable');
     this.editableArea.classList.add('textarea');
+
+    this.editableArea.textContent = 'Add your description here';
   }
 
   connectedCallback() {
+    this.classList.add('product-element__text', 'textarea-container');
+    this.toggleAttribute('editable-text')
+
+    if (!this.getAttribute('child-block')) {
+      this.setAttribute('child-block', window.uniqueID.childBlock());
+    }
+
+    if (!this.hasAttribute('text-align')) {
+      this.setAttribute('text-align', 'center');
+    }
+
+    if (!this.hasAttribute('is-bold')) {
+      this.setAttribute('is-bold', false);
+    }
+
+    if (!this.hasAttribute('is-italic')) {
+      this.setAttribute('is-italic', false);
+    }
+
+    if (!this.hasAttribute('is-underline')) {
+      this.setAttribute('is-underline', false);
+    }
+
+    if (!this.hasAttribute('font')) {
+      this.setAttribute('font', Studio.state.panel.tools.text.value.font);
+    }
+
     this.append(this.editableArea);
 
-    if (this.hasAttribute('line') === 'line') {
+    if (this.hasAttribute('line')) {
       this.editableArea.classList.add('line');
+      this.observer = this.observeSpan(this.editableArea);
+    }
+
+    this.addEventListener('click', (event) => {
+      Studio.studioView.setSelectedChild(this);
+    })
+  }
+
+  observeSpan = (element) => {
+    const mutate = (mutations) => {
+      mutations.forEach(mutation => {
+        const { textContent } = mutation.target;
+
+        const range = document.createRange();
+        const selection = document.getSelection();
+        const textArr = textContent.split('');
+
+        if (textArr.length > 35 && this.classList.contains('line')) {
+          mutation.target.textContent = textContent.substring(0, 35);
+          range.setStartAfter(element.lastChild);
+          range.collapse(true);
+
+          selection.removeAllRanges();
+          selection.addRange(range);
+        } else if (textArr.length > 300) {
+          mutation.target.textContent = textContent.substring(0, 35);
+          range.setStartAfter(element.lastChild);
+          range.collapse(true);
+
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      })
+    }
+
+    const observer = new MutationObserver(mutate);
+    const config = { characterData: true, attributes: false, childList: false, subtree: true };
+
+    observer.observe(element, config);
+
+    return observer;
+  }
+
+  select() {
+    this.classList.add('is-selected');
+  }
+
+  unselect() {
+    this.classList.remove('is-selected');
+  }
+
+  getToolsList() {
+    return ['text'];
+  }
+
+  setValue(settings) {
+    const { text, align, fontStyle, font } = settings;
+
+    if (text) {
+      this.editableArea.textContent = text;
+    }
+
+    if (align) {
+      this.setAttribute('text-align', align);
+    }
+
+    if (fontStyle) {
+      const { bold, italic, underline } = fontStyle;
+
+      if (typeof bold === 'boolean') {
+        this.setAttribute('is-bold', bold);
+      }
+
+      if (typeof italic === 'boolean') {
+        this.setAttribute('is-italic', italic);
+      }
+
+      if (typeof underline === 'boolean') {
+        this.setAttribute('is-underline', underline);
+      }
+    }
+
+    if (font) {
+      this.setAttribute('font', font);
+    }
+  }
+
+  getValue() {
+    return {
+      text: {
+        text: this.editableArea.textContent,
+        align: this.getAttribute('text-align'),
+        fontStyle: {
+          bold: JSON.parse(this.getAttribute('is-bold')),
+          italic: JSON.parse(this.getAttribute('is-italic')),
+          underline: JSON.parse(this.getAttribute('is-underline')),
+        }
+      }
     }
   }
 }
@@ -2174,57 +2820,9 @@ class ProductControls extends HTMLElement {
     `,
   }
 
-  static template = `
-    <product-controls
-      class="product-element__controls product-controls"
-    >
-      <button data-remove class="product-controls__button">
-        <svg width="19" height="20" viewBox="0 0 19 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M3.17499 4.75H16.225L15.8025 13.4914C15.6737 16.1559 13.4759 18.25 10.8083 18.25H8.59166C5.92407 18.25 3.72627 16.1559 3.59749 13.4914L3.17499 4.75Z" stroke="currentColor" stroke-width="2"/>
-          <path d="M6.07501 4.75V4.75C6.07501 3.09315 7.41816 1.75 9.07501 1.75H10.325C11.9819 1.75 13.325 3.09315 13.325 4.75V4.75" stroke="currentColor" stroke-width="2"/>
-          <path d="M11.875 9.25V13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <path d="M7.52499 9.25V13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <path d="M1.72501 4.75H17.675" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>                
-      </button>
-
-      <div class="product-controls__quantity" data-quantity>
-        <button class="product-controls__button" data-quantity-add>
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M6.52499 9.00977C6.52499 9.28591 6.30114 9.50977 6.02499 9.50977H4.75742C4.48127 9.50977 4.25742 9.28591 4.25742 9.00977V6.66113C4.25742 6.38499 4.03356 6.16113 3.75742 6.16113H1.3912C1.11506 6.16113 0.891205 5.93728 0.891205 5.66113V4.3584C0.891205 4.08226 1.11506 3.8584 1.3912 3.8584H3.75742C4.03356 3.8584 4.25742 3.63454 4.25742 3.3584V0.992188C4.25742 0.716045 4.48127 0.492188 4.75742 0.492188H6.02499C6.30114 0.492188 6.52499 0.716045 6.52499 0.992188V3.3584C6.52499 3.63454 6.74885 3.8584 7.02499 3.8584H9.40878C9.68493 3.8584 9.90878 4.08226 9.90878 4.3584V5.66113C9.90878 5.93728 9.68493 6.16113 9.40878 6.16113H7.02499C6.74885 6.16113 6.52499 6.38499 6.52499 6.66113V9.00977Z" fill="black"/>
-          </svg>
-        </button>
-
-        <span data-quantity-count>
-          1
-        </span>
-
-        <button class="product-controls__button" data-quantity-remove>
-          <svg width="7" height="4" viewBox="0 0 7 4" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M4.78867 3.05957H2.01132C1.58945 3.05957 1.26718 2.96289 1.04453 2.76953C0.827728 2.57031 0.71933 2.31543 0.71933 2.00488C0.71933 1.68848 0.824799 1.43359 1.03574 1.24023C1.25253 1.04102 1.57773 0.941406 2.01132 0.941406H4.78867C5.22226 0.941406 5.54453 1.04102 5.75546 1.24023C5.97226 1.43359 6.08066 1.68848 6.08066 2.00488C6.08066 2.31543 5.97519 2.57031 5.76425 2.76953C5.55331 2.96289 5.22812 3.05957 4.78867 3.05957Z" fill="black"/>
-          </svg>
-        </button>
-      </div>
-
-      <button data-edit class="product-controls__button">
-        <svg width="19" height="18" viewBox="0 0 19 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M3.30143 11.8619L13.6969 1.46643C13.7062 1.46378 13.7158 1.4611 13.7258 1.45839C13.8626 1.42133 14.0605 1.38264 14.2925 1.37944C14.7367 1.37331 15.3279 1.49293 15.9134 2.07843C16.4989 2.66392 16.6185 3.25504 16.6123 3.69925C16.6091 3.93131 16.5705 4.1292 16.5334 4.266C16.5307 4.27601 16.528 4.28563 16.5254 4.29486L6.12986 14.6904L2.91574 15.076L3.30143 11.8619Z" stroke="white" stroke-width="2" stroke-linecap="round"/>
-          <path d="M3.30143 11.8619L13.6969 1.46643C13.7062 1.46378 13.7158 1.4611 13.7258 1.45839C13.8626 1.42133 14.0605 1.38264 14.2925 1.37944C14.7367 1.37331 15.3279 1.49293 15.9134 2.07843C16.4989 2.66392 16.6185 3.25504 16.6123 3.69925C16.6091 3.93131 16.5705 4.1292 16.5334 4.266C16.5307 4.27601 16.528 4.28563 16.5254 4.29486L6.12986 14.6904L2.91574 15.076L3.30143 11.8619Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <path d="M11.1003 2.64844L15.141 6.68905" stroke="white" stroke-width="2"/>
-          <path d="M11.1003 2.64844L15.141 6.68905" stroke="currentColor" stroke-width="2"/>
-          <path d="M3.90781 1V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M6.39999 3.5L1.39999 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>  
-        
-        <span class="button__tooltip">
-          Edit
-        </span>
-      </button>
-    </product-controls>
-  `;
-
   static createBlockControls = (productId) => {
     const productControls = document.createElement('product-controls');
+    productControls.setAttribute('type', 'block');
     productControls.classList.add('product-element__controls', 'product-controls');
     productControls.setAttribute('block-controls', productId);
 
@@ -2258,9 +2856,42 @@ class ProductControls extends HTMLElement {
     editBtn.toggleAttribute('data-edit');
     editBtn.innerHTML = ProductControls.icons.edit;
 
+    const editTooltip = document.createElement('span');
+    editTooltip.classList.add('button__tooltip');
+    editTooltip.textContent = 'Edit';
+
+    editBtn.append(editTooltip);
+
     productControls.append(removeBtn, controlsQuantity, editBtn);
 
     return productControls;
+  }
+
+  static createPictureControls = (blockId) => {
+    const pictureControls = document.createElement('product-controls');
+    pictureControls.classList.add('product-element__controls', 'product-controls', 'product-controls--picture');
+    pictureControls.setAttribute('type', 'picture');
+    pictureControls.setAttribute('block-controls', blockId);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.toggleAttribute('data-remove');
+    removeBtn.classList.add('product-controls__button');
+    removeBtn.innerHTML = ProductControls.icons.remove;
+
+    const editBtn = document.createElement('button');
+    editBtn.classList.add('product-controls__button');
+    editBtn.toggleAttribute('data-edit');
+    editBtn.innerHTML = ProductControls.icons.edit;
+
+    const editTooltip = document.createElement('span');
+    editTooltip.classList.add('button__tooltip');
+    editTooltip.textContent = 'Edit';
+
+    editBtn.append(editTooltip);
+
+    pictureControls.append(removeBtn, editBtn);
+
+    return pictureControls
   }
 
   static selectors = {
@@ -2279,10 +2910,10 @@ class ProductControls extends HTMLElement {
   }
 
   connectedCallback() {
-    this.init();
+    this.init(this.getAttribute('type'));
   }
 
-  init() {
+  init(type) {
     const block = this.parentElement.querySelector('.product-builder__element');
 
     const remove = this.querySelector(ProductControls.selectors.remove);
@@ -2291,19 +2922,23 @@ class ProductControls extends HTMLElement {
     const increaseQuantity = this.querySelector(ProductControls.selectors.quantity.plus);
     const decreaseQuantity = this.querySelector(ProductControls.selectors.quantity.minus);
 
-    increaseQuantity.addEventListener('click', () => {
-      block.setQuantity(block.getQuantity() + 1);
+    if (increaseQuantity) {
+      increaseQuantity.addEventListener('click', () => {
+        block.setQuantity(block.getQuantity() + 1);
+  
+        this.setValue();
+      });
+    }
 
-      this.setValue();
-    });
-
-    decreaseQuantity.addEventListener('click', () => {
-      if (block.getQuantity() > 1) {
-        block.setQuantity(block.getQuantity() - 1);
-      }
-
-      this.setValue();
-    });
+    if (decreaseQuantity) {
+      decreaseQuantity.addEventListener('click', () => {
+        if (block.getQuantity() > 1) {
+          block.setQuantity(block.getQuantity() - 1);
+        }
+  
+        this.setValue();
+      });
+    }
 
     const quantity = this.querySelector(ProductControls.selectors.quantity.count);
 
@@ -2316,15 +2951,85 @@ class ProductControls extends HTMLElement {
       quantity
     }
 
-    remove.addEventListener('click', () => {
-      this.dispatchEvent(new CustomEvent('clear:product', {
-        detail: {}
-      }))
-    });
+    if (remove) {
+      switch (type) {
+        case 'block':
+          remove.addEventListener('click', () => {
+            const newBlocks = Studio.state.view.blocks
+              .map(block => {
+                if (block.id === this.getAttribute('block-controls')) {
+                  const newChildren = block.childBlocks
+                    .map(child => {
+                      if (child.type === 'editable-picture') {
+                        return {
+                          ...child,
+                          imageUrl: null
+                        }
+                      }
 
-    edit.addEventListener('click', () => {
-      console.log('should to edit');
-    });
+                      return child;
+                    })
+
+                  return {
+                    ...block,
+                    childBlocks: newChildren
+                  }
+                }
+
+                return block;
+              });
+
+            Studio.utils.change({
+              view: {
+                ...Studio.state.view,
+                blocks: newBlocks
+              }
+            })
+          });
+          break;
+        case 'picture':
+          remove.addEventListener('click', () => {
+            const newBlocks = Studio.state.view.blocks
+              .map(block => {
+                if (block.childBlocks.some(child => child.id === this.getAttribute('block-controls'))) {
+                  const newChildren = block.childBlocks
+                    .map(child => {
+                      if (child.id === this.getAttribute('block-controls')) {
+                        return {
+                          ...child,
+                          imageUrl: null
+                        }
+                      }
+
+                      return child
+                    });
+
+                  return {
+                    ...block,
+                    childBlocks: newChildren
+                  }
+                }
+                
+
+                return block
+              });
+
+            Studio.utils.change({
+              view: {
+                ...Studio.state.view,
+                blocks: newBlocks
+              }
+            })
+          })
+          break;
+      }
+    }
+
+    if (edit) {
+      edit.addEventListener('click', () => {
+        console.log('should to edit');
+      });
+    }
   }
 
   setValue() {
@@ -2384,10 +3089,12 @@ class ProductElement extends HTMLElement {
 
   initControls() {
     this.controls = this.querySelector(ProductElement.selectors.controls);
-  
-    this.controls.addEventListener('clear:product', (() => {
-      this.clear()
-    }).bind(this));
+
+    if (this.controls) {
+      this.controls.addEventListener('clear:product', (() => {
+        this.clear()
+      }).bind(this));
+    }
   }
 
   toggle(event) {
@@ -2460,7 +3167,7 @@ customElements.define('product-element', ProductElement);
 class PhotobookPage extends HTMLElement {
   static selectors = {
     picture: 'editable-picture',
-    text: '[data-textarea]',
+    text: 'editable-text',
     child: 'photobook-page > [data-child]'
   }
 
@@ -2473,10 +3180,15 @@ class PhotobookPage extends HTMLElement {
   }
 
   connectedCallback() {
-    this.setAttribute('block', uniqueID.block());
+    if (!this.getAttribute('block')) {
+      this.setAttribute('block', uniqueID.block());
+    }
+
     this.setAttribute('block-type', 'photobook-page');
 
     this.controls = ProductControls.createBlockControls(this.getAttribute('block'));
+
+    this.parentElement.append(this.controls);
   
     this.init();
 
@@ -2517,11 +3229,12 @@ class PhotobookPage extends HTMLElement {
     const callback = this[this.layout.id + 'Layout'];
 
     if (callback) {
-      callback.apply(this);
+      callback.apply(this, this.editablePicturesJSON);
     }
   }
 
-  setLayout(layout) {
+  setLayout(layout, editablePicturesJSON) {
+    this.editablePicturesJSON = editablePicturesJSON;
     this.setAttribute('photobook-page', layout);
   }
 
@@ -2554,7 +3267,7 @@ class PhotobookPage extends HTMLElement {
     }
   }
 
-  getEditable() {
+  getEditable(state) {
     const picture = document.createElement('editable-picture')
     picture.classList.add(
       'product-element__picture',
@@ -2564,6 +3277,17 @@ class PhotobookPage extends HTMLElement {
 
     picture.innerHTML += EditablePicture.emptyState;
 
+    if (state) {
+      const { id, imageUrl } = state;
+
+      picture.setAttribute('child-block', id);
+
+      if (imageUrl) {
+        picture.setImage(imageUrl);
+      }
+
+    }
+
     return picture;
   }
 
@@ -2572,25 +3296,13 @@ class PhotobookPage extends HTMLElement {
   }) {
     const { line } = options;
 
-    const container = document.createElement('div');
-    container.classList.add('product-element__text', 'textarea-container');
-      container.toggleAttribute('data-textarea', 'is-empty');
-
-    const text = document.createElement('span');
-    text.toggleAttribute('contenteditable');
-    text.classList.add(
-      'textarea',
-    );
+    const textarea = document.createElement('editable-text');
 
     if (line) {
-      text.classList.add('line');
+      textarea.toggleAttribute('line');
     }
 
-    text.textContent = 'Add your description here';
-
-    container.append(text);
-
-    return container;
+    return textarea;
   }
 
   select() {
@@ -2612,10 +3324,22 @@ class PhotobookPage extends HTMLElement {
       .forEach(item => item.remove());
   }
 
+  editableQuery(editablePicturesJSON = []) {
+    let queryCount = 0;
+
+    const states = [...editablePicturesJSON];
+
+    return () => {
+      return states[queryCount++];
+    };
+  }
+
   wholeLayout() {
     this.clearLayout();
 
-    const bigImage = this.getEditable();
+    const editableQuery = this.editableQuery(this.editablePicturesJSON);
+
+    const bigImage = this.getEditable(editableQuery());
 
     this.append(bigImage);
 
@@ -2624,9 +3348,15 @@ class PhotobookPage extends HTMLElement {
   bigWithThreeSquareLayout() {
     this.clearLayout();
 
-    const bigImage = this.getEditable();
+    const editableQuery = this.editableQuery(this.editablePicturesJSON);
 
-    const small = [this.getEditable(), this.getEditable(), this.getEditable()];
+    const bigImage = this.getEditable(editableQuery());
+
+    const small = [
+      this.getEditable(editableQuery()),
+      this.getEditable(editableQuery()),
+      this.getEditable(editableQuery())
+    ];
 
     this.append(bigImage, ...small);
 
@@ -2635,16 +3365,20 @@ class PhotobookPage extends HTMLElement {
   wholeFramelessLayout() {
     this.clearLayout();
 
-    this.append(this.getEditable());
+    const editableQuery = this.editableQuery(this.editablePicturesJSON);
+
+    this.append(this.getEditable(editableQuery()));
 
   }
 
   rightImageWithTextLayout() {
     this.clearLayout();
 
+    const editableQuery = this.editableQuery(this.editablePicturesJSON);
+
     const text = this.getText();
 
-    const image = this.getEditable();
+    const image = this.getEditable(editableQuery());
 
     this.append(text, image);
 
@@ -2653,9 +3387,11 @@ class PhotobookPage extends HTMLElement {
   leftImageWithTextLayout() {
     this.clearLayout();
 
+    const editableQuery = this.editableQuery(this.editablePicturesJSON);
+
     const text = this.getText();
 
-    const image = this.getEditable();
+    const image = this.getEditable(editableQuery());
 
     this.append(image, text);
 
@@ -2664,13 +3400,15 @@ class PhotobookPage extends HTMLElement {
   twoRectangleImagesWithTextLayout() {
     this.clearLayout();
 
+    const editableQuery = this.editableQuery(this.editablePicturesJSON);
+
     const [leftWrap, rightWrap] = [document.createElement('div'), document.createElement('div')];
 
     leftWrap.toggleAttribute('data-child');
     rightWrap.toggleAttribute('data-child');
 
-    leftWrap.append(this.getEditable(), this.getText({ line: true }));
-    rightWrap.append(this.getEditable(), this.getText({ line: true }));
+    leftWrap.append(this.getEditable(editableQuery()), this.getText({ line: true }));
+    rightWrap.append(this.getEditable(editableQuery()), this.getText({ line: true }));
 
     this.append(leftWrap, rightWrap);
   }
@@ -2692,6 +3430,7 @@ class StudioView extends HTMLElement {
     productInfo: 'product-info',
     tools: 'customization-tools',
     block: '[block]',
+    studioBlock: '[data-studio-block]',
     blockById: (id) => `[block="${id}"]`,
     editableById: (id) => `[editable-picture="${id}"]`,
     editablePicture: '[editable-picture]',
@@ -2730,15 +3469,19 @@ class StudioView extends HTMLElement {
     if (!compareObjects(prevState.blocks, currState.blocks)) {
       this.toggleSelected(prevState.blocks, currState.blocks);
 
-      this.setBlocksValue(prevState.blocks, currState.blocks);
+      this.setBlocksValue(prevState.blocks, currState.blocks)
     }
 
     if (currState.product && prevState.blockCount !== currState.blockCount) {
       this.setProductElements(currState.blockCount);
     }
 
-    if (!compareObjects(currState.imagesToDownload, prevState.imagesToDownload) && currState.imagesToDownload) {      
-      this.setImages(currState)
+    if (currState.imagesToDownload && !compareObjects(currState.imagesToDownload, prevState.imagesToDownload)) {      
+      this.setImages(currState);
+
+      Studio.utils.change({
+        imagesToDownload: null
+      })
     }
   }
 
@@ -2756,22 +3499,23 @@ class StudioView extends HTMLElement {
 
           const newBlock = blocks.find(block => block.childBlocks.some(child => child.id === pictureId));
 
-          const newChilds = newBlock.childBlocks.map(child => {
-            if (pictureIds.includes(child.id)) {
-              return {
-                ...child,
-                imageUrl
+          if (newBlock) {
+            const newChilds = newBlock.childBlocks.map(child => {
+              if (pictureIds.includes(child.id)) {
+                return {
+                  ...child,
+                  imageUrl
+                }
               }
-            }
 
-            return child
-          });
+              return child
+            });
 
-          changedBlocks.push({
-            ...newBlock,
-            childBlocks: newChilds
-          });
-
+            changedBlocks.push({
+              ...newBlock,
+              childBlocks: newChilds
+            });
+          }
         })
       });
 
@@ -2881,10 +3625,20 @@ class StudioView extends HTMLElement {
   }
 
   setBlocksValue(prevBlocks, currBlocks) {
-    const initiateNewChildren = (element, selectedChildrenIds) => {
+    const initiateNewChildren = (element, selectedChildrenIds, prevChildrens) => {
       return [...element.querySelectorAll(StudioView.selectors.childBlock)]
         .map(child => {
           const childID = child.getAttribute('child-block');
+
+          const currBlock = currBlocks.find(block => block.id === element.getAttribute('block'))
+
+          if (currBlock) {
+            const currChild = currBlock.childBlocks.find(child => child.id === childID);
+
+            if (currChild) {
+              return currChild;
+            }
+          }
 
           return this.getChildJSON(child, selectedChildrenIds.includes(childID));
         });
@@ -2913,9 +3667,13 @@ class StudioView extends HTMLElement {
         switch(block.type) {
           case 'photobook-page':
             if (!compareObjects(prevSettings.layout, layout)) {
-              element.setLayout(layout.layout);
-              children = initiateNewChildren(element, selectedChildrenIds);
+              const editablePictures = block.childBlocks
+                .filter(child => child.type === 'editable-picture');
+
+              element.setLayout(layout.layout, editablePictures);
             }
+
+            children = initiateNewChildren(element, selectedChildrenIds, block.childBlocks);
             break;
         }
 
@@ -2925,12 +3683,53 @@ class StudioView extends HTMLElement {
         };
       });
 
+    const prevChildren = prevBlocks.map(block => block.childBlocks);
+    const currChildren = newBlocks.map(block => block.childBlocks);
+
+    if (!compareObjects(prevChildren, currChildren)) {
+      this.setChildsValue(prevChildren, currChildren, newBlocks);
+    } else {
+      Studio.utils.change({
+        view: {
+          ...JSON.parse(this.getAttribute('state')),
+          blocks: newBlocks
+        }
+      }, 'set block value')
+    }
+  }
+
+  setChildsValue(prevChildren, currChildren, currBlocks) {
+    const newBlocks = currBlocks
+      .map(block => {
+        const currBlockChildren = currChildren.find(children => compareObjects(children, block.childBlocks));
+        
+        const newChildren = currBlockChildren
+          .map(child => {
+            switch(child.type) {
+              case 'text':
+                const textElement = this.querySelector(StudioView.selectors.childBlockById(child.id));
+
+                textElement.setValue(child.settings.text);
+                break;
+              case 'editable-picture':
+                const pictureElement = this.querySelector(StudioView.selectors.childBlockById(child.id));
+
+                if (!child.imageUrl && pictureElement.hasImage()) {
+                  pictureElement.removeImage();
+                } 
+                break;
+            }
+          })
+
+        return block;
+      })
+
     Studio.utils.change({
       view: {
-        ...JSON.parse(this.getAttribute('state')),
+        ...this.state,
         blocks: newBlocks
       }
-    }, 'set block value')
+    })
   }
 
   initEventListeners() {
@@ -2965,7 +3764,24 @@ class StudioView extends HTMLElement {
     }));
   }
 
+  createStudioBlock(type) {
+    const block = document.createElement('div');
+
+    block.classList.add('studio-view__block');
+    block.toggleAttribute('data-studio-block');
+
+    switch(type) {
+      case 'photobook-page':
+        block.classList.add('block__photobook-page');
+        break;
+    }
+
+    return block
+  }
+
   createDefaultProductElement() {
+    const block = this.createStudioBlock();
+
     const productElement = document.createElement('product-element');
     productElement.classList.add('product-builder__element', 'product-element', 'is-default');
     productElement.setAttribute('quantity', 1);
@@ -2993,14 +3809,17 @@ class StudioView extends HTMLElement {
       this.setSelectedBlock(productElement);
     });
 
-    productElement.innerHTML += ProductControls.template;
+    block.append(productElement);
 
-    this.elements.container.appendChild(productElement);
+    const elementControls = ProductControls.createBlockControls(productElement.getAttribute('block'));
+
+    block.append(elementControls);
+
+    this.elements.container.appendChild(block);
   }
 
   createPhotobookPage(layout) {
-    const block = document.createElement('div');
-    block.classList.add('studio-view__block', 'block__photobook-page');
+    const block = this.createStudioBlock('photobook-page');
 
     const page = document.createElement('photobook-page');
     page.classList.add('photobook-page', 'product-builder__element');
@@ -3016,10 +3835,6 @@ class StudioView extends HTMLElement {
     });
 
     block.append(page);
-    
-    const pageControls = ProductControls.createBlockControls(page.getAttribute('block'));
-
-    block.append(pageControls);
 
     this.elements.container.append(block);
   }
@@ -3128,7 +3943,7 @@ class StudioView extends HTMLElement {
   }
 
   clearView(size) {
-    const blocks =  this.elements.container.querySelectorAll(StudioView.selectors.block);
+    const blocks =  this.elements.container.querySelectorAll(StudioView.selectors.studioBlock);
 
     if (!size) {
       return new Promise((res, rej) => {
@@ -3139,7 +3954,6 @@ class StudioView extends HTMLElement {
         blocks
           .forEach((item, idx) => {
             item.style.opacity = 0;
-            item.setAttribute('quantity', 0);
 
             setTimeout(() => {
               item.remove();
@@ -3163,7 +3977,6 @@ class StudioView extends HTMLElement {
         .forEach((item, idx) => {
           if (idx >= size) {
             item.style.opacity = 0;
-            item.setAttribute('quantity', 0);
             setTimeout(() => {
               item.remove();
 
@@ -3286,12 +4099,31 @@ class StudioView extends HTMLElement {
     const key = child.getAttribute('child-block');
     const type = child.hasAttribute('editable-picture') ? 'editable-picture' : 'text';
 
+    if (type === 'editable-picture') {
+      return {
+        type,
+        id: key,
+        selected: isSelected,
+        tools: child.getToolsList(),
+        settings: child.getValue()
+      }
+    } else if (type === 'text') {
+      return {
+        type,
+        id: key,
+        isLine: child.hasAttribute('line'),
+        selected: isSelected,
+        tools: child.getToolsList(),
+        settings: child.getValue()
+      }
+    }
+
     return {
       type,
       id: key,
       selected: isSelected,
       tools: child.getToolsList(),
-      imageUrl: null
+      settings: child.getValue()
     }
   }
 
@@ -3661,7 +4493,6 @@ class ImageChooser extends HTMLElement {
 
     const photos = await fetch(`https://graph.instagram.com/${user_id}/media?fields=media_url,id,name,craeted_time&access_token=${access_token}`)
       .then(res => {
-        console.log(res);
         if (!res.ok) {
           this.instLogin.create();
           
