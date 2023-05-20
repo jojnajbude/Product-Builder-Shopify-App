@@ -489,6 +489,13 @@ class ProductBuilder extends HTMLElement {
               value: selectedSettings[tool]
             }
             break;
+          case 'backgroundColor':
+              updatedTools[tool] = {
+                ...updatedTools[tool],
+                show: settings.hasBackground,
+                value: selectedSettings[tool]
+              }
+              break;
         }
       }
 
@@ -635,22 +642,96 @@ class ProductBuilder extends HTMLElement {
 }
 customElements.define('product-builder', ProductBuilder);
 
-const change = (state, initiator) => {
-  // console.log(initiator);
-
-  const changeEvent = new CustomEvent('studio:change', {
-    detail: {
-      state
+const utils = {
+  change: (state, initiator) => {
+    // console.log(initiator);
+  
+    const changeEvent = new CustomEvent('studio:change', {
+      detail: {
+        state
+      }
+    });
+  
+    Studio.dispatchEvent(changeEvent);
+  },
+  save: () => {
+    const historyString = localStorage.getItem('product-builder-history');
+  
+    if (!historyString) {
+      localStorage.setItem('product-builder-history', JSON.stringify([]));
+      return Studio.utils.save();
     }
-  });
+  
+    const history = JSON.parse(historyString);
+  
+    history.push(Studio.state);
+    
+    if (history.length > 20) {
+      history.pop();
+    }
 
-  Studio.dispatchEvent(changeEvent);
+    localStorage.setItem('product-builder-history', JSON.stringify(history));
+
+    localStorage.removeItem('product-builder-remove-history');
+  },
+  setState: (state) => {
+    if (state) {
+      Studio.setAttribute('state', JSON.stringify(state));
+    }
+  },
+  getState: () => {
+    return Studio.state;
+  },
+  undoState: () => {
+    const historyString = localStorage.getItem('product-builder-history');
+  
+    if (!historyString) {
+      return;
+    }  
+    const history = JSON.parse(historyString);
+  
+    const lastState = history.pop();
+
+    localStorage.setItem('product-builder-history', JSON.stringify(history));
+
+    const getRedoHistory = localStorage.getItem('product-builder-redo-history');
+
+    if (getRedoHistory) {
+      const redoHistory = JSON.parse(getRedoHistory);
+
+      redoHistory.push(utils.getState());
+
+      localStorage.setItem('product-builder-redo-history', JSON.stringify(redoHistory));
+    } else {
+      localStorage.setItem('product-builder-redo-history', JSON.stringify([utils.getState]));
+    }
+
+    utils.setState(lastState);
+  },
+  redoState: () => {
+    const redoHistoryString = localStorage.getItem('product-builder-redo-history');
+
+    if (!redoHistoryString) {
+      return;
+    }
+
+    const redoHistory = JSON.parse(redoHistoryString);
+
+    utils.setState(redoHistory.pop());
+  },
+  history: () => JSON.parse(localStorage.getItem('product-builder-history')),
+  clearHistory: () => {
+    const historyString = localStorage.getItem('product-builder-history');
+
+    if (historyString) {
+      localStorage.removeItem('product-builder-history');
+    }
+  }
 }
 
 window.Studio = document.querySelector('product-builder');
-window.Studio.utils = {
-  change
-};
+window.Studio.utils = utils;
+utils.clearHistory();
 
 class ErrorToast extends HTMLElement {
   static selectors = {
@@ -734,6 +815,92 @@ class Radio extends HTMLElement {
   }
 }
 customElements.define('custom-radio', Radio);
+
+class RangeSlider {
+  constructor({ min, max, defValue } = { min: 0, max: 100, defValue: 0}) {
+    const slider = this.container = document.createElement('div');
+    slider.classList.add('slider');
+
+    const rangeSlider = document.createElement('div');
+    rangeSlider.classList.add('slider__range');
+
+    const bullet = this.bullet = document.createElement('div');
+    bullet.classList.add('slider__holder');
+
+    const bulletStrip = document.createElement('span');
+    bulletStrip.classList.add('slider__holder-strip');
+    bullet.append(bulletStrip);
+
+    const fullBar = document.createElement('div');
+    fullBar.classList.add('slider__full-bar');
+
+    const valueBar = this.valueBar = document.createElement('div');
+    valueBar.classList.add('slider__value-bar');
+
+    fullBar.append(valueBar);
+
+    const input = this.input = document.createElement('input');
+    input.classList.add('slider__input');
+    input.type = 'range';
+    input.min = min;
+    input.max = max;
+    input.value = defValue;
+
+    this.min = min;
+    this.max = max;
+    this.default = defValue;
+
+    rangeSlider.append(bullet, fullBar, input);
+
+    slider.append(rangeSlider);
+
+    const showSliderValue = () => {
+      const inputValue = ((+input.value) * 100) / this.max;
+
+      const bulletPosition = (inputValue / 100);
+      const space = input.offsetWidth - bullet.offsetWidth;
+
+      bullet.style.left = (bulletPosition * space) + 'px';
+      bullet.style.transform = `translateY(-50%)`;
+      valueBar.style.width = (inputValue) + '%';
+    }
+
+    input.addEventListener('input', showSliderValue, false);
+
+    this.classList = {
+      add: this.container.classList.add.bind(this.container.classList),
+      remove: this.container.classList.remove.bind(this.container.classList),
+      contains: this.container.classList.contains.bind(this.container.classList)
+    }
+  }
+
+  setValue(value) {
+    if (typeof value === 'number' && value >= this.min && value <= this.max) {
+      this.input.value = value;
+      this.input.dispatchEvent(new Event('input'));
+    }
+  };
+
+  onChange(callback) {
+    this.input.addEventListener('input', callback);
+  }
+
+  getValue() {
+    return +this.input.value;
+  };
+
+  increase(step) {
+    if (typeof step === 'number') {
+      this.setValue(this.getValue() + step);
+    }
+  }
+
+  decrease(step) {
+    if (typeof step === 'number') {
+      this.setValue(this.getValue() - step);
+    }
+  }
+}
 
 class Switch extends HTMLElement {
   constructor() {
@@ -1686,6 +1853,7 @@ class TextTool extends Tool {
     this.text.style.height = (this.text.scrollHeight) + 'px';
 
     const isLine = Studio.state.view.blocks
+      .filter(block => block.selected || block.activeChild)
       .some(block => block.childBlocks.some(child => child.isLine));
 
     const { value } = this.text;
@@ -1725,6 +1893,7 @@ class TextTool extends Tool {
 
   setValue(value) {
     const isLine = Studio.state.view.blocks
+      .filter(block => block.selected || block.activeChild)
       .some(block => block.childBlocks.some(child => child.isLine));
 
     if (isLine) {
@@ -1794,71 +1963,56 @@ class RotateTool extends Tool {
 
   setContent() {
     const wrapper = document.createElement('div');
-    wrapper.classList.add('crop-tool');
+    wrapper.classList.add('rotate-tool');
 
     const againstClock = document.createElement('button');
     againstClock.innerHTML = RotateTool.icons.against;
-    againstClock.classList.add('crop-tool__button');
+    againstClock.classList.add('rotate-tool__button');
 
     const byClock = document.createElement('button');
-    byClock.classList.add('crop-tool__button');
+    byClock.classList.add('rotate-tool__button');
     byClock.innerHTML = RotateTool.icons.by;
 
-    const slider = this.createSlider();
+    const slider = this.slider = new RangeSlider({ min: 0, max: 360, defValue: 0 });
+    slider.classList.add('rotate-tool__slider');
+
+    againstClock.addEventListener('click', () => {
+      slider.decrease(5);
+    })
+
+    byClock.addEventListener('click', () => {
+      slider.increase(5);
+    })
+
+    slider.onChange(() => {
+      Studio.utils.change({
+        panel: {
+          ...Studio.state.panel,
+          tools: {
+            ...Studio.state.panel.tools,
+            rotate: {
+              ...Studio.state.panel.tools.rotate,
+              value: this.getValue()
+            }
+          }
+        }
+      })
+    })
 
     wrapper.append(againstClock, slider.container, byClock);
 
     this.collapsible.inner.append(wrapper);
   }
-  
-  createSlider() {
-    const slider = document.createElement('div');
-    slider.classList.add('slider');
 
-    const fullBar = document.createElement('div');
-    fullBar.classList.add('slider__full-bar');
+  setValue(state) {
+    const { value } = state;
 
-    const valueBar = document.createElement('div');
-    valueBar.classList.add('slider__value-bar');
+    this.slider.setValue(value);
+  }
 
-    fullBar.append(valueBar);
-
-    slider.append(fullBar);
-
-    const holder = document.createElement('div');
-    holder.classList.add('slider__holder');
-
-    const holderStrip = document.createElement('span');
-    holderStrip.classList.add('slider__holder-strip');
-    holder.append(holderStrip);
-
-    const sliderMouseMove = (event) => {
-      console.log(event);
-    }
-
-    const sliderMouseDown = (event) => {
-      console.log(event.target === holder, holder.contains(event.target))
-      if (event.target === holder || holder.contains(event.target)) {
-        holder.addEventListener('mousemove', sliderMouseMove);
-      }
-    }
-
-    slider.addEventListener('mousedown', sliderMouseDown);
-
-    slider.addEventListener('mouseup', () => {
-      holder.removeEventListener('mousemove', sliderMouseDown);
-    })
-
-    slider.append(holder);
-
-    const setValue = (value) => {};
-
-    const getValue = () => {};
-
+  getValue() {
     return {
-      container: slider,
-      setValue,
-      getValue
+      value: this.slider.getValue()
     }
   }
 }
@@ -1876,6 +2030,246 @@ class CropTool extends Tool {
     `
 
     this.icon.setIcon(icon);
+  }
+
+  setContent() {
+    const wrapper = document.createElement('div');
+    wrapper.classList.add('crop-tool');
+
+    const slider = this.slider = new RangeSlider();
+    slider.classList.add('crop-tool__slider');
+
+    const cropValue = (() => {
+      const container = document.createElement('div');
+      container.classList.add('crop-tool__value');
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.min = 0;
+      input.max = 100;
+      input.classList.add('crop-tool__value-input');
+
+      container.append(input);
+
+      return {
+        container,
+        setValue: (value) => {
+          if (typeof value === 'number' && value >= 0 && value <= 100) {
+            input.value = value;
+          }
+        },
+        onChange: (callback) => {
+          input.addEventListener('input', callback);
+        },
+        getValue: () => {
+          return +input.value;
+        }
+      }
+    })();
+
+    slider.setValue(0);
+    cropValue.setValue(slider.getValue());
+
+    slider.onChange(() => {
+      cropValue.setValue(slider.getValue());
+    });
+
+    cropValue.onChange(() => {
+      slider.setValue(cropValue.getValue());
+    });
+
+    slider.onChange(() => {
+      Studio.utils.change({
+        panel: {
+          ...Studio.state.panel,
+          tools: {
+            ...Studio.state.panel.tools,
+            crop: {
+              ...Studio.state.panel.tools.crop,
+              value: this.getValue()
+            }
+          }
+        }
+      })
+    })
+
+    wrapper.append(slider.container, cropValue.container);
+
+    this.collapsible.inner.append(wrapper);
+  }
+
+  getValue() {
+    return {
+      value: this.slider.getValue()
+    }
+  }
+
+  setValue(state) {
+    const { value } = state;
+
+    this.slider.setValue(value);
+  }
+}
+
+class BackgroundColorTool extends Tool {
+  static colors = {
+    black: {
+      label: 'Black',
+      value: '#000',
+      whiteFont: true,
+    },
+    white: {
+      label: 'White',
+      value: '#fff',
+      default: true
+    },
+    red: {
+      label: 'Red',
+      value: '#FF2828',
+      whiteFont: true,
+    },
+    orange: {
+      label: 'Orange',
+      value: '#FFA41C',
+      whiteFont: true,
+    },
+    yellow: {
+      label: 'Yellow',
+      value: '#FFE81C'
+    },
+    green: {
+      label: 'Green',
+      value: '#00FF85'
+    },
+    blue: {
+      label: 'Blue',
+      value: '#28A5FF',
+      whiteFont: true,
+    },
+    indigo: {
+      label: 'Indigo',
+      value: '#0029FF',
+      whiteFont: true,
+    },
+    purple: {
+      label: 'Purple',
+      value: '#FF28C3',
+      whiteFont: true,
+    }
+  }
+
+  constructor() {
+    super();
+
+    this.label.setLabel('Background color')
+
+    const icon = `
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M7.85416 1.48922C7.6589 1.29396 7.34231 1.29396 7.14705 1.48922L1.4902 7.14607C1.29493 7.34134 1.29493 7.65792 1.4902 7.85318L7.14705 13.51C7.34231 13.7053 7.6589 13.7053 7.85416 13.51L13.511 7.85318C13.7063 7.65792 13.7063 7.34134 13.511 7.14607L7.85416 1.48922ZM7.50049 2.55L2.55086 7.49963L7.50049 12.4493V2.55Z" fill="black"/>
+      </svg>
+    `;
+
+    this.icon.setIcon(icon);
+  }
+
+  setContent() {
+    const wrapper = document.createElement('div');
+    wrapper.classList.add('background-tool');
+
+    const colorButtons = this.buttons = Object.keys(BackgroundColorTool.colors)
+      .map((color) => this.colorOptionTemplate(BackgroundColorTool.colors[color]))
+      .map(button => {
+        button.addEventListener('click', () => {
+          const toUnselect = wrapper.querySelector('button.is-selected');
+
+          if (toUnselect) {
+            toUnselect.classList.remove('is-selected');
+          }
+
+          button.classList.add('is-selected');
+
+          Studio.utils.change({
+            panel: {
+              ...Studio.state.panel,
+              tools: {
+                ...Studio.state.panel.tools,
+                backgroundColor: {
+                  ...Studio.state.panel.tools.backgroundColor,
+                  value: this.getValue()
+                }
+              }
+            }
+          })
+        })
+
+        return button;
+      });
+
+    wrapper.append(...colorButtons);
+
+    this.collapsible.inner.append(wrapper);
+  }
+
+  colorOptionTemplate(color) {
+    const { label, value } = color;
+
+    const button = document.createElement('button');
+    button.classList.add('background-tool__button');
+    button.setAttribute('data-color', JSON.stringify(color));
+    button.setAttribute('data-color-value', value);
+
+    const icon = document.createElement('div');
+    icon.classList.add('background-tool__icon');
+    icon.style.backgroundColor = value;
+
+    if (color.default) {
+      button.classList.add('is-selected');
+    }
+
+    const title = document.createElement('div');
+    title.classList.add('background-tool__title');
+    title.textContent = label;
+
+    button.append(icon, title);
+
+    return button;
+  }
+
+  setValue(state) {
+    const { value } = state;
+
+    const toUnselect = this.collapsible.inner.querySelector(`button.is-selected`);
+
+    if (toUnselect) {
+      toUnselect.classList.remove('is-selected');
+    }
+
+    const btnToSelect = this.collapsible.inner.querySelector(`button[data-color-value="${value}"`);
+
+    if (backButton) {
+      btnToSelect.classList.add('is-selected');
+    }
+
+  }
+
+  getValue() {
+    const selectedColor = this.collapsible.container.querySelector('button.is-selected');
+
+    if (selectedColor) {
+      const color = JSON.parse(selectedColor.getAttribute('data-color'));
+
+      return {
+        ...color
+      }
+    }
+  }
+}
+
+class FilterTool extends Tool {
+  constructor() {
+    super();
+
+    this.label.setLabel('Filter');
   }
 }
 
@@ -1939,7 +2333,9 @@ class Tools extends HTMLElement {
             this.edit.tools[tool].create(value);
           }
         } else {
-          this.edit.tools[tool].remove();
+          if (this.edit.tools[tool].isExists()) {
+            this.edit.tools[tool].remove();
+          }
         }
       }
     }
@@ -2359,9 +2755,8 @@ class Tools extends HTMLElement {
         text: new TextTool(),
         rotate: new RotateTool(),
         crop: new CropTool(),
-        tool1: new Tool('Tool 1'),
-        tool2: new Tool('Tool 2'),
-        tool3: new Tool('Tool 3'),
+        backgroundColor: new BackgroundColorTool(),
+        filter: new FilterTool()
       }
     }
 
@@ -2417,7 +2812,7 @@ class Tools extends HTMLElement {
         .filter(block => block.type === 'editable-picture' && !block.imageUrl);
 
       return [...arr, ...editablePictures ];
-    }, [])
+    }, []);
 
     const imagesToSet = [...this.pages.images.imageList]
       .slice(0, childs.length)
@@ -2482,8 +2877,6 @@ class Panel extends HTMLElement {
     }
 
     if (!compareObjects(prevState.tools, currState.tools)) {
-      const { layout, text, rotate } = currState.tools;
-
       const toSet = Object.keys(currState.tools)
         .reduce((obj, tool) => {
           obj[tool] = {
@@ -2557,13 +2950,25 @@ class EditablePicture extends HTMLElement {
       })
     }
 
+    if (!this.hasAttribute('crop')) {
+      this.setAttribute('crop', 0);
+    }
+
+    if (!this.hasAttribute('rotate')) {
+      this.setAttribute('rotate', 0);
+    }
+
     this.addEventListener('click', (event) => {
       const isControlsTarget = event.target === this.controls || this.controls.contains(event.target)
 
       Studio.studioView.setSelectedChild(this);
 
-      if (event.target !== this.emptyState && !this.emptyState.contains(event.target) && !isControlsTarget) {
+      if (!this.classList.contains('is-empty') && event.target !== this.emptyState && !this.emptyState.contains(event.target) && !isControlsTarget) {
         Studio.panel.tools.focusOnTab('edit');
+      }
+
+      if (this.classList.contains('is-empty')) {
+        Studio.panel.tools.focusOnTab('images');
       }
     })
   }
@@ -2635,8 +3040,31 @@ class EditablePicture extends HTMLElement {
     return this.image && this.image.hasAttribute('src');
   }
 
+  setValue(settings) {
+    const { crop, rotate } = settings;
+
+    if (crop) {
+      this.setAttribute('crop', crop.value);
+    }
+
+    if (rotate) {
+      this.setAttribute('rotate', rotate.value);
+    }
+
+    if (this.image && crop && rotate) {
+      this.image.style.transform = `rotate(${rotate.value}deg) scale(${1 + (crop.value / 50)})`;
+    }
+  }
+
   getValue() {
-    return {}
+    return {
+      crop: {
+        value: +this.getAttribute('crop')
+      },
+      rotate: {
+        value: +this.getAttribute('rotate')
+      }
+    }
   }
 }
 customElements.define('editable-picture', EditablePicture);
@@ -2687,8 +3115,9 @@ class EditableText extends HTMLElement {
       this.observer = this.observeSpan(this.editableArea);
     }
 
-    this.addEventListener('click', (event) => {
+    this.addEventListener('click', () => {
       Studio.studioView.setSelectedChild(this);
+      Studio.panel.tools.focusOnTab('edit');
     })
   }
 
@@ -3172,7 +3601,7 @@ class PhotobookPage extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return ['photobook-page'];
+    return ['photobook-page', 'background-color', 'is-white'];
   }
   
   constructor() {
@@ -3185,6 +3614,11 @@ class PhotobookPage extends HTMLElement {
     }
 
     this.setAttribute('block-type', 'photobook-page');
+
+    if (!this.hasAttribute('background-color')) {
+      this.setAttribute('background-color', '#fff');
+      this.setAttribute('is-white', false);
+    }
 
     this.controls = ProductControls.createBlockControls(this.getAttribute('block'));
 
@@ -3209,6 +3643,18 @@ class PhotobookPage extends HTMLElement {
       case 'photobook-page':
         this.layout = layouts[newValue];
         this.selectLayout();
+        break;
+      case 'background-color':
+        this.backgroundColor = newValue;
+        this.setBackgroundColor();
+        break;
+      case 'is-white':
+        if (JSON.parse(newValue)) {
+          this.style.color = '#fff';
+        } else {
+          this.style.color = null;
+        }
+        break;
     }
   }
 
@@ -3219,6 +3665,38 @@ class PhotobookPage extends HTMLElement {
     this.midGradiend.create();
 
     this.selectLayout();
+  }
+
+  setValue(settings, block) {
+    const { layout, backgroundColor } = settings;
+
+    if (this.layout !== layout.value) {
+      const editablePictures = block.childBlocks
+        .filter(child => child.type === 'editable-picture');
+
+      const editableText = block.childBlocks
+        .filter(child => child.type === 'text');
+
+      this.setLayout(layout.layout, editablePictures, editableText);
+    }
+
+    if (backgroundColor) {
+      this.setAttribute('background-color', backgroundColor.value);
+
+      if (backgroundColor.whiteFont) {
+        this.setAttribute('is-white', true);
+      } else {
+        this.setAttribute('is-white', false);
+      }
+    }
+  }
+
+  setBackgroundColor() {
+    if (!this.backgroundColor) {
+      return;
+    }
+
+    this.style.backgroundColor = this.backgroundColor;
   }
 
   selectLayout() {
@@ -3233,8 +3711,9 @@ class PhotobookPage extends HTMLElement {
     }
   }
 
-  setLayout(layout, editablePicturesJSON) {
+  setLayout(layout, editablePicturesJSON, editableTextJSON) {
     this.editablePicturesJSON = editablePicturesJSON;
+    this.editableTextJSON = editableTextJSON;
     this.setAttribute('photobook-page', layout);
   }
 
@@ -3278,7 +3757,7 @@ class PhotobookPage extends HTMLElement {
     picture.innerHTML += EditablePicture.emptyState;
 
     if (state) {
-      const { id, imageUrl } = state;
+      const { id, imageUrl, settings } = state;
 
       picture.setAttribute('child-block', id);
 
@@ -3286,12 +3765,13 @@ class PhotobookPage extends HTMLElement {
         picture.setImage(imageUrl);
       }
 
+      picture.setValue(settings);
     }
 
     return picture;
   }
 
-  getText(options = {
+  getText(state, options = {
     line: false
   }) {
     const { line } = options;
@@ -3300,6 +3780,13 @@ class PhotobookPage extends HTMLElement {
 
     if (line) {
       textarea.toggleAttribute('line');
+    }
+
+    if (state) {
+      const { id, settings } = state;
+
+      textarea.setAttribute('child-block', id);
+      textarea.setValue(settings);
     }
 
     return textarea;
@@ -3374,11 +3861,12 @@ class PhotobookPage extends HTMLElement {
   rightImageWithTextLayout() {
     this.clearLayout();
 
-    const editableQuery = this.editableQuery(this.editablePicturesJSON);
+    const editablePicQuery = this.editableQuery(this.editablePicturesJSON);
+    const editableTextQuery = this.editableQuery(this.editableTextJSON);
 
-    const text = this.getText();
+    const text = this.getText(editableTextQuery());
 
-    const image = this.getEditable(editableQuery());
+    const image = this.getEditable(editablePicQuery());
 
     this.append(text, image);
 
@@ -3388,8 +3876,9 @@ class PhotobookPage extends HTMLElement {
     this.clearLayout();
 
     const editableQuery = this.editableQuery(this.editablePicturesJSON);
+    const editableTextQuery = this.editableQuery(this.editableTextJSON);
 
-    const text = this.getText();
+    const text = this.getText(editableTextQuery());
 
     const image = this.getEditable(editableQuery());
 
@@ -3401,14 +3890,15 @@ class PhotobookPage extends HTMLElement {
     this.clearLayout();
 
     const editableQuery = this.editableQuery(this.editablePicturesJSON);
+    const editableTextQuery = this.editableQuery(this.editableTextJSON);
 
     const [leftWrap, rightWrap] = [document.createElement('div'), document.createElement('div')];
 
     leftWrap.toggleAttribute('data-child');
     rightWrap.toggleAttribute('data-child');
 
-    leftWrap.append(this.getEditable(editableQuery()), this.getText({ line: true }));
-    rightWrap.append(this.getEditable(editableQuery()), this.getText({ line: true }));
+    leftWrap.append(this.getEditable(editableQuery()), this.getText(editableTextQuery(), { line: true }));
+    rightWrap.append(this.getEditable(editableQuery()), this.getText(editableTextQuery(), { line: true }));
 
     this.append(leftWrap, rightWrap);
   }
@@ -3422,6 +3912,26 @@ class Tiles extends ProductElement {
 }
 customElements.define('product-tiles', Tiles);
 
+class ViewControls extends HTMLElement {
+  static selectors = {
+    zoomIn: '[data-zoom-in]',
+    zoomOut: '[data-zoom-out]',
+    undo: '[data-undo]',
+    redo: '[data-redo]',
+  }
+
+  constructor() {
+    super();
+
+    this.element = {
+      zoomIn: this.querySelector(ViewControls.selectors.zoomIn),
+      zoomOut: this.querySelector(ViewControls.selectors.zoomOut),
+      undo: this.querySelector(ViewControls.selectors.undo),
+      redo: this.querySelector(ViewControls.selectors.redo)
+    }
+  }
+}
+customElements.define('view-controls', ViewControls);
 class StudioView extends HTMLElement {
   static selectors = {
     sizeSelector: '[data-product-option-selector]',
@@ -3488,6 +3998,8 @@ class StudioView extends HTMLElement {
   setImages({ blocks, imagesToDownload }) {
     const changedBlocks = [];
 
+    console.log(imagesToDownload);
+
     imagesToDownload
       .forEach(({ pictureIds, imageUrl }) => {
         pictureIds.forEach(pictureId => {
@@ -3500,21 +4012,43 @@ class StudioView extends HTMLElement {
           const newBlock = blocks.find(block => block.childBlocks.some(child => child.id === pictureId));
 
           if (newBlock) {
-            const newChilds = newBlock.childBlocks.map(child => {
-              if (pictureIds.includes(child.id)) {
-                return {
-                  ...child,
-                  imageUrl
+            const ifChangedBlock = changedBlocks.find(block => block.id === newBlock.id);
+
+            if (ifChangedBlock) {
+              const newChilds = ifChangedBlock.childBlocks.map(child => {
+                if (pictureIds.includes(child.id)) {
+                  return {
+                    ...child,
+                    imageUrl
+                  }
                 }
+  
+                return child
+              });
+
+              const index = changedBlocks.indexOf(ifChangedBlock);
+
+              changedBlocks[index] = {
+                ...ifChangedBlock,
+                childBlocks: newChilds
               }
-
-              return child
-            });
-
-            changedBlocks.push({
-              ...newBlock,
-              childBlocks: newChilds
-            });
+            } else {
+              const newChilds = newBlock.childBlocks.map(child => {
+                if (pictureIds.includes(child.id)) {
+                  return {
+                    ...child,
+                    imageUrl
+                  }
+                }
+  
+                return child
+              });
+  
+              changedBlocks.push({
+                ...newBlock,
+                childBlocks: newChilds
+              });
+            }
           }
         })
       });
@@ -3586,7 +4120,7 @@ class StudioView extends HTMLElement {
     );
 
     if (selected) {
-      if (selectedBlock.id !== toSelectBlock.id) {
+      if (!toSelectBlock || (toSelectBlock && selectedBlock.id !== toSelectBlock.id)) {
         selected.unselect();
       }
 
@@ -3603,21 +4137,23 @@ class StudioView extends HTMLElement {
       }
     }
     
-    const toSelect = this.querySelector(
-      StudioView.selectors.blockById(toSelectBlock?.id)
-    );
-
-    if (toSelect) {
-      toSelect.select();
-
-      if (toSelectBlock.activeChild && !toSelectBlock.selected) {
-        const childJSON = toSelectBlock.childBlocks.find(child => child.selected);
-
-        if (childJSON) {
-          const child = this.querySelector(StudioView.selectors.childBlockById(childJSON.id));
-
-          if (child) {
-            child.select();
+    if (toSelectBlock) {
+      const toSelect = this.querySelector(
+        StudioView.selectors.blockById(toSelectBlock.id)
+      );
+  
+      if (toSelect) {
+        toSelect.select();
+  
+        if (toSelectBlock.activeChild && !toSelectBlock.selected) {
+          const childJSON = toSelectBlock.childBlocks.find(child => child.selected);
+  
+          if (childJSON) {
+            const child = this.querySelector(StudioView.selectors.childBlockById(childJSON.id));
+  
+            if (child) {
+              child.select();
+            }
           }
         }
       }
@@ -3666,11 +4202,8 @@ class StudioView extends HTMLElement {
 
         switch(block.type) {
           case 'photobook-page':
-            if (!compareObjects(prevSettings.layout, layout)) {
-              const editablePictures = block.childBlocks
-                .filter(child => child.type === 'editable-picture');
-
-              element.setLayout(layout.layout, editablePictures);
+            if (!compareObjects(prevSettings, block.settings)) {
+              element.setValue(block.settings, block);
             }
 
             children = initiateNewChildren(element, selectedChildrenIds, block.childBlocks);
@@ -3717,6 +4250,8 @@ class StudioView extends HTMLElement {
                 if (!child.imageUrl && pictureElement.hasImage()) {
                   pictureElement.removeImage();
                 } 
+
+                pictureElement.setValue(child.settings);
                 break;
             }
           })
@@ -4058,7 +4593,7 @@ class StudioView extends HTMLElement {
 
     const { settings } = Studio.product;
 
-    const { tools } = JSON.parse(Studio.panel.getAttribute('state'));
+    const { tools } = Studio.state.panel;
 
     const blockSettings = Object.keys(settings)
       .reduce((obj, tool) => {
@@ -4068,9 +4603,9 @@ class StudioView extends HTMLElement {
               obj.layout = tools.layout.value;
             }
             break;
-          case 'hasText':
+          case 'hasBackground':
             if (settings[tool]) {
-              obj.text = tools.text.value;
+              obj.backgroundColor = tools.backgroundColor.value;
             }
             break;
         }
