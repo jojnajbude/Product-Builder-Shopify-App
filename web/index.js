@@ -77,7 +77,7 @@ const imageUpload = multer({
 
 const app = express();
 
-app.use(cors())
+app.use(cors());
 
 // Set up Shopify authentication and webhook handling
 app.get(shopify.config.auth.path, shopify.auth.begin());

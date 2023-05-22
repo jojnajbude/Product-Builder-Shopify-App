@@ -39,7 +39,7 @@ function ActiveActionsController() {
   return addToActiveAction
 }
 
-const subsctibeToActionController = ActiveActionsController();
+const subscribeToActionController = ActiveActionsController();
 
 (function() {
   let counter = 0;
@@ -244,7 +244,8 @@ const globalState = {
   view: {
     product: null,
     blocks: [],
-    blockCount: 0
+    blockCount: 0,
+    imagesToDownload: null
   },
   panel: {
     product: null,
@@ -654,26 +655,6 @@ const utils = {
   
     Studio.dispatchEvent(changeEvent);
   },
-  save: () => {
-    const historyString = localStorage.getItem('product-builder-history');
-  
-    if (!historyString) {
-      localStorage.setItem('product-builder-history', JSON.stringify([]));
-      return Studio.utils.save();
-    }
-  
-    const history = JSON.parse(historyString);
-  
-    history.push(Studio.state);
-    
-    if (history.length > 20) {
-      history.pop();
-    }
-
-    localStorage.setItem('product-builder-history', JSON.stringify(history));
-
-    localStorage.removeItem('product-builder-remove-history');
-  },
   setState: (state) => {
     if (state) {
       Studio.setAttribute('state', JSON.stringify(state));
@@ -682,56 +663,100 @@ const utils = {
   getState: () => {
     return Studio.state;
   },
-  undoState: () => {
-    const historyString = localStorage.getItem('product-builder-history');
+  history: {
+    save: () => {
+      if (!utils.history.allowSave) {
+        return;
+      }
   
-    if (!historyString) {
-      return;
-    }  
-    const history = JSON.parse(historyString);
+      const historyString = localStorage.getItem('product-builder-history');
+    
+      if (!historyString) {
+        localStorage.setItem('product-builder-history', JSON.stringify([Studio.state]));
+        return Studio.utils.history.save();
+      }
+    
+      let history = JSON.parse(historyString);
   
-    const lastState = history.pop();
-
-    localStorage.setItem('product-builder-history', JSON.stringify(history));
-
-    const getRedoHistory = localStorage.getItem('product-builder-redo-history');
-
-    if (getRedoHistory) {
-      const redoHistory = JSON.parse(getRedoHistory);
-
-      redoHistory.push(utils.getState());
-
-      localStorage.setItem('product-builder-redo-history', JSON.stringify(redoHistory));
-    } else {
-      localStorage.setItem('product-builder-redo-history', JSON.stringify([utils.getState]));
-    }
-
-    utils.setState(lastState);
-  },
-  redoState: () => {
-    const redoHistoryString = localStorage.getItem('product-builder-redo-history');
-
-    if (!redoHistoryString) {
-      return;
-    }
-
-    const redoHistory = JSON.parse(redoHistoryString);
-
-    utils.setState(redoHistory.pop());
-  },
-  history: () => JSON.parse(localStorage.getItem('product-builder-history')),
-  clearHistory: () => {
-    const historyString = localStorage.getItem('product-builder-history');
-
-    if (historyString) {
-      localStorage.removeItem('product-builder-history');
-    }
+      if (utils.history.position === history.length && !compareObjects(history.at(-1), Studio.state)) {
+        history.push(Studio.state);
+        utils.history.position++;
+      } else if (!compareObjects(Studio.state, history[utils.history.position - 1])){
+        history = [...history.slice(0, utils.history.position), Studio.state]
+        utils.history.position = history.length;
+      }
+  
+      if (history.length > 20) {
+        history = history.slice(history.length - 20);
+        utils.history.position = history.length;
+      }
+  
+      localStorage.setItem('product-builder-history', JSON.stringify(history));
+    },
+    allowSave: true,
+    position: 1,
+    undoState: () => {
+      const historyString = localStorage.getItem('product-builder-history');
+    
+      if (!historyString) {
+        return;
+      }  
+      const history = JSON.parse(historyString);
+  
+      if (history.length <= 1) {
+        return;
+      }
+  
+      localStorage.setItem('product-builder-history', JSON.stringify(history));
+  
+      if (utils.history.position > 1) {
+        utils.history.position--;
+      }
+      utils.setState(history[utils.history.position - 1]);
+      utils.inUndoHistory = true;
+    },
+    redoState: () => {
+      const historyString = localStorage.getItem('product-builder-history');
+    
+      if (!historyString) {
+        return;
+      }  
+      const history = JSON.parse(historyString);
+  
+      if (history.length <= 1) {
+        return;
+      }
+  
+      localStorage.setItem('product-builder-history', JSON.stringify(history));
+  
+      if (utils.history.position < history.length) {
+        utils.history.position++;
+      }
+  
+      utils.setState(history[utils.history.position - 1]);
+    },
+    historyList: () => JSON.parse(localStorage.getItem('product-builder-history')),
+    clear: () => {
+      const historyString = localStorage.getItem('product-builder-history');
+  
+      if (historyString) {
+        localStorage.removeItem('product-builder-history');
+      }
+    },
   }
 }
 
 window.Studio = document.querySelector('product-builder');
 window.Studio.utils = utils;
-utils.clearHistory();
+utils.history.clear();
+
+document.addEventListener('keyup', (event) => {
+  if (event.ctrlKey && event.which === 90 && !event.shiftKey) {
+    Studio.utils.history.undoState();
+  } else if (event.ctrlKey && event.shiftKey && event.which === 90) {
+    Studio.utils.history.redoState();
+  }
+});
 
 class ErrorToast extends HTMLElement {
   static selectors = {
@@ -872,6 +897,17 @@ class RangeSlider {
       remove: this.container.classList.remove.bind(this.container.classList),
       contains: this.container.classList.contains.bind(this.container.classList)
     }
+
+    this.container.addEventListener('mousedown', () => {
+      utils.history.allowSave = false;
+      console.log(utils.history.allowSave);
+    })
+
+    this.container.addEventListener('mouseup', () => {
+      utils.history.allowSave = true;
+      Studio.utils.history.save();
+      console.log(utils.history.allowSave);
+    })
   }
 
   setValue(value) {
@@ -977,7 +1013,7 @@ class OptionSelector extends HTMLElement {
     } else {
       this.open();
 
-      subsctibeToActionController({
+      subscribeToActionController({
         target: this,
         opener: this.elements.selectedWrapper,
         callback: this.close.bind(this)
@@ -2564,7 +2600,7 @@ class Tools extends HTMLElement {
       uploadSelector.classList.toggle('is-open');
 
       if (uploadSelector.classList.contains('is-open')) {
-        subsctibeToActionController({
+        subscribeToActionController({
           target: uploadSelector,
           opener: uploadButton,
           callback: () => {
@@ -3929,6 +3965,14 @@ class ViewControls extends HTMLElement {
       undo: this.querySelector(ViewControls.selectors.undo),
       redo: this.querySelector(ViewControls.selectors.redo)
     }
+
+    this.element.undo.addEventListener('click', () => {
+      Studio.utils.history.undoState();
+    });
+
+    this.element.redo.addEventListener('click', () => {
+      Studio.utils.history.redoState();
+    });
   }
 }
 customElements.define('view-controls', ViewControls);
@@ -3979,7 +4023,7 @@ class StudioView extends HTMLElement {
     if (!compareObjects(prevState.blocks, currState.blocks)) {
       this.toggleSelected(prevState.blocks, currState.blocks);
 
-      this.setBlocksValue(prevState.blocks, currState.blocks)
+      this.setBlocksValue(prevState.blocks, currState.blocks);
     }
 
     if (currState.product && prevState.blockCount !== currState.blockCount) {
@@ -3997,8 +4041,6 @@ class StudioView extends HTMLElement {
 
   setImages({ blocks, imagesToDownload }) {
     const changedBlocks = [];
-
-    console.log(imagesToDownload);
 
     imagesToDownload
       .forEach(({ pictureIds, imageUrl }) => {
@@ -4112,7 +4154,7 @@ class StudioView extends HTMLElement {
     const toSelectBlock = currBlocks.find(block => block.selected || block.activeChild);
 
     if (compareObjects(selectedBlock, toSelectBlock)) {
-      return;
+      return ;
     }
 
     const selected = this.querySelector(
@@ -4196,8 +4238,6 @@ class StudioView extends HTMLElement {
           prevSettings = prevBlock.settings;
         }
 
-        const { layout, text } = block.settings;
-
         let children = null;
 
         switch(block.type) {
@@ -4229,6 +4269,34 @@ class StudioView extends HTMLElement {
         }
       }, 'set block value')
     }
+
+    const prevSelected = prevBlocks.filter(block => block.selected || block.activeChild).map(block => block.id);
+    const currSelected = newBlocks.filter(block => block.selected || block.activeChild).map(block => block.id);
+
+    const prevChildsSelected = prevBlocks
+      .filter(block => block.activeChild)
+      .map(block => block.childBlocks
+        .filter(child => child.selected)
+        .map(child => child.id)
+      )
+      .reduce((arr, childArr) => [...arr, ...childArr], []);
+
+    const currChildsSelected = newBlocks
+      .filter(block => block.activeChild)
+      .map(block => block.childBlocks
+        .filter(child => child.selected)
+        .map(child => child.id)
+      )
+      .reduce((arr, childArr) => [...arr, ...childArr], []);
+
+    const allowToSave = currSelected.every(block => prevSelected.includes(block)) && currChildsSelected.every(child => prevChildsSelected.includes(child));
+
+    if (allowToSave) {
+      clearTimeout(window.Savetimer);
+      window.Savetimer = setTimeout(() => {
+        Studio.utils.history.save();
+      }, 10);
+    }
   }
 
   setChildsValue(prevChildren, currChildren, currBlocks) {
@@ -4249,7 +4317,9 @@ class StudioView extends HTMLElement {
 
                 if (!child.imageUrl && pictureElement.hasImage()) {
                   pictureElement.removeImage();
-                } 
+                } else if (child.imageUrl && !pictureElement.hasImage()) {
+                  pictureElement.setImage(child.imageUrl);
+                }
 
                 pictureElement.setValue(child.settings);
                 break;

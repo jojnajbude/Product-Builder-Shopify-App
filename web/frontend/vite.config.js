@@ -42,6 +42,8 @@ if (host === "localhost") {
   };
 }
 
+console.log(process.cwd());
+
 export default defineConfig({
   root: dirname(fileURLToPath(import.meta.url)),
   plugins: [react()],
@@ -52,11 +54,12 @@ export default defineConfig({
     preserveSymlinks: true,
   },
   build: {
+    target: 'esnext',
+    outDir: 'product-builder/dist',
+    assetsDir: 'product-builder/src/assets',
     rollupOptions: {
-      output: {
-        manualChunks: {
-          globalDist: ['product-builder/src/**/*.js']
-        }
+      input: {
+        main: 'product-builder/src/index.html'
       }
     }
   },
