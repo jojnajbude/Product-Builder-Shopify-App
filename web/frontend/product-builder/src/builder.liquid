@@ -14,13 +14,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Tomorrow:ital,wght@1,200&display=swap" rel="stylesheet">
-  
+
+  <script src="https://scaleflex.cloudimg.io/v7/plugins/filerobot-image-editor/latest/filerobot-image-editor.min.js"></script>
+
   <link rel="stylesheet" href="./product-builder/assets/main.css">
 
   <script>
     window.customerId = {% if customer %} {{ customer.id }} {% else %} null {% endif %};
   </script>
-
   <script src="./product-builder/assets/global.js" defer></script>
 </head>
   <body>
@@ -330,6 +331,8 @@
       >
         <div class="studio-view__container" data-studio-view-container>
         </div>
+
+        <canvas id="editor_container"></canvas>
 
         <view-controls class="view-controls">
           <button class="view-controls__button" data-zoom-in>
