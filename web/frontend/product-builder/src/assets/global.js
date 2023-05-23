@@ -39,6 +39,8 @@ function ActiveActionsController() {
   return addToActiveAction
 }
 
+const Caman = window.Caman;
+
 const subscribeToActionController = ActiveActionsController();
 
 (function() {
@@ -260,6 +262,10 @@ const globalState = {
     }
   },
 }
+
+const DraftImages = [
+  'https://hladkevych-dev.myshopify.com/apps/product-builder/uploads/1024%20(1).jpeg'
+];
 
 const compareObjects = (obj1, obj2) => {
   return JSON.stringify(obj1) === JSON.stringify(obj2);
@@ -901,12 +907,15 @@ class RangeSlider {
     this.container.addEventListener('mousedown', () => {
       utils.history.allowSave = false;
       console.log(utils.history.allowSave);
+      Studio.utils.rangeActivated = true;
     })
 
     this.container.addEventListener('mouseup', () => {
       utils.history.allowSave = true;
       Studio.utils.history.save();
       console.log(utils.history.allowSave);
+      Studio.utils.rangeActivated = false;
+      window.dispatchEvent(new CustomEvent('range:mouseup'));
     })
   }
 
@@ -2013,11 +2022,43 @@ class RotateTool extends Tool {
     slider.classList.add('rotate-tool__slider');
 
     againstClock.addEventListener('click', () => {
-      slider.decrease(5);
+      const value = slider.getValue();
+
+      switch (true) {
+        case value <= 90:
+          slider.setValue(0);
+          break;
+        case value <= 180:
+          slider.setValue(90);
+          break;
+        case value <= 270:
+          slider.setValue(180);
+          break;
+        case value <= 360:
+          slider.setValue(270);
+          break;   
+      }
     })
 
     byClock.addEventListener('click', () => {
-      slider.increase(5);
+      const value = slider.getValue();
+
+      console.log(value);
+
+      switch (true) {
+        case value >= 270:
+          slider.setValue(360);
+          break;  
+        case value >= 180:
+          slider.setValue(270);
+          break;
+        case value >= 90:
+          slider.setValue(180);
+          break;
+        case value >= 0:
+          slider.setValue(90);
+          break; 
+      }
     })
 
     slider.onChange(() => {
@@ -2596,6 +2637,15 @@ class Tools extends HTMLElement {
       }
     });
 
+
+    DraftImages.forEach(imageUrl => {
+      const imageTemplate = this.createNewImage(imageUrl);
+
+      if (imageTemplate) {
+        imagesWrapper.append(imageTemplate);
+      }
+    })
+
     uploadButton.addEventListener('click', () => {
       uploadSelector.classList.toggle('is-open');
 
@@ -2639,6 +2689,8 @@ class Tools extends HTMLElement {
   createNewImage(imageFile) {
     const formData = new FormData();
 
+    console.log(typeof imageFile);
+
     const image = new Image();
     const imageWrapper = document.createElement('div');
     imageWrapper.classList.add('page__image-wrapper', 'is-loading');
@@ -2676,83 +2728,93 @@ class Tools extends HTMLElement {
 
     imageWrapper.append(deleteBtn);
 
-    const setImage = (imageName) => {
-      image.src = 'product-builder/uploads/' + imageName;
+    if (typeof imageFile === 'object') {
+      const setImage = (imageName) => {
+        image.src = 'product-builder/uploads/' + imageName;
+  
+        image.onload = () => {
+          imageWrapper.classList.remove('is-loading');
+        };
+  
+        this.pages.images.imageList.push(image.src);
+      }
+  
+      if (imageFile.size >= ImageLimits.size) {
+        this.errorToast.dispatchEvent(new CustomEvent('error:show', {
+          detail: {
+            type: 'size',
+            imageWrapper,
+            text: `Some files have too big size. File: ${imageFile.name}`
+          }
+        }));
+        return;
+      }
+  
+      if (!ImageLimits.types.includes(imageFile.type)) {
+        this.errorToast.dispatchEvent(new CustomEvent('error:show', {
+          detail: {
+            type: 'type',
+            imageWrapper,
+            text: `Some files have an incompatible type. File: ${imageFile.name}`
+          }
+        }))
+        return;
+      }
+  
+      const reader = new FileReader;
+  
+      reader.onload = async () => {
+        image.src = reader.result;
+  
+        image.onload = async () => {
+          if (image.naturalWidth <= ImageLimits.resolution.width && image.naturalHeight <= ImageLimits.resolution.height) {
+            this.errorToast.dispatchEvent(new CustomEvent('error:show', {
+              detail: {
+                type: 'resolution',
+                imageWrapper,
+                text: `Some files are too low resolution. File: ${imageFile.name}`
+              }
+            }))
+          } else {
+            formData.append(this.inputFromPC.name, imageFile);
+  
+            const response = await fetch('product-builder/uploads', {
+              method: 'POST',
+              body: formData
+            });
+  
+            const imageName = await response.text();
+  
+            if (!this.pages.images.imageList.includes(imageName) && response.ok) {
+              setImage(imageName);
+            } else {
+              this.errorToast.dispatchEvent(new CustomEvent('error:show', {
+                detail: {
+                  type: "loadErr",
+                  imageWrapper,
+                  text: 'This image already uploaded'
+                }
+              }))
+            }
+          }
+        }
+  
+        this.pages.images.uploadButton.dispatchEvent(new Event('click'));
+        image.style.opacity = null;
+      }
+  
+      reader.readAsDataURL(imageFile);
+  
+      image.style.opacity = 0;
+    } else if (typeof imageFile === 'string') {
+      image.src = imageFile;
 
       image.onload = () => {
         imageWrapper.classList.remove('is-loading');
       };
 
-      this.pages.images.imageList.push(image.src);
+      // this.pages.images.imageList.push(image.src);
     }
-
-    if (imageFile.size >= ImageLimits.size) {
-      this.errorToast.dispatchEvent(new CustomEvent('error:show', {
-        detail: {
-          type: 'size',
-          imageWrapper,
-          text: `Some files have too big size. File: ${imageFile.name}`
-        }
-      }));
-      return;
-    }
-
-    if (!ImageLimits.types.includes(imageFile.type)) {
-      this.errorToast.dispatchEvent(new CustomEvent('error:show', {
-        detail: {
-          type: 'type',
-          imageWrapper,
-          text: `Some files have an incompatible type. File: ${imageFile.name}`
-        }
-      }))
-      return;
-    }
-
-    const reader = new FileReader;
-
-    reader.onload = async () => {
-      image.src = reader.result;
-
-      image.onload = async () => {
-        if (image.naturalWidth <= ImageLimits.resolution.width && image.naturalHeight <= ImageLimits.resolution.height) {
-          this.errorToast.dispatchEvent(new CustomEvent('error:show', {
-            detail: {
-              type: 'resolution',
-              imageWrapper,
-              text: `Some files are too low resolution. File: ${imageFile.name}`
-            }
-          }))
-        } else {
-          formData.append(this.inputFromPC.name, imageFile);
-
-          const response = await fetch('product-builder/uploads', {
-            method: 'POST',
-            body: formData
-          });
-
-          const imageName = await response.text();
-
-          if (!this.pages.images.imageList.includes(imageName) && response.ok) {
-            setImage(imageName);
-          } else {
-            this.errorToast.dispatchEvent(new CustomEvent('error:show', {
-              detail: {
-                type: "loadErr",
-                imageWrapper,
-                text: 'This image already uploaded'
-              }
-            }))
-          }
-        }
-      }
-
-      this.pages.images.uploadButton.dispatchEvent(new Event('click'));
-      image.style.opacity = null;
-    }
-
-    reader.readAsDataURL(imageFile);
-
-    image.style.opacity = 0;
 
     imageWrapper.appendChild(image);
 
@@ -3040,26 +3102,44 @@ class EditablePicture extends HTMLElement {
     return ['rotate', 'crop', 'filter'];
   }
   
+  
   setImage(imageUrl) {
     if (this.image) {
       this.oldImage = this.image;
       this.oldImage.remove();
     }
-    
+
+    this.defaultImageUrl = imageUrl;
+
+    this.previewImage = new Image();
+    this.previewImage.toggleAttribute('crossOrigin');
+    this.previewImage.classList.add('editable-picture__image', 'editable-picture__preview-image');
+    this.previewImage.style.opacity = 0;
+    this.previewImage.draggable = false;
+
+    this.previewImage.onload = () => {
+      console.log(this.previewImage.naturalWidth);
+      this.previewImage.style.width = this.previewImage.naturalWidth + 'px';
+      this.previewImage.style.height = this.previewImage.naturalHeight + 'px'; 
+    }
+
+    this.previewImage.src = imageUrl;
+
+
     this.image = new Image();
     this.image.classList.add('editable-picture__image');
     this.image.style.opacity = 0;
     this.image.draggable = false;
+    this.image.toggleAttribute('crossOrigin');
     
     this.image.onload = () => {
       this.image.style.opacity = null;
-        
     }
     
     this.image.src = imageUrl;
     
     this.classList.remove('is-empty');
-    this.appendChild(this.image);
+    this.append(this.previewImage, this.image);
   }
 
   removeImage() {
@@ -3077,6 +3157,7 @@ class EditablePicture extends HTMLElement {
   }
 
   setValue(settings) {
+    clearTimeout(this.timer);
     const { crop, rotate } = settings;
 
     if (crop) {
@@ -3088,7 +3169,24 @@ class EditablePicture extends HTMLElement {
     }
 
     if (this.image && crop && rotate) {
-      this.image.style.transform = `rotate(${rotate.value}deg) scale(${1 + (crop.value / 50)})`;
+      this.image.style.opacity = 0;
+      this.previewImage.style.opacity = null;
+
+      this.previewImage.style.transform = `translate(0, -50%) rotate(${rotate.value}deg) scale(${1 + (crop.value / 50)})`;
+    }
+
+    if (this.image && rotate) {
+      this.image.onload = () => {
+        this.image.style.opacity = 1;
+
+        setTimeout(() => {
+          this.previewImage.style.opacity = 0;
+        }, 300);
+      }
+
+      this.timer = setTimeout(() => {
+        this.image.src = `${this.defaultImageUrl}?rotate=${rotate.value}`;
+      }, 600);
     }
   }
 
@@ -5129,80 +5227,3 @@ class ImageChooser extends HTMLElement {
       }
   }
 }
-
-const { TABS, TOOLS } = FilerobotImageEditor;
-const config = {
-  source: 'https://scaleflex.airstore.io/demo/stephen-walker-unsplash.jpg',
-  onSave: (editedImageObject, designState) =>
-    console.log('saved', editedImageObject, designState),
-  annotationsCommon: {
-    fill: '#ff0000',
-  },
-  Text: { text: 'Filerobot...' },
-  Rotate: { angle: 90, componentType: 'slider' },
-  translations: {
-    profile: 'Profile',
-    coverPhoto: 'Cover photo',
-    facebook: 'Facebook',
-    socialMedia: 'Social Media',
-    fbProfileSize: '180x180px',
-    fbCoverPhotoSize: '820x312px',
-  },
-  Crop: {
-    presetsItems: [
-      {
-        titleKey: 'classicTv',
-        descriptionKey: '4:3',
-        ratio: 4 / 3,
-        // icon: CropClassicTv, // optional, CropClassicTv is a React Function component. Possible (React Function component, string or HTML Element)
-      },
-      {
-        titleKey: 'cinemascope',
-        descriptionKey: '21:9',
-        ratio: 21 / 9,
-        // icon: CropCinemaScope, // optional, CropCinemaScope is a React Function component.  Possible (React Function component, string or HTML Element)
-      },
-    ],
-    presetsFolders: [
-      {
-        titleKey: 'socialMedia', // will be translated into Social Media as backend contains this translation key
-        // icon: Social, // optional, Social is a React Function component. Possible (React Function component, string or HTML Element)
-        groups: [
-          {
-            titleKey: 'facebook',
-            items: [
-              {
-                titleKey: 'profile',
-                width: 180,
-                height: 180,
-                descriptionKey: 'fbProfileSize',
-              },
-              {
-                titleKey: 'coverPhoto',
-                width: 820,
-                height: 312,
-                descriptionKey: 'fbCoverPhotoSize',
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  },
-  tabsIds: [TABS.ADJUST, TABS.ANNOTATE, TABS.WATERMARK], // or ['Adjust', 'Annotate', 'Watermark']
-  defaultTabId: TABS.ANNOTATE, // or 'Annotate'
-  defaultToolId: TOOLS.TEXT, // or 'Text'
-};
-
-// Assuming we have a div with id="editor_container"
-const filerobotImageEditor = new FilerobotImageEditor(
-  document.querySelector('#editor_container'),
-  config,
-);
-
-filerobotImageEditor.render({
-  onClose: (closingReason) => {
-    console.log('Closing reason', closingReason);
-    filerobotImageEditor.terminate();
-  },
-});

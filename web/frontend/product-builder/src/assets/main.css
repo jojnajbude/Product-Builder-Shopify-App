@@ -1320,7 +1320,7 @@ editable-picture {
 }
 
 .editable-picture:not(.is-empty).is-selected {
-  background-color: #000;
+  background-color: #fff;
 }
 
 .editable-picture:not(.is-empty) .editable-picture__empty-state {
@@ -1349,6 +1349,10 @@ editable-picture {
 
 .editable-picture:not(.is-empty).is-selected .editable-picture__image {
   opacity: 0.85;
+}
+
+.editable-picture__image.editable-picture__preview-image {
+  
 }
 
 /* product-controls */

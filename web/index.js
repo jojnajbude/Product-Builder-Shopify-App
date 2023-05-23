@@ -15,6 +15,8 @@ import { productTypes } from "./models/ProductTypes.js";
 import multer from "multer";
 import cors from 'cors';
 
+import sharp from 'sharp';
+
 import GetCode from "./utils/makeCode.js";
 import { encryptPassword, decryptPassword } from "./utils/password_hashing.js";
 
@@ -189,7 +191,65 @@ app.get('/product-builder/customer', async (req, res) => {
     })
   }
 });
+
+app.get('/product-builder/uploads/:fileName', async (req, res) => {
+  const defaultConfig = {
+    rotate: 0,
+    flip: false,
+    flop: false,
+  };
+
+  const { fileName } = req.params;
+
+  const userConfig = Object.keys(req.query)
+    .filter(option => Object.keys(defaultConfig).includes(option))
+    .reduce((obj, option) => {
+      obj[option] = JSON.parse(req.query[option])
+
+      return obj;
+    }, {});
+
+  const config = {
+    ...defaultConfig,
+    ...userConfig
+  }
+
+  const path = join(PROXY_PATH, 'uploads', fileName);
+
+  let file = sharp(path)
+    // .resize({
+    //   width: 830,
+    //   height: 400,
+    //   background: { r: 255, g: 255, b: 255, alpha: 0 },
+    //   // fit: 'cover'
+    // });
+
+
+  console.log(config);
  
+  Object.keys(config)
+    .forEach(option => {
+      if (config[option]) {
+        if (typeof config[option] === 'boolean') {
+          file = file[option]();
+        } else if  (typeof config[option] === 'object'){
+          file = file[option](...config[option]);
+        } else { 
+          file = file[option](config[option], { background: '#ffffff' });
+        }
+      }
+    })
+
+  res.setHeader('Content-Type', 'image/jpeg'); 
+
+  const readyFile = await file
+    .withMetadata()
+    .jpeg()
+    .toBuffer(); 
+ 
+  res.send(readyFile); 
+}) 
+  
 app.use('/product-builder', express.static(PROXY_PATH));
 
 app.post('/api/customers/create', express.json(), async (req, res) => {
