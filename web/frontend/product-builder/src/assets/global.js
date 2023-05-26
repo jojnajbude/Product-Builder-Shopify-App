@@ -264,7 +264,8 @@ const globalState = {
 }
 
 const DraftImages = [
-  'https://hladkevych-dev.myshopify.com/apps/product-builder/uploads/1024%20(1).jpeg'
+  'https://hladkevych-dev.myshopify.com/apps/product-builder/uploads/1024%20(1).jpeg',
+  'https://hladkevych-dev.myshopify.com/apps/product-builder/uploads/IMG_20220811_202102.jpg'
 ];
 
 const compareObjects = (obj1, obj2) => {
@@ -3039,6 +3040,8 @@ class EditablePicture extends HTMLElement {
       this.setAttribute('child-block', window.uniqueID.childBlock());
     }
 
+    this.parentBlock = Array.from(document.querySelectorAll('[block]')).find(block => block.contains(this));
+
     this.controls = ProductControls.createPictureControls(this.getAttribute('child-block'));
     
     this.emptyState = this.querySelector(EditablePicture.selectors.emptyState);
@@ -3119,8 +3122,8 @@ class EditablePicture extends HTMLElement {
 
     this.previewImage.onload = () => {
       console.log(this.previewImage.naturalWidth);
-      this.previewImage.style.width = this.previewImage.naturalWidth + 'px';
-      this.previewImage.style.height = this.previewImage.naturalHeight + 'px'; 
+      // this.previewImage.style.width = this.previewImage.naturalWidth + 'px';
+      // this.previewImage.style.height = this.previewImage.naturalHeight + 'px'; 
     }
 
     this.previewImage.src = imageUrl;
@@ -3135,8 +3138,27 @@ class EditablePicture extends HTMLElement {
     this.image.onload = () => {
       this.image.style.opacity = null;
     }
+
+    const getParams = () => {
+      const size = PhotobookPage.config[this.parentBlock.getAttribute('photobook-size')];
+
+      const widthProcent = Math.round(((this.offsetWidth * 100) / this.parentBlock.offsetWidth))
+      const heightProcent = Math.round(((this.offsetHeight * 100) / this.parentBlock.offsetHeight))
+      console.log(size);
+
+      const width = Math.ceil(size.width / 100 * widthProcent);
+      const height = Math.ceil(size.height / 100 * heightProcent);
+
+      return [width, height];
+    };
+
+    const [width, height] = getParams();
+
+    console.log(width, height);
     
-    this.image.src = imageUrl;
+    this.image.src = imageUrl + `?resize=[${width},${height}]`;
+
+    this.defaultImageUrl = imageUrl + `?resize=[${width},${height}]`;
     
     this.classList.remove('is-empty');
     this.append(this.previewImage, this.image);
@@ -3172,7 +3194,7 @@ class EditablePicture extends HTMLElement {
       this.image.style.opacity = 0;
       this.previewImage.style.opacity = null;
 
-      this.previewImage.style.transform = `translate(0, -50%) rotate(${rotate.value}deg) scale(${1 + (crop.value / 50)})`;
+      this.previewImage.style.transform = `rotate(${rotate.value}deg) scale(${1 + (crop.value / 50)})`;
     }
 
     if (this.image && rotate) {
@@ -3185,7 +3207,7 @@ class EditablePicture extends HTMLElement {
       }
 
       this.timer = setTimeout(() => {
-        this.image.src = `${this.defaultImageUrl}?rotate=${rotate.value}`;
+        this.image.src = `${this.defaultImageUrl}&rotate=${rotate.value}`;
       }, 600);
     }
   }
@@ -3734,6 +3756,17 @@ class PhotobookPage extends HTMLElement {
     child: 'photobook-page > [data-child]'
   }
 
+  static config = {
+    '20x20': {
+      width: 4724,
+      height: 2362
+    },
+    '15x15': {
+      width: 3543,
+      height: 1772
+    }
+  }
+
   static get observedAttributes() {
     return ['photobook-page', 'background-color', 'is-white'];
   }
@@ -3746,6 +3779,8 @@ class PhotobookPage extends HTMLElement {
     if (!this.getAttribute('block')) {
       this.setAttribute('block', uniqueID.block());
     }
+
+    this.setAttribute('photobook-size', '20x20');
 
     this.setAttribute('block-type', 'photobook-page');
 

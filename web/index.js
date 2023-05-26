@@ -22,6 +22,7 @@ import { encryptPassword, decryptPassword } from "./utils/password_hashing.js";
 
 import { google } from "googleapis";
 import Customer from "./models/Customer.js";
+import { youtube } from "googleapis/build/src/apis/youtube/index.js";
 dotenv.config();
 
 const googleKeys = {
@@ -193,52 +194,78 @@ app.get('/product-builder/customer', async (req, res) => {
 });
 
 app.get('/product-builder/uploads/:fileName', async (req, res) => {
-  const defaultConfig = {
-    rotate: 0,
-    flip: false,
-    flop: false,
-  };
+  const options = ['rotate', 'flip', 'flop', 'crop', 'resize', 'filter'];
 
-  const { fileName } = req.params;
-
-  const userConfig = Object.keys(req.query)
-    .filter(option => Object.keys(defaultConfig).includes(option))
-    .reduce((obj, option) => {
-      obj[option] = JSON.parse(req.query[option])
+  const config = Object.keys(req.query)
+    .reduce((obj, key) => {
+      if (options.includes(key) && req.query[key]) {
+        obj[key] = JSON.parse(req.query[key]);
+      }
 
       return obj;
-    }, {});
+    }, {})
 
-  const config = {
-    ...defaultConfig,
-    ...userConfig
-  }
+  const { flip, flop, rotate, crop, resize } = config;
 
+  const { fileName } = req.params;
+ 
   const path = join(PROXY_PATH, 'uploads', fileName);
 
-  let file = sharp(path)
-    // .resize({
-    //   width: 830,
-    //   height: 400,
-    //   background: { r: 255, g: 255, b: 255, alpha: 0 },
-    //   // fit: 'cover'
-    // });
+  let file = sharp(path);
 
+  const metadata = await file.metadata();
 
-  console.log(config);
+  const { width, height } = metadata;
+
+  // if (flip && typeof flop === 'boolean') {
+  //   file = file.flip();
+  // }
  
-  Object.keys(config)
-    .forEach(option => {
-      if (config[option]) {
-        if (typeof config[option] === 'boolean') {
-          file = file[option]();
-        } else if  (typeof config[option] === 'object'){
-          file = file[option](...config[option]);
-        } else { 
-          file = file[option](config[option], { background: '#ffffff' });
-        }
-      }
-    })
+  // if (flop && typeof flop === 'boolean') {
+  //   file = file.flop();
+  // } 
+
+  if (rotate && typeof rotate === 'number') {
+    file = file
+      .rotate(rotate, { background: { r: 255, g: 255, b: 255, alpha: 1 } })
+  }
+
+  if (resize && Array.isArray(resize) && width && height) {
+    const [resizeWidth, resizeHeight] = resize;
+
+    if (width > resizeWidth || height > resizeHeight) {
+      file = file.resize({
+        width: resizeWidth,
+        height: resizeHeight
+      })
+    } else {
+      const horizontal = width > resizeWidth ? 0 : Math.round((resizeWidth - width) / 2);
+      const vertical = height > resizeHeight ? 0 : Math.round((resizeHeight - height) / 2);
+
+      const maxResize = Math.max(width, height);
+
+      console.log(resizeWidth, resizeHeight, horizontal, vertical);
+  
+      file = file.extend({ 
+        top: vertical,
+        left: horizontal,
+        right: horizontal, 
+        bottom: vertical,
+        background: { r: 255, g: 255, b: 255, alpha: 1 },
+      }); 
+    }
+  }
+
+  // if (resize && Array.isArray(resize)) {
+  //   const [resizeWidth, resizeHeight] = resize;
+
+  //   file = file.resize({
+  //     width: resizeWidth,
+  //     height: resizeHeight,
+  //     fit: 'contain',
+  //     background: { r: 255, g: 255, b: 255, alpha: 1 },
+  //   });
+  // }
 
   res.setHeader('Content-Type', 'image/jpeg'); 
 
@@ -248,7 +275,7 @@ app.get('/product-builder/uploads/:fileName', async (req, res) => {
     .toBuffer(); 
  
   res.send(readyFile); 
-}) 
+})
   
 app.use('/product-builder', express.static(PROXY_PATH));
 

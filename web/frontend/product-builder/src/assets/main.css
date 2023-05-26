@@ -1342,7 +1342,7 @@ editable-picture {
   left: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   opacity: 1;
   transition: opacity .3s;
 }
@@ -1351,9 +1351,10 @@ editable-picture {
   opacity: 0.85;
 }
 
-.editable-picture__image.editable-picture__preview-image {
-  
-}
+/* .editable-picture__image.editable-picture__preview-image {
+  top: 50%;
+  left: 50%;
+} */
 
 /* product-controls */
 product-controls {
