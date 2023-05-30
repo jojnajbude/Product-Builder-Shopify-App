@@ -46,6 +46,32 @@ const subscribeToActionController = ActiveActionsController();
 (function() {
   let counter = 0;
 
+  const getCode = (l) => {
+    let result = '';
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const charactersLength = characters.length;
+    let counter = 0;
+    while (counter < l) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+      counter += 1;
+    }
+    return result;
+  }
+
+  const draft = () => {
+    let string = '';
+
+    for (let i = 0; i < 20; i++) {
+      string += Math.round((Math.random() * 10));
+    }
+
+    return string;
+  }
+
+  const anonim = () => {
+    return Date.now() + '-' + getCode(5);
+  }
+
   const childBlock = () => {
     return 'childBlock-' + counter++;
   }
@@ -56,9 +82,13 @@ const subscribeToActionController = ActiveActionsController();
 
   window.uniqueID = {
     childBlock,
-    block
+    block,
+    draft,
+    anonim
   }
 })();
+
+const baseURL = 'https://product-builder.dev-test.pro';
 
 const layouts = {
   whole: {
@@ -263,11 +293,6 @@ const globalState = {
   },
 }
 
-const DraftImages = [
-  'https://hladkevych-dev.myshopify.com/apps/product-builder/uploads/1024%20(1).jpeg',
-  'https://hladkevych-dev.myshopify.com/apps/product-builder/uploads/IMG_20220811_202102.jpg'
-];
-
 const compareObjects = (obj1, obj2) => {
   return JSON.stringify(obj1) === JSON.stringify(obj2);
 }
@@ -296,12 +321,22 @@ class ProductBuilder extends HTMLElement {
     this.panel = this.querySelector(ProductBuilder.selectors.panel);
     this.studioView = this.querySelector(ProductBuilder.selectors.studioView);
 
+    this.draft = {};
+
+    if (localStorage.getItem('product-builder-draft')) {
+      this.draft = JSON.parse(localStorage.getItem('product-builder-draft'));
+    } else {
+      this.draft.id = uniqueID.draft();
+    }
+
     this.init();
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
     const prevState = JSON.parse(oldValue);
     const currState = JSON.parse(newValue);
+
+    this.draft.state = currState;
 
     this.state = { ...currState };
 
@@ -312,11 +347,14 @@ class ProductBuilder extends HTMLElement {
     if (prevState.productId !== currState.productId) {
       this.getProduct(currState.productId)
         .then(data => Studio.utils.change({ product: data }));
+
       return;
     }
 
     if (!compareObjects(prevState.product, currState.product) && currState.product) {
       this.product = currState.product; 
+
+      this.draft.product = currState.product;
 
       this.panel.setState({ product: currState.product });
 
@@ -603,6 +641,10 @@ class ProductBuilder extends HTMLElement {
 
     const customer = await this.getCustomer();
 
+    if (!customer) {
+      this.anonimCustomerId = localStorage.getItem('product-builder-anonim-id');
+    }
+
     this.setState({
       ...JSON.parse(this.getAttribute('state')),
       productId: productParams.get('id') || null,
@@ -613,6 +655,14 @@ class ProductBuilder extends HTMLElement {
     });
 
     this.customer = customer;
+
+    this.uploaded = await this.getUploadedList();
+
+    if (this.uploaded && this.uploaded.length > 0) {
+      this.panel.tools.uploadedImages(this.uploaded);
+    }
+
+    this.draft.customer = customer;
 
     window.oauthInstagram = JSON.parse(localStorage.getItem('oauthInstagram'));
 
@@ -639,6 +689,10 @@ class ProductBuilder extends HTMLElement {
       ? fetch(`product-builder/customer?id=${customerId}`)
         .then(res => res.json())
       : null
+  }
+
+  getUploadedList() {
+    return fetch(`product-builder/uploads/list${this.customer ? '' : `?anonimId=${this.anonimCustomerId}`}`).then(res => res.json());
   }
 
   checkImages() {
@@ -2638,15 +2692,6 @@ class Tools extends HTMLElement {
       }
     });
 
-
-    DraftImages.forEach(imageUrl => {
-      const imageTemplate = this.createNewImage(imageUrl);
-
-      if (imageTemplate) {
-        imagesWrapper.append(imageTemplate);
-      }
-    })
-
     uploadButton.addEventListener('click', () => {
       uploadSelector.classList.toggle('is-open');
 
@@ -2669,7 +2714,8 @@ class Tools extends HTMLElement {
     this.pages.images = {
       uploadButton,
       uploadSelector,
-      imageList: []
+      imageList: [],
+      imagesWrapper
     }
 
     const inputFromPC = this.querySelector(Tools.selectors.pages.images.importFromPC);
@@ -2684,13 +2730,22 @@ class Tools extends HTMLElement {
             imagesWrapper.appendChild(imageTemplate);
           }
         });
-    }).bind(this))
+    }).bind(this));
+  }
+
+  uploadedImages(uploaded) {
+    uploaded
+      .forEach(fileSource => {
+        const imageTemplate = this.createNewImage(fileSource);
+
+        if (imageTemplate) {
+          this.pages.images.imagesWrapper.appendChild(imageTemplate);
+        }
+      })
   }
 
   createNewImage(imageFile) {
     const formData = new FormData();
-
-    console.log(typeof imageFile);
 
     const image = new Image();
     const imageWrapper = document.createElement('div');
@@ -2722,6 +2777,16 @@ class Tools extends HTMLElement {
     deleteBtn.append(deleteIcon);
 
     const deleteImage = () => {
+      fetch(baseURL + '/product-builder/uploads/remove', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          imageURL: image.src
+        })
+      });
+
       imageWrapper.remove();
     }
 
@@ -2778,8 +2843,15 @@ class Tools extends HTMLElement {
             }))
           } else {
             formData.append(this.inputFromPC.name, imageFile);
+
+            if (!Studio.anonimCustomerId) {
+              Studio.anonimCustomerId = uniqueID.anonim();
+              localStorage.setItem('product-builder-anonim-id', Studio.anonimCustomerId);
+            }
+
+            const fetchURL = baseURL + `/product-builder/drafts/uploads${Studio.customer ? `?customerId=${Studio.customer.shopify_id}` : `?anonimId=${Studio.anonimCustomerId}`}&shop=${shop}`;
   
-            const response = await fetch('product-builder/uploads', {
+            const response = await fetch(fetchURL, {
               method: 'POST',
               body: formData
             });
@@ -2813,8 +2885,6 @@ class Tools extends HTMLElement {
       image.onload = () => {
         imageWrapper.classList.remove('is-loading');
       };
-
-      // this.pages.images.imageList.push(image.src);
     }
 
     imageWrapper.appendChild(image);

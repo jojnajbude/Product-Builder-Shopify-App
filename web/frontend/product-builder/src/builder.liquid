@@ -19,7 +19,9 @@
 
   <script>
     window.customerId = {% if customer %} {{ customer.id }} {% else %} null {% endif %};
+    window.shop = {{ shop.domain | json }}
   </script>
+
   <script src="./product-builder/assets/global.js" defer></script>
 </head>
   <body>

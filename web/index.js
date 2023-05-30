@@ -12,10 +12,7 @@ import Shop from './models/Shop.js';
 
 import * as dotenv from 'dotenv';
 import { productTypes } from "./models/ProductTypes.js";
-import multer from "multer";
 import cors from 'cors';
-
-import sharp from 'sharp';
 
 import GetCode from "./utils/makeCode.js";
 import { encryptPassword, decryptPassword } from "./utils/password_hashing.js";
@@ -23,6 +20,10 @@ import { encryptPassword, decryptPassword } from "./utils/password_hashing.js";
 import { google } from "googleapis";
 import Customer from "./models/Customer.js";
 import { youtube } from "googleapis/build/src/apis/youtube/index.js";
+
+import orders from './routes/order.js';
+import productBuilder from "./routes/product-builder.js";
+
 dotenv.config();
 
 const googleKeys = {
@@ -60,23 +61,6 @@ const STATIC_PATH =
   process.env.NODE_ENV === "production"
     ? `${process.cwd()}/frontend/dist`
     : `${process.cwd()}/frontend/`; 
-
-const PROXY_PATH = `${process.cwd()}/frontend/product-builder/src`;
-
-const imageStorage = multer.diskStorage({
-  destination: './frontend/product-builder/src/uploads', 
-  filename: function (req, file, cb) {
-    const { originalname } = file;
-
-    cb(null, originalname);
-  },
-});
-const imageUpload = multer({
-  storage: imageStorage,
-  limits: {
-    fileSize: 1048576 * 40
-  }
-});
 
 const app = express();
 
@@ -139,145 +123,7 @@ app.post(
 // If you are adding routes outside of the /api path, remember to
 // also add a proxy rule for them in web/frontend/vite.config.js
 
-app.get("/product-builder", (req, res) => {
-  res.setHeader('Content-Type', 'application/liquid');
-
-  res.sendFile(join(PROXY_PATH, 'builder.liquid')); 
-});
-
-app.get('/product-builder/product', async (req, res) => {
-  const { id } = req.query;
-
-  const product = await ProductModel.findOne({ shopify_id: `gid://shopify/Product/${id}` });
-
-  res.send(product); 
-})
-
-app.get('/product-builder/products', async (req, res) => {
-  const products = await ProductModel.find({});
-
-  res.send(products);
-});
- 
-app.post('/product-builder/uploads', imageUpload.single('images') ,async (req, res) => {
-  const file = req.file;
-
-  if (!file) {
-    res.send(400);
-  } else { 
-    res.send(file.originalname);
-  }  
-});
-
-app.get('/product-builder/customer', async (req, res) => {
-  const { id } = req.query;
-
-  console.log(id);
-
-  if (!id) { 
-    res.send({
-      error: 'customer id has not provided'
-    });
-    return;
-  }
-
-  const customer = await Customer.findOne({ shopify_id: id });
-
-  if (customer) {
-    res.send(customer);
-    return;
-  } else {
-    res.send({
-      error: 'Customer do not exist'
-    })
-  }
-});
-
-app.get('/product-builder/uploads/:fileName', async (req, res) => {
-  const options = ['rotate', 'flip', 'flop', 'crop', 'resize', 'filter'];
-
-  const config = Object.keys(req.query)
-    .reduce((obj, key) => {
-      if (options.includes(key) && req.query[key]) {
-        obj[key] = JSON.parse(req.query[key]);
-      }
-
-      return obj;
-    }, {})
-
-  const { flip, flop, rotate, crop, resize } = config;
-
-  const { fileName } = req.params;
- 
-  const path = join(PROXY_PATH, 'uploads', fileName);
-
-  let file = sharp(path);
-
-  const metadata = await file.metadata();
-
-  const { width, height } = metadata;
-
-  // if (flip && typeof flop === 'boolean') {
-  //   file = file.flip();
-  // }
- 
-  // if (flop && typeof flop === 'boolean') {
-  //   file = file.flop();
-  // } 
-
-  if (rotate && typeof rotate === 'number') {
-    file = file
-      .rotate(rotate, { background: { r: 255, g: 255, b: 255, alpha: 1 } })
-  }
-
-  if (resize && Array.isArray(resize) && width && height) {
-    const [resizeWidth, resizeHeight] = resize;
-
-    if (width > resizeWidth || height > resizeHeight) {
-      file = file.resize({
-        width: resizeWidth,
-        height: resizeHeight
-      })
-    } else {
-      const horizontal = width > resizeWidth ? 0 : Math.round((resizeWidth - width) / 2);
-      const vertical = height > resizeHeight ? 0 : Math.round((resizeHeight - height) / 2);
-
-      const maxResize = Math.max(width, height);
-
-      console.log(resizeWidth, resizeHeight, horizontal, vertical);
-  
-      file = file.extend({ 
-        top: vertical,
-        left: horizontal,
-        right: horizontal, 
-        bottom: vertical,
-        background: { r: 255, g: 255, b: 255, alpha: 1 },
-      }); 
-    }
-  }
-
-  // if (resize && Array.isArray(resize)) {
-  //   const [resizeWidth, resizeHeight] = resize;
-
-  //   file = file.resize({
-  //     width: resizeWidth,
-  //     height: resizeHeight,
-  //     fit: 'contain',
-  //     background: { r: 255, g: 255, b: 255, alpha: 1 },
-  //   });
-  // }
-
-  res.setHeader('Content-Type', 'image/jpeg'); 
-
-  const readyFile = await file
-    .withMetadata()
-    .jpeg()
-    .toBuffer(); 
- 
-  res.send(readyFile); 
-})
-  
-app.use('/product-builder', express.static(PROXY_PATH));
+app.use('/product-builder', productBuilder);
 
 app.post('/api/customers/create', express.json(), async (req, res) => {
   const { email, id } = req.body;
@@ -301,7 +147,7 @@ app.post('/api/customers/delete', express.json(), async (req, res) => {
   res.sendStatus(200);
 });
 
-app.use('/api/social/*', express.json());
+app.use('/api/social/*', express.json()); 
 
 app.get('/api/social/credentials', (req, res) => { 
   res.send({
