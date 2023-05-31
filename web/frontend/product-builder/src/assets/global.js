@@ -692,7 +692,12 @@ class ProductBuilder extends HTMLElement {
   }
 
   getUploadedList() {
-    return fetch(`product-builder/uploads/list${this.customer ? '' : `?anonimId=${this.anonimCustomerId}`}`).then(res => res.json());
+    return fetch(`product-builder/uploads/list${this.customer ? '' : `?anonimId=${this.anonimCustomerId}`}`)
+      .then(res => res.json())
+      .then(data => Array.isArray(data) ? data.map(imageURL => ({
+        original: imageURL,
+        thumbnail: imageURL + `?resize=[${devicePixelRatio * 125},${devicePixelRatio * 125}]&thumbnail=true`
+      })) : []);
   }
 
   checkImages() {
@@ -2736,7 +2741,9 @@ class Tools extends HTMLElement {
   uploadedImages(uploaded) {
     uploaded
       .forEach(fileSource => {
-        const imageTemplate = this.createNewImage(fileSource);
+        const { thumbnail } = fileSource;
+
+        const imageTemplate = this.createNewImage(thumbnail);
 
         if (imageTemplate) {
           this.pages.images.imagesWrapper.appendChild(imageTemplate);
@@ -3182,6 +3189,11 @@ class EditablePicture extends HTMLElement {
       this.oldImage.remove();
     }
 
+    if (this.previewImage) {
+      this.oldPreviewImage = this.previewImage;
+      this.oldPreviewImage.remove();
+    }
+
     this.defaultImageUrl = imageUrl;
 
     this.previewImage = new Image();
@@ -3196,8 +3208,13 @@ class EditablePicture extends HTMLElement {
       // this.previewImage.style.height = this.previewImage.naturalHeight + 'px'; 
     }
 
-    this.previewImage.src = imageUrl;
+    const findedImage = Studio.uploaded.find(image => imageUrl.includes(image.thumbnail));
+    
+    if (!findedImage) {
+      return;
+    }
 
+    const imageOriginalURL = baseURL + '/' + findedImage.original;
 
     this.image = new Image();
     this.image.classList.add('editable-picture__image');
@@ -3213,7 +3230,7 @@ class EditablePicture extends HTMLElement {
       const size = PhotobookPage.config[this.parentBlock.getAttribute('photobook-size')];
 
       const widthProcent = Math.round(((this.offsetWidth * 100) / this.parentBlock.offsetWidth))
-      const heightProcent = Math.round(((this.offsetHeight * 100) / this.parentBlock.offsetHeight))
+      const heightProcent = Math.round((this.offsetHeight * 100) / this.parentBlock.offsetHeight);
       console.log(size);
 
       const width = Math.ceil(size.width / 100 * widthProcent);
@@ -3225,10 +3242,12 @@ class EditablePicture extends HTMLElement {
     const [width, height] = getParams();
 
     console.log(width, height);
-    
-    this.image.src = imageUrl + `?resize=[${width},${height}]`;
 
-    this.defaultImageUrl = imageUrl + `?resize=[${width},${height}]`;
+    this.previewImage.src = imageOriginalURL + `?resize=[${width},${height}]`;
+
+    this.image.src = imageOriginalURL + `?resize=[${width},${height}]`;
+
+    this.defaultImageUrl = imageOriginalURL + `?resize=[${width},${height}]`;
     
     this.classList.remove('is-empty');
     this.append(this.previewImage, this.image);
@@ -3236,6 +3255,7 @@ class EditablePicture extends HTMLElement {
 
   removeImage() {
     this.image.remove();
+    this.previewImage.remove();
 
     this.classList.add('is-empty');
   }
@@ -3268,6 +3288,8 @@ class EditablePicture extends HTMLElement {
     }
 
     if (this.image && rotate) {
+
+
       this.image.onload = () => {
         this.image.style.opacity = 1;
 
@@ -3277,6 +3299,7 @@ class EditablePicture extends HTMLElement {
       }
 
       this.timer = setTimeout(() => {
+
         this.image.src = `${this.defaultImageUrl}&rotate=${rotate.value}`;
       }, 600);
     }
@@ -5077,7 +5100,7 @@ class ImageChooser extends HTMLElement {
       .map((image) => new Promise(async (res, rej) => {
         const url = new URL(image.src);
   
-        const blob = await fetch(image.src)
+        const blob = await fetch(url.origin + url.pathname)
           .then(res => res.blob())
           .catch(res => rej(res));
 
