@@ -39,8 +39,6 @@ function ActiveActionsController() {
   return addToActiveAction
 }
 
-const Caman = window.Caman;
-
 const subscribeToActionController = ActiveActionsController();
 
 (function() {
@@ -358,8 +356,8 @@ class ProductBuilder extends HTMLElement {
 
       this.panel.setState({ product: currState.product });
 
-      const { type, settings, shopify_id } = currState.product;
-      this.studioView.setState({ product: { type, settings, shopify_id }});
+      const { type, settings, shopify_id, handle } = currState.product;
+      this.studioView.setState({ product: { type, settings, shopify_id, handle }});
     }
 
     if (!compareObjects(prevState.panel, currState.panel)) {
@@ -409,8 +407,11 @@ class ProductBuilder extends HTMLElement {
       const { blocks } = currState.view;
 
       const isSelectedBlocks = blocks.some(block => block.selected);
+      const isSelectedChildren = blocks.some(block => block.activeChild);
 
-      if (!isSelectedBlocks) {
+      if (!isSelectedBlocks && !isSelectedChildren) {
+
+      } else if (!isSelectedBlocks && isSelectedChildren) {
         const newBlocks = blocks
           .map(block => {
             if (block.activeChild) {
@@ -515,6 +516,7 @@ class ProductBuilder extends HTMLElement {
 
     if (!toolsList) {
       const { settings } = this.product;
+
 
       const childTools = this.childTools = ['rotate', 'filter', 'crop', 'text'];
 
@@ -966,14 +968,13 @@ class RangeSlider {
 
     this.container.addEventListener('mousedown', () => {
       utils.history.allowSave = false;
-      console.log(utils.history.allowSave);
       Studio.utils.rangeActivated = true;
     })
 
     this.container.addEventListener('mouseup', () => {
       utils.history.allowSave = true;
       Studio.utils.history.save();
-      console.log(utils.history.allowSave);
+
       Studio.utils.rangeActivated = false;
       window.dispatchEvent(new CustomEvent('range:mouseup'));
     })
@@ -1962,14 +1963,19 @@ class TextTool extends Tool {
       .some(block => block.childBlocks.some(child => child.isLine));
 
     const { value } = this.text;
+    const maxSize = this.maxSize !== Infinity
+      ? this.maxSize
+      : isLine ? 35 : 300;
 
-    if (value.length > 35 && isLine) {
-      this.text.value = value.substring(0, 35);
+
+    if (value.length > maxSize && isLine) {
+      this.text.value = value.substring(0, maxSize);
+
       
       this.text.focus();
       this.text.setSelectionRange(this.text.value.length, this.text.value.length);
-    } else if (!isLine && value.length > 300) {
-      this.text.value = value.substring(0, 300);
+    } else if (!isLine && value.length > maxSize) {
+      this.text.value = value.substring(0, maxSize);
       
       this.text.focus();
       this.text.setSelectionRange(this.text.value.length, this.text.value.length);
@@ -2001,6 +2007,17 @@ class TextTool extends Tool {
       .filter(block => block.selected || block.activeChild)
       .some(block => block.childBlocks.some(child => child.isLine));
 
+    this.maxSize = Math.min(...Studio.state.view.blocks
+      .filter(block => block.activeChild)
+      .map(block => block.childBlocks
+          .filter(child => child.selected
+            && child.type === 'text' 
+            && child.settings.text.maxSize
+            && typeof child.settings.text.maxSize === 'number'
+          )
+      ).map(children => children.map(child => child.settings.text.maxSize))
+      .reduce((arr, children) => [...arr, ...children], []));
+
     if (isLine) {
       this.selectType.setValue('Line');
     } else {
@@ -2031,7 +2048,8 @@ class TextTool extends Tool {
       text: this.values.text,
       align: this.values.align,
       fontStyle: this.values.fontStyle,
-      font: this.values.font
+      font: this.values.font,
+      maxSize: this.maxSize
     }
   }
 }
@@ -2990,7 +3008,7 @@ class Tools extends HTMLElement {
       return [...arr, ...editablePictures ];
     }, []);
 
-    const imagesToSet = [...this.pages.images.imageList]
+    const imagesToSet = [...Studio.uploaded.map(upload => baseURL + '/' + upload.original)]
       .slice(0, childs.length)
       .map((image, idx) => {
         const child = childs[idx];
@@ -3040,16 +3058,6 @@ class Panel extends HTMLElement {
         product: currState.product
       });
 
-      const { hasLayout, hasText } = currState.product.settings;
-
-      this.tools.setToolsState({
-        layout: {
-          show: hasLayout
-        },
-        text: {
-          show: false
-        }
-      })
     }
 
     if (!compareObjects(prevState.tools, currState.tools)) {
@@ -3106,8 +3114,6 @@ class EditablePicture extends HTMLElement {
 
   constructor() {
     super();
-
-    this.initImage();
   }
 
   connectedCallback() {
@@ -3117,10 +3123,28 @@ class EditablePicture extends HTMLElement {
       this.setAttribute('child-block', window.uniqueID.childBlock());
     }
 
-    this.parentBlock = Array.from(document.querySelectorAll('[block]')).find(block => block.contains(this));
-
     this.controls = ProductControls.createPictureControls(this.getAttribute('child-block'));
     
+    this.parentBlock = Array.from(document.querySelectorAll('[block]')).find(block => {
+      const child = Array.from(block.querySelectorAll('[child-block]')).find(cBlock => cBlock.getAttribute('child-block') === this.getAttribute('child-block'));
+
+      return child;
+    });
+
+    if (this.parentBlock.hasAttribute('photobook-page')) {
+      this.pageConfig = PhotobookPage.config[this.parentBlock.getAttribute('photobook-size')];
+    } else {
+      switch (this.parentBlock.getAttribute('block-type')) {
+        case 'prints':
+          this.pageConfig = Prints.getConfig(this.parentBlock.getAttribute('prints-type'));
+          break;
+        default:
+          this.pageConfig = [this.offsetWidth, this.offsetHeight]
+          break;
+      }
+    }
+
+
     this.emptyState = this.querySelector(EditablePicture.selectors.emptyState);
     if (this.emptyState) {
       this.emptyState.addEventListener('click', () => {
@@ -3136,6 +3160,11 @@ class EditablePicture extends HTMLElement {
       this.setAttribute('rotate', 0);
     }
 
+    if (this.hasAttribute('picture-url')) {
+      this.setImage(this.getAttribute('picture-url'));
+      this.toggleAttribute('picture-url');
+    }
+
     this.addEventListener('click', (event) => {
       const isControlsTarget = event.target === this.controls || this.controls.contains(event.target)
 
@@ -3149,10 +3178,6 @@ class EditablePicture extends HTMLElement {
         Studio.panel.tools.focusOnTab('images');
       }
     })
-  }
-
-
-  initImage() {
   }
 
   select() {
@@ -3202,13 +3227,10 @@ class EditablePicture extends HTMLElement {
     this.previewImage.style.opacity = 0;
     this.previewImage.draggable = false;
 
-    this.previewImage.onload = () => {
-      console.log(this.previewImage.naturalWidth);
-      // this.previewImage.style.width = this.previewImage.naturalWidth + 'px';
-      // this.previewImage.style.height = this.previewImage.naturalHeight + 'px'; 
-    }
-
-    const findedImage = Studio.uploaded.find(image => imageUrl.includes(image.thumbnail));
+    const findedImage = Studio.uploaded
+      .find(image => Object.values(image)
+        .some(source => imageUrl.includes(source))
+      );
     
     if (!findedImage) {
       return;
@@ -3227,21 +3249,23 @@ class EditablePicture extends HTMLElement {
     }
 
     const getParams = () => {
-      const size = PhotobookPage.config[this.parentBlock.getAttribute('photobook-size')];
+      const size = this.pageConfig;
 
-      const widthProcent = Math.round(((this.offsetWidth * 100) / this.parentBlock.offsetWidth))
-      const heightProcent = Math.round((this.offsetHeight * 100) / this.parentBlock.offsetHeight);
-      console.log(size);
+      if (this.parentBlock.hasAttribute('photobook-page')) {
 
-      const width = Math.ceil(size.width / 100 * widthProcent);
-      const height = Math.ceil(size.height / 100 * heightProcent);
+        const widthProcent = Math.round(((this.offsetWidth * 100) / this.parentBlock.offsetWidth))
+        const heightProcent = Math.round((this.offsetHeight * 100) / this.parentBlock.offsetHeight);
+  
+        const width = Math.ceil(size.width / 100 * widthProcent);
+        const height = Math.ceil(size.height / 100 * heightProcent);
+  
+        return [width, height];
+      }
 
-      return [width, height];
+      return [this.pageConfig.width, this.pageConfig.height];
     };
 
-    const [width, height] = getParams();
-
-    console.log(width, height);
+    const [width, height] = this.pageConfig ? getParams() : [this.offsetWidth, this.offsetHeight];
 
     this.previewImage.src = imageOriginalURL + `?resize=[${width},${height}]`;
 
@@ -3288,8 +3312,6 @@ class EditablePicture extends HTMLElement {
     }
 
     if (this.image && rotate) {
-
-
       this.image.onload = () => {
         this.image.style.opacity = 1;
 
@@ -3299,8 +3321,11 @@ class EditablePicture extends HTMLElement {
       }
 
       this.timer = setTimeout(() => {
+        const cropValue = 1 + (Math.round((crop.value / 50) * 100) / 100);
 
-        this.image.src = `${this.defaultImageUrl}&rotate=${rotate.value}`;
+        console.log(cropValue, crop.value);
+
+        this.image.src = `${this.defaultImageUrl}&rotate=${rotate.value}&crop=${cropValue}`;
       }, 600);
     }
   }
@@ -3323,7 +3348,6 @@ class EditableText extends HTMLElement {
     super();
 
     this.editableArea = document.createElement('span');
-    // this.editableArea.toggleAttribute('contenteditable');
     this.editableArea.classList.add('textarea');
 
     this.editableArea.textContent = 'Add your description here';
@@ -3380,14 +3404,16 @@ class EditableText extends HTMLElement {
         const textArr = textContent.split('');
 
         if (textArr.length > 35 && this.classList.contains('line')) {
-          mutation.target.textContent = textContent.substring(0, 35);
+          const maxSize = this.hasAttribute('max-size') ? this.getAttribute('max-size') : 35;
+
+          mutation.target.textContent = textContent.substring(0, maxSize);
           range.setStartAfter(element.lastChild);
           range.collapse(true);
 
           selection.removeAllRanges();
           selection.addRange(range);
         } else if (textArr.length > 300) {
-          mutation.target.textContent = textContent.substring(0, 35);
+          mutation.target.textContent = textContent.substring(0, 300);
           range.setStartAfter(element.lastChild);
           range.collapse(true);
 
@@ -3418,10 +3444,14 @@ class EditableText extends HTMLElement {
   }
 
   setValue(settings) {
-    const { text, align, fontStyle, font } = settings;
+    const { text, align, fontStyle, font, maxSize } = settings;
 
     if (text) {
       this.editableArea.textContent = text;
+    }
+
+    if (maxSize) {
+      this.setAttribute('max-size', maxSize);
     }
 
     if (align) {
@@ -3458,9 +3488,14 @@ class EditableText extends HTMLElement {
           bold: JSON.parse(this.getAttribute('is-bold')),
           italic: JSON.parse(this.getAttribute('is-italic')),
           underline: JSON.parse(this.getAttribute('is-underline')),
-        }
+        },
+        maxSize: +this.getAttribute('max-size')
       }
     }
+  }
+
+  setDefaultText(text) {
+    this.editableArea.textContent = text;
   }
 }
 customElements.define('editable-text', EditableText);
@@ -3759,10 +3794,35 @@ class ProductElement extends HTMLElement {
     this.setAttribute('required-count-of-images', 1);
     this.setAttribute('count-of-images', 0);
 
-    this.setAttribute('block', uniqueID.block());
+    if (!this.hasAttribute('block')) {
+      this.setAttribute('block', uniqueID.block());
+    }
+
     this.setAttribute('block-type', 'default-product');
 
     this.initControls();
+    this.setContent();
+  }
+
+  setContent() {
+    const picture = document.createElement('editable-picture');
+    picture.classList.add(
+      'product-element__picture',
+      'editable-picture',
+      'is-empty'
+    );
+
+    picture.innerHTML += EditablePicture.emptyState;
+    this.appendChild(picture);
+
+    this.style.opacity = 0;
+    setTimeout(() => {
+      this.style.opacity = null;
+    });
+
+    this.addEventListener('product-controls:quantity:changed', (event) => {
+      console.log(event.detail.value);
+    });
   }
 
   initControls() {
@@ -3793,39 +3853,78 @@ class ProductElement extends HTMLElement {
     this.setAttribute('count-of-images', currImages);
   }
 
-  setImage(imageUrl) {
-    if (!this.state.selectedPicture) {
-      this.state.selectedPicture = this.querySelector(ProductElement.selectors.picture);
+  editableQuery(editablePicturesJSON = []) {
+    let queryCount = 0;
+
+    const states = [...editablePicturesJSON];
+
+    return () => {
+      return states[queryCount++];
+    };
+  }
+
+  getEditable(state) {
+    const picture = document.createElement('editable-picture')
+    picture.classList.add(
+      'product-element__picture',
+      'editable-picture',
+      'is-empty'
+    );
+
+    picture.innerHTML += EditablePicture.emptyState;
+
+    if (state) {
+      const { id, imageUrl, settings } = state;
+
+      picture.setAttribute('child-block', id);
+
+      if (imageUrl) {
+        picture.setAttribute('picture-url', imageUrl);
+      }
+
+      picture.setValue(settings);
     }
 
-    this.state.selectedPicture.setImage(imageUrl);
-
-    const currImages = this.querySelectorAll(ProductElement.selectors.picture + ':not(.is-empty)').length
-
-    this.setAttribute('count-of-images', currImages);
+    return picture;
   }
-  
+
+  getText(state, options = {
+    line: false,
+    defaultText: null,
+    maxSize: 35
+  }) {
+    const { line, defaultText, maxSize } = options;
+
+    const textarea = document.createElement('editable-text');
+
+    if (line) {
+      textarea.toggleAttribute('line');
+
+      if (maxSize) {
+        textarea.setAttribute('max-size', maxSize);
+      }
+    }
+
+    if (defaultText) {
+      textarea.setDefaultText(defaultText);
+    }
+
+    if (state) {
+      const { id, settings } = state;
+
+      textarea.setAttribute('child-block', id);
+      textarea.setValue(settings);
+    }
+
+    return textarea;
+  }
 
   select() {
     this.classList.add('is-selected');
-
-    this.dispatchEvent(new CustomEvent('select', {
-      detail: {
-        element: this,
-        id: this.getAttribute('block')
-      }
-    }))
   }
 
   unselect() {
     this.classList.remove('is-selected');
-
-    this.dispatchEvent(new CustomEvent('unselect', {
-      detail: {
-        element: this,
-        id: this.getId()
-      }
-    }))
   }
 
   getId() {
@@ -3889,7 +3988,6 @@ class PhotobookPage extends HTMLElement {
     this.init();
 
     this.addEventListener('click', (event) => {
-
       if (event.target === this) {
         Studio.panel.tools.focusOnTab('edit');
       }
@@ -3904,7 +4002,9 @@ class PhotobookPage extends HTMLElement {
     switch(name) {
       case 'photobook-page':
         this.layout = layouts[newValue];
-        this.selectLayout();
+        if (this.layout.id !== oldValue) {
+          this.selectLayout();
+        }
         break;
       case 'background-color':
         this.backgroundColor = newValue;
@@ -3925,14 +4025,12 @@ class PhotobookPage extends HTMLElement {
 
     this.midGradiend = this.initMiddleGradient();
     this.midGradiend.create();
-
-    this.selectLayout();
   }
 
   setValue(settings, block) {
     const { layout, backgroundColor } = settings;
 
-    if (this.layout !== layout.value) {
+    if (layout && this.layout !== layout.value) {
       const editablePictures = block.childBlocks
         .filter(child => child.type === 'editable-picture');
 
@@ -4024,7 +4122,7 @@ class PhotobookPage extends HTMLElement {
       picture.setAttribute('child-block', id);
 
       if (imageUrl) {
-        picture.setImage(imageUrl);
+        picture.setAttribute('picture-url', imageUrl);
       }
 
       picture.setValue(settings);
@@ -4167,6 +4265,140 @@ class PhotobookPage extends HTMLElement {
 }
 customElements.define('photobook-page', PhotobookPage);
 
+class Prints extends ProductElement {
+  static getConfig = (type) => {
+    switch (type) {
+      case 'polaroid':
+        return PolaroidPrints.config.sizes;
+      default:
+        return {
+          width: 800,
+          height: 800
+        }
+    }
+  }
+
+  static get observedAttributes() {
+    return ['background-color', 'is-white'];
+  }
+
+  constructor() {
+    super();
+
+    this.addEventListener('click', (event) => {
+      if (event.target === this) {
+        Studio.panel.tools.focusOnTab('edit');
+      }
+    })
+  }
+
+  connectedCallback() {
+    this.initDefaultPrintsConfig();
+  }
+
+  initDefaultPrintsConfig() {
+    this.classList.add('prints', 'product-element');
+
+    if (!this.hasAttribute('block')) {
+      this.setAttribute('block', uniqueID.block());
+    }
+
+    this.controls = ProductControls.createBlockControls(this.getAttribute('block'));
+
+    this.setAttribute('block-type', 'prints');
+
+    if (!this.hasAttribute('background-color')) {
+      this.setAttribute('background-color', '#fff');
+    }
+
+    this.parentElement.append(this.controls);
+
+    this.setContent();
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    this.initAttributeChangeConfig(name, oldValue, newValue);
+  }
+
+  initAttributeChangeConfig(name, oldValue, newValue) {
+    switch(name) {
+      case 'background-color':
+        this.backgroundColor = newValue;
+        this.setBackgroundColor();
+        break;
+      case 'is-white':
+        if (JSON.parse(newValue)) {
+          this.style.color = '#fff';
+        } else {
+          this.style.color = null;
+        }
+      break;
+    }
+  }
+
+  setValue(settings, block) {
+    const { backgroundColor} = settings;
+
+    if (backgroundColor) {
+      this.setAttribute('background-color', backgroundColor.value);
+
+      if (backgroundColor.whiteFont) {
+        this.setAttribute('is-white', true);
+      } else {
+        this.setAttribute('is-white', false);
+      }
+    }
+  }
+
+  setBackgroundColor() {
+    if (!this.backgroundColor) {
+      return;
+    }
+
+    this.style.backgroundColor = this.backgroundColor;
+  }
+}
+
+class PolaroidPrints extends Prints {
+  static config = { 
+    sizes: {
+      width: 780,
+      height: 780
+    }
+  } 
+
+  constructor() {
+    super();
+  }
+
+  connectedCallback() {
+    this.initDefaultPrintsConfig();
+
+    this.setAttribute('required-count-of-images', 1);
+    this.setAttribute('count-of-images', 0);
+
+    this.classList.add('prints__polaroid', 'polaroid');
+    this.setAttribute('prints-type', 'polaroid');
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    this.initAttributeChangeConfig(name, oldValue, newValue);
+
+  }
+
+  setContent() {
+    const picture = this.getEditable();
+    const text = this.getText(null, {
+      line: true,
+      defaultText: 'Add text here',
+      maxSize: 20
+    });
+
+    this.append(picture, text);
+  }
+}
+customElements.define('polaroid-prints', PolaroidPrints);
+
 class Tiles extends ProductElement {
   constructor() {
     super();
@@ -4212,10 +4444,12 @@ class StudioView extends HTMLElement {
     block: '[block]',
     studioBlock: '[data-studio-block]',
     blockById: (id) => `[block="${id}"]`,
+    studioBlockById: (id) => `[data-studio-block="${id}"]`,
     editableById: (id) => `[editable-picture="${id}"]`,
     editablePicture: '[editable-picture]',
     childBlock: '[child-block]',
-    childBlockById: (id) => `[child-block="${id}"]`
+    childBlockById: (id) => `[child-block="${id}"]`,
+    viewControls: 'view-controls'
   };
 
   static get observedAttributes() {
@@ -4225,6 +4459,55 @@ class StudioView extends HTMLElement {
   constructor() {
     super();
     this.setAttribute('state', JSON.stringify(globalState.view));
+
+    this.viewControls = this.querySelector(StudioView.selectors.viewControls);
+
+    this.addEventListener('click', (event) => {
+      const blocks = JSON.parse(this.getAttribute('state')).blocks;
+
+      const allBlocksElements = Array.from(this.querySelectorAll(StudioView.selectors.studioBlock));
+
+      const selectedBlocksElements = allBlocksElements.filter(block => {
+        const blockElem = block.querySelector(StudioView.selectors.block);
+
+        if (this.lastSelected) {
+          return blockElem.classList.contains('is-selected') && blockElem.getAttribute('block') !== this.lastSelected.id;
+        }
+
+        return blockElem.classList.contains('is-selected');
+      });
+
+      const toDeselectGroup = !selectedBlocksElements.every(block => block.contains(event.target))
+        && !event.shiftKey;
+
+      if (toDeselectGroup || allBlocksElements.every(block => !block.contains(event.target))) {
+        const newBlocks = blocks
+          .map(newBlock => {
+            if (this.lastSelected && newBlock.id !== this.lastSelected.id) {
+              const newChildren = newBlock.childBlocks
+              .map(child => ({ ...child, selected: false }));
+
+              return {
+                ...newBlock,
+                selected: false,
+                activeChild: false,
+                childBlocks: newChildren
+              }
+            }
+            
+            return {
+              ...newBlock
+            }
+          });
+
+        Studio.utils.change({
+          view: {
+            ...JSON.parse(this.getAttribute('state')),
+            blocks: newBlocks
+          }
+        }, 'set block value')
+      }
+    })
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -4376,56 +4659,58 @@ class StudioView extends HTMLElement {
   }
 
   toggleSelected(prevBlocks, currBlocks) {
-    const selectedBlock = prevBlocks.find(block => block.selected || block.activeChild);
-    const toSelectBlock = currBlocks.find(block => block.selected || block.activeChild);
+    const selectedBlocks = prevBlocks.filter(block => block.selected || block.activeChild);
+    const toSelectBlocks = currBlocks.filter(block => block.selected || block.activeChild);
 
-    if (compareObjects(selectedBlock, toSelectBlock)) {
-      return ;
-    }
+    selectedBlocks
+      .forEach(selectedBlock => {
+        const selected = this.querySelector(
+          StudioView.selectors.blockById(selectedBlock.id)
+        );
 
-    const selected = this.querySelector(
-      StudioView.selectors.blockById(selectedBlock?.id)
-    );
+        const currStateThisBlock = toSelectBlocks.find(block => block.id === selectedBlock.id);
 
-    if (selected) {
-      if (!toSelectBlock || (toSelectBlock && selectedBlock.id !== toSelectBlock.id)) {
-        selected.unselect();
-      }
-
-      if (selectedBlock.activeChild && !selectedBlock.selected) {
-        const childJSON = selectedBlock.childBlocks.find(child => child.selected);
-
-        if (childJSON) {
-          const child = this.querySelector(StudioView.selectors.childBlockById(childJSON.id));
-          
-          if (child) {
-            child.unselect();
+        if (selected) {
+          if (currStateThisBlock !== selectedBlock.id) {
+            selected.unselect();
           }
-        }
-      }
-    }
     
-    if (toSelectBlock) {
-      const toSelect = this.querySelector(
-        StudioView.selectors.blockById(toSelectBlock.id)
-      );
-  
-      if (toSelect) {
-        toSelect.select();
-  
-        if (toSelectBlock.activeChild && !toSelectBlock.selected) {
-          const childJSON = toSelectBlock.childBlocks.find(child => child.selected);
-  
-          if (childJSON) {
-            const child = this.querySelector(StudioView.selectors.childBlockById(childJSON.id));
-  
-            if (child) {
-              child.select();
+          if (selectedBlock.activeChild && !selectedBlock.selected) {
+            const childJSON = selectedBlock.childBlocks.find(child => child.selected);
+    
+            if (childJSON) {
+              const child = this.querySelector(StudioView.selectors.childBlockById(childJSON.id));
+              
+              if (child) {
+                child.unselect();
+              }
             }
           }
         }
-      }
-    }
+      })
+    
+    toSelectBlocks
+      .forEach(toSelectBlock => {
+        const toSelect = this.querySelector(
+          StudioView.selectors.blockById(toSelectBlock.id)
+        );
+    
+        if (toSelect) {
+          toSelect.select();
+    
+          if (toSelectBlock.activeChild && !toSelectBlock.selected) {
+            const childJSON = toSelectBlock.childBlocks.find(child => child.selected);
+    
+            if (childJSON) {
+              const child = this.querySelector(StudioView.selectors.childBlockById(childJSON.id));
+    
+              if (child) {
+                child.select();
+              }
+            }
+          }
+        }
+      })
   }
 
   setBlocksValue(prevBlocks, currBlocks) {
@@ -4466,15 +4751,11 @@ class StudioView extends HTMLElement {
 
         let children = null;
 
-        switch(block.type) {
-          case 'photobook-page':
-            if (!compareObjects(prevSettings, block.settings)) {
-              element.setValue(block.settings, block);
-            }
-
-            children = initiateNewChildren(element, selectedChildrenIds, block.childBlocks);
-            break;
+        if (!compareObjects(prevSettings, block.settings)) {
+          element.setValue(block.settings, block);
         }
+
+        children = initiateNewChildren(element, selectedChildrenIds, block.childBlocks);
 
         return {
           ...block,
@@ -4595,10 +4876,11 @@ class StudioView extends HTMLElement {
     }));
   }
 
-  createStudioBlock(type) {
+  createStudioBlock(type, id) {
     const block = document.createElement('div');
 
     block.classList.add('studio-view__block');
+
     block.toggleAttribute('data-studio-block');
 
     switch(type) {
@@ -4616,25 +4898,6 @@ class StudioView extends HTMLElement {
     const productElement = document.createElement('product-element');
     productElement.classList.add('product-builder__element', 'product-element', 'is-default');
     productElement.setAttribute('quantity', 1);
-
-    const picture = document.createElement('editable-picture');
-    picture.classList.add(
-      'product-element__picture',
-      'editable-picture',
-      'is-empty'
-    );
-
-    picture.innerHTML += EditablePicture.emptyState;
-    productElement.appendChild(picture);
-
-    productElement.style.opacity = 0;
-    setTimeout(() => {
-      productElement.style.opacity = null;
-    });
-
-    productElement.addEventListener('product-controls:quantity:changed', (event) => {
-      console.log(event.detail.value);
-    });
 
     productElement.addEventListener('click', (event) => {
       this.setSelectedBlock(productElement);
@@ -4670,18 +4933,49 @@ class StudioView extends HTMLElement {
     this.elements.container.append(block);
   }
 
-  setSelectedBlock(block, activeChild) {
+  createPolaroidPrints() {
+    const block = this.createStudioBlock('polaroid-prints');
+
+    const polaroid = document.createElement('polaroid-prints');
+
+    polaroid.addEventListener('click', (event) => {
+      const childs = [...polaroid.querySelectorAll(StudioView.selectors.childBlock)];
+
+      const someIsChild = childs.includes(event.target)
+        || childs.some(child => child.contains(event.target));
+
+      this.setSelectedBlock(polaroid, someIsChild, event.shiftKey);
+    });
+
+    block.append(polaroid);
+
+    this.elements.container.append(block);
+  }
+
+  setSelectedBlock(block, activeChild, isBulk) {
     const selectedBlock = this.getBlockJSON(block);
+
+    this.lastSelected = selectedBlock;
     const { blocks } = JSON.parse(this.getAttribute('state'));
 
     const turnOfChilds = activeChild ? !activeChild : true;
 
     const newBlocks = blocks
       .map(sBlock => {
+        let isSelected;
+
+        if (isBulk) {
+          const blockElement = this.querySelector(StudioView.selectors.blockById(sBlock.id));
+          
+          if (blockElement) {
+            isSelected = blockElement.classList.contains('is-selected');
+          }
+        }
+
         if (sBlock.id !== selectedBlock.id) {
           return {
             ...sBlock,
-            selected: false,
+            selected: isBulk ? isSelected : false,
             activeChild: false,
             childBlocks: turnOfChilds
               ? sBlock.childBlocks.map(child => ({ ...child, selected: false }))
@@ -4691,8 +4985,8 @@ class StudioView extends HTMLElement {
 
         return {
           ...sBlock,
-          selected: activeChild ? !activeChild : true,
-          activeChild: activeChild ? activeChild : false,
+          selected: !activeChild,
+          activeChild: activeChild,
           childBlocks: turnOfChilds
               ? sBlock.childBlocks.map(child => ({ ...child, selected: false }))
               : sBlock.childBlocks
@@ -4839,6 +5133,7 @@ class StudioView extends HTMLElement {
       return;
     }
 
+    
     if (!options.clearAll) {
       if (size > this.elements.container.children.length) {
         const nowLength = this.elements.container.children.length;
@@ -4847,6 +5142,16 @@ class StudioView extends HTMLElement {
           switch(product.type.id) {
             case 'photobook':
               this.createPhotobookPage('whole');
+              break;
+            case 'prints':
+              switch(product.handle) {
+                case 'polaroid':
+                  this.createPolaroidPrints();
+                  break;
+                default:
+                  this.createDefaultProductElement();
+                  break;
+              }
               break;
             default:
               this.createDefaultProductElement();
@@ -4863,6 +5168,16 @@ class StudioView extends HTMLElement {
         switch(product.type.id) {
           case 'photobook':
             this.createPhotobookPage('whole');
+            break;
+          case 'prints':
+            switch(product.handle) {
+              case 'polaroid':
+                this.createPolaroidPrints();
+                break;
+              default:
+                this.createDefaultProductElement();
+                break;
+            }
             break;
           default:
             this.createDefaultProductElement();
@@ -5099,8 +5414,8 @@ class ImageChooser extends HTMLElement {
     const FilesFromImages = await Promise.all(selectedImages
       .map((image) => new Promise(async (res, rej) => {
         const url = new URL(image.src);
-  
-        const blob = await fetch(url.origin + url.pathname)
+
+          const blob = await fetch(image.src)
           .then(res => res.blob())
           .catch(res => rej(res));
 
@@ -5307,7 +5622,9 @@ class ImageChooser extends HTMLElement {
 
             photos
               .map(photo => photo.image.source)
-              .forEach(photo => this.imageList.append(this.imageTemplate(photo)));
+              .forEach(photo => {
+                this.imageList.append(this.imageTemplate(photo))
+              });
           });
       }
     });

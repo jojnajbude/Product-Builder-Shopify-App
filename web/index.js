@@ -221,7 +221,7 @@ app.post('/api/social/register', async (req, res) => {
     name: customer.name,
     lastName: customer.lastName
   });
-});
+}); 
 
 app.use('/api/handle-register', express.json(), async (req, res) => {
   const { email, password, name, lastName} = req.body;

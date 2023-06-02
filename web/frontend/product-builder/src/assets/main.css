@@ -1933,3 +1933,26 @@ view-controls {
 .view-controls__button:hover {
   border-color: #e4e4e4;
 }
+
+/* Prints - Polaroid */
+polaroid-prints {
+  cursor: pointer;
+  display: flex;
+}
+
+.prints.prints__polaroid {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  padding-bottom: 20px;
+  align-items: center;
+  gap: 10px;
+  background-color: #fff;
+  box-shadow: 0px 10px 20px -20px rgba(0, 0, 0, 0.25), 0px 4px 8px rgba(0, 0, 0, 0.09);
+  transition: background-color .3s, color .3s;
+}
+
+.prints.prints__polaroid .editable-picture {
+  width: 140px;
+  height: 140px;
+}
