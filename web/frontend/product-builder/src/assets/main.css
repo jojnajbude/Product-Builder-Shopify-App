@@ -705,6 +705,7 @@ product-builder {
   transition: opacity .3s;
   background-color: var(--action-background);
   border-radius: 10px;
+  user-select: none;
 }
 
 .tool__trigger {
@@ -1223,10 +1224,11 @@ product-option-selector {
 
 .studio-view__container {
   position: absolute;
-  top: 50px;
-  left: 50px;
+  top: 35px;
+  left: 35px;
   right: 0px;
-  bottom: 50px;
+  bottom: 35px;
+  padding: 15px;
   padding-right: 100px;
   display: flex;
   align-content: flex-start;
@@ -1270,7 +1272,7 @@ product-element {
   position: absolute;
   right: 0;
   left: 0;
-  top: 0;
+  top: -10px;
   height: 5px;
   background-color: var(--product-element-is-selected);
   border-radius: 20px;

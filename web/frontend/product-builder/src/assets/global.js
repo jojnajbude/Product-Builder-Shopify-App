@@ -342,6 +342,10 @@ class ProductBuilder extends HTMLElement {
       return;
     }
 
+    if (!currState.productId) {
+      this.panel.tools.focusOnTab('products');
+    }
+
     if (prevState.productId !== currState.productId) {
       this.getProduct(currState.productId)
         .then(data => Studio.utils.change({ product: data }));
@@ -481,6 +485,8 @@ class ProductBuilder extends HTMLElement {
 
       const selectedBlock = blocks.find(block => block.selected);
       const blockWithActiveChild = blocks.find(block => block.activeChild);
+
+      console.log(selectedBlock, blockWithActiveChild);
 
       if (!selectedBlock) {
         if (blockWithActiveChild) {
@@ -678,6 +684,7 @@ class ProductBuilder extends HTMLElement {
 
     if (id) {
       productId = id;
+      this.productId = productId;
     }
 
     return fetch(`product-builder/product?id=${productId}`)
@@ -1496,9 +1503,18 @@ class Tool {
   exists() {
     return document.contains(this.container);
   }
+
+  reset() {
+    this.close();
+    this.setValue('Content');
+  }
 }
 
 class LayoutTool extends Tool {
+  static defaultValue = {
+    layout: 'whole'
+  }
+
   constructor() {
     super();
 
@@ -1606,6 +1622,22 @@ class LayoutTool extends Tool {
 
     return layoutIcon
   }
+
+  reset() {
+    this.close();
+    Studio.utils.change({
+      panel: {
+        ...Studio.state.panel,
+        tools: {
+          ...Studio.state.panel.tools,
+          backgroundColor: {
+            ...Studio.state.panel.tools.backgroundColor,
+            value: LayoutTool.defaultValue
+          }
+        }
+      }
+    })
+  }
 }
 
 class TextTool extends Tool {
@@ -1652,6 +1684,17 @@ class TextTool extends Tool {
         <path d="M4.33594 12.457H14.6363" stroke="currentColor" stroke-width="0.885185" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     `
+  }
+
+  static defaultValue = {
+    align: 'center',
+    font: 'Times New Roman',
+    fontStyle: {
+      bold: false,
+      italic: false,
+      underline: false
+    },
+    text: ''
   }
 
   constructor() {
@@ -2052,6 +2095,22 @@ class TextTool extends Tool {
       maxSize: this.maxSize
     }
   }
+
+  reset() {
+    this.close();
+    Studio.utils.change({
+      panel: {
+        ...Studio.state.panel,
+        tools: {
+          ...Studio.state.panel.tools,
+          backgroundColor: {
+            ...Studio.state.panel.tools.backgroundColor,
+            value: TextTool.defaultValue
+          }
+        }
+      }
+    })
+  }
 }
 
 class RotateTool extends Tool {
@@ -2070,6 +2129,10 @@ class RotateTool extends Tool {
     `, 
   }
 
+  static defaultValue = {
+    value: 0
+  }
+
   constructor() {
     super();
 
@@ -2082,6 +2145,22 @@ class RotateTool extends Tool {
     `
 
     this.icon.setIcon(icon);
+  }
+
+  reset() {
+    this.close();
+    Studio.utils.change({
+      panel: {
+        ...Studio.state.panel,
+        tools: {
+          ...Studio.state.panel.tools,
+          backgroundColor: {
+            ...Studio.state.panel.tools.backgroundColor,
+            value: RotateTool.defaultValue
+          }
+        }
+      }
+    })
   }
 
   setContent() {
@@ -2120,8 +2199,6 @@ class RotateTool extends Tool {
 
     byClock.addEventListener('click', () => {
       const value = slider.getValue();
-
-      console.log(value);
 
       switch (true) {
         case value >= 270:
@@ -2173,6 +2250,10 @@ class RotateTool extends Tool {
 }
 
 class CropTool extends Tool {
+  static defaultValue = {
+    value: 0
+  }
+
   constructor() {
     super();
 
@@ -2185,6 +2266,22 @@ class CropTool extends Tool {
     `
 
     this.icon.setIcon(icon);
+  }
+
+  reset() {
+    this.close();
+    Studio.utils.change({
+      panel: {
+        ...Studio.state.panel,
+        tools: {
+          ...Studio.state.panel.tools,
+          backgroundColor: {
+            ...Studio.state.panel.tools.backgroundColor,
+            value: CropTool.defaultValue
+          }
+        }
+      }
+    })
   }
 
   setContent() {
@@ -2313,6 +2410,12 @@ class BackgroundColorTool extends Tool {
     }
   }
 
+  static defaultValue = {
+    label: 'White',
+    value: '#fff',
+    whiteFont: false
+  }
+
   constructor() {
     super();
 
@@ -2354,7 +2457,7 @@ class BackgroundColorTool extends Tool {
                 }
               }
             }
-          })
+          });
         })
 
         return button;
@@ -2401,7 +2504,7 @@ class BackgroundColorTool extends Tool {
 
     const btnToSelect = this.collapsible.inner.querySelector(`button[data-color-value="${value}"`);
 
-    if (backButton) {
+    if (btnToSelect) {
       btnToSelect.classList.add('is-selected');
     }
 
@@ -2417,6 +2520,22 @@ class BackgroundColorTool extends Tool {
         ...color
       }
     }
+  }
+
+  reset() {
+    this.close();
+    Studio.utils.change({
+      panel: {
+        ...Studio.state.panel,
+        tools: {
+          ...Studio.state.panel.tools,
+          backgroundColor: {
+            ...Studio.state.panel.tools.backgroundColor,
+            value: BackgroundColorTool.defaultValue
+          }
+        }
+      }
+    })
   }
 }
 
@@ -2998,6 +3117,12 @@ class Tools extends HTMLElement {
     }
   }
 
+  resetTools() {
+    for (const tool in this.edit.tools) {
+      this.edit.tools[tool].reset();
+    }
+  }
+
   makeMagic() {
     const { blocks } = Studio.state.view;
 
@@ -3058,6 +3183,7 @@ class Panel extends HTMLElement {
         product: currState.product
       });
 
+      this.tools.resetTools();
     }
 
     if (!compareObjects(prevState.tools, currState.tools)) {
@@ -3168,7 +3294,7 @@ class EditablePicture extends HTMLElement {
     this.addEventListener('click', (event) => {
       const isControlsTarget = event.target === this.controls || this.controls.contains(event.target)
 
-      Studio.studioView.setSelectedChild(this);
+      Studio.studioView.setSelectedChild(this, event.shiftKey);
 
       if (!this.classList.contains('is-empty') && event.target !== this.emptyState && !this.emptyState.contains(event.target) && !isControlsTarget) {
         Studio.panel.tools.focusOnTab('edit');
@@ -3296,6 +3422,15 @@ class EditablePicture extends HTMLElement {
     clearTimeout(this.timer);
     const { crop, rotate } = settings;
 
+    const toChange = this.classList.contains('is-selected')
+      || (
+        !compareObjects(this.crop, crop)
+          || !compareObjects(this.rotate, rotate)
+      );
+
+    this.crop = crop;
+    this.rotate = rotate;
+
     if (crop) {
       this.setAttribute('crop', crop.value);
     }
@@ -3304,14 +3439,14 @@ class EditablePicture extends HTMLElement {
       this.setAttribute('rotate', rotate.value);
     }
 
-    if (this.image && crop && rotate) {
+    if (this.image && crop && rotate && toChange) {
       this.image.style.opacity = 0;
       this.previewImage.style.opacity = null;
 
       this.previewImage.style.transform = `rotate(${rotate.value}deg) scale(${1 + (crop.value / 50)})`;
     }
 
-    if (this.image && rotate) {
+    if (this.image && rotate && toChange) {
       this.image.onload = () => {
         this.image.style.opacity = 1;
 
@@ -3322,8 +3457,6 @@ class EditablePicture extends HTMLElement {
 
       this.timer = setTimeout(() => {
         const cropValue = 1 + (Math.round((crop.value / 50) * 100) / 100);
-
-        console.log(cropValue, crop.value);
 
         this.image.src = `${this.defaultImageUrl}&rotate=${rotate.value}&crop=${cropValue}`;
       }, 600);
@@ -3388,8 +3521,8 @@ class EditableText extends HTMLElement {
       this.observer = this.observeSpan(this.editableArea);
     }
 
-    this.addEventListener('click', () => {
-      Studio.studioView.setSelectedChild(this);
+    this.addEventListener('click', (event) => {
+      Studio.studioView.setSelectedChild(this, event.shiftKey);
       Studio.panel.tools.focusOnTab('edit');
     })
   }
@@ -3818,10 +3951,6 @@ class ProductElement extends HTMLElement {
     this.style.opacity = 0;
     setTimeout(() => {
       this.style.opacity = null;
-    });
-
-    this.addEventListener('product-controls:quantity:changed', (event) => {
-      console.log(event.detail.value);
     });
   }
 
@@ -4462,52 +4591,7 @@ class StudioView extends HTMLElement {
 
     this.viewControls = this.querySelector(StudioView.selectors.viewControls);
 
-    this.addEventListener('click', (event) => {
-      const blocks = JSON.parse(this.getAttribute('state')).blocks;
-
-      const allBlocksElements = Array.from(this.querySelectorAll(StudioView.selectors.studioBlock));
-
-      const selectedBlocksElements = allBlocksElements.filter(block => {
-        const blockElem = block.querySelector(StudioView.selectors.block);
-
-        if (this.lastSelected) {
-          return blockElem.classList.contains('is-selected') && blockElem.getAttribute('block') !== this.lastSelected.id;
-        }
-
-        return blockElem.classList.contains('is-selected');
-      });
-
-      const toDeselectGroup = !selectedBlocksElements.every(block => block.contains(event.target))
-        && !event.shiftKey;
-
-      if (toDeselectGroup || allBlocksElements.every(block => !block.contains(event.target))) {
-        const newBlocks = blocks
-          .map(newBlock => {
-            if (this.lastSelected && newBlock.id !== this.lastSelected.id) {
-              const newChildren = newBlock.childBlocks
-              .map(child => ({ ...child, selected: false }));
-
-              return {
-                ...newBlock,
-                selected: false,
-                activeChild: false,
-                childBlocks: newChildren
-              }
-            }
-            
-            return {
-              ...newBlock
-            }
-          });
-
-        Studio.utils.change({
-          view: {
-            ...JSON.parse(this.getAttribute('state')),
-            blocks: newBlocks
-          }
-        }, 'set block value')
-      }
-    })
+    this.addEventListener('click', this.eventSelectedBulk.bind(this));
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -4530,6 +4614,7 @@ class StudioView extends HTMLElement {
     }
 
     if (!compareObjects(prevState.blocks, currState.blocks)) {
+      console.log(currState.blocks)
       this.toggleSelected(prevState.blocks, currState.blocks);
 
       this.setBlocksValue(prevState.blocks, currState.blocks);
@@ -4658,9 +4743,188 @@ class StudioView extends HTMLElement {
     this.inited = true;
   }
 
+  eventSelectedBulk(event) {
+    const blocks = JSON.parse(this.getAttribute('state')).blocks;
+
+    const allBlocksElements = Array.from(this.querySelectorAll(StudioView.selectors.studioBlock));
+    const allChildElements = Array.from(this.querySelectorAll(StudioView.selectors.childBlock));
+
+    const selectedBlocksElements = allBlocksElements.filter(block => {
+      const blockElem = block.querySelector(StudioView.selectors.block);
+
+      if (this.lastSelected) {
+        return blockElem.classList.contains('is-selected') && blockElem.getAttribute('block') !== this.lastSelected.id;
+      }
+
+      return blockElem.classList.contains('is-selected');
+    });
+
+    const selectedChildElements = allChildElements.filter(child => child.classList.contains('is-selected'));
+
+    const noBlocksClicked = allBlocksElements.every(block => !block.contains(event.target));
+    const noChildClicked = allChildElements.every(child => child !== event.target && !child.contains(event.target));
+
+    const toDeselectBlockGroup = (!selectedBlocksElements.every(block => block.contains(event.target))
+      && !event.shiftKey && noChildClicked);
+
+    const toDeselectChildGroup = (!selectedChildElements.every(child => child.contains(event.target))
+      && !event.shiftKey);
+
+    if ((toDeselectBlockGroup && !toDeselectChildGroup)) {
+      const newBlocks = blocks
+        .map(newBlock => {
+          if (this.lastSelected && newBlock.id !== this.lastSelected.id) {
+            const newChildren = newBlock.childBlocks
+            .map(child => ({ ...child, selected: false }));
+
+            return {
+              ...newBlock,
+              selected: false,
+              activeChild: false,
+              childBlocks: newChildren
+            }
+          }
+          
+          return {
+            ...newBlock
+          }
+        });
+
+      Studio.utils.change({
+        view: {
+          ...JSON.parse(this.getAttribute('state')),
+          blocks: newBlocks
+        }
+      }, 'set block value')
+    } else if ((toDeselectChildGroup && !toDeselectBlockGroup)) {
+      const newBlocks = blocks
+        .map(newBlock => {
+          const newChildren = newBlock.childBlocks
+            .map(child => {
+              if (this.lastSelectedChild && child.id !== this.lastSelectedChild.id) {
+                return {
+                  ...child,
+                  selected: false
+                }
+              }
+
+              return child;
+            });
+          
+          const isActiveChild = newChildren.some(child => child.selected);
+
+          return {
+            ...newBlock,
+            childBlocks: newChildren,
+            selected: false,
+            activeChild: isActiveChild
+          }
+        });
+
+      Studio.utils.change({
+        view: {
+          ...JSON.parse(this.getAttribute('state')),
+          blocks: newBlocks
+        }
+      }, 'set block value')
+    } else if (toDeselectBlockGroup || (!noChildClicked && noBlocksClicked)) {
+      const newBlocks = blocks
+        .map(newBlock => {
+          const newChildren = newBlock.childBlocks
+            .map(child => {
+              if (this.lastSelectedChild && child.id !== this.lastSelectedChild.id) {
+                return {
+                  ...child,
+                  selected: false
+                }
+              }
+
+              return child;
+            });
+          
+          const isActiveChild = newChildren.some(child => child.selected);
+
+          return {
+            ...newBlock,
+            childBlocks: newChildren,
+            selected: false,
+            activeChild: isActiveChild
+          }
+        });
+
+      Studio.utils.change({
+        view: {
+          ...JSON.parse(this.getAttribute('state')),
+          blocks: newBlocks
+        }
+      }, 'set block value')
+    } else if (noBlocksClicked && noChildClicked) {
+      if (this.lastSelected) {
+        const newBlocks = blocks
+          .map(newBlock => {
+            if (this.lastSelected && newBlock.id !== this.lastSelected.id) {
+              const newChildren = newBlock.childBlocks
+              .map(child => ({ ...child, selected: false }));
+
+              return {
+                ...newBlock,
+                selected: false,
+                activeChild: false,
+                childBlocks: newChildren
+              }
+            }
+            
+            return {
+              ...newBlock
+            }
+          });
+
+        Studio.utils.change({
+          view: {
+            ...JSON.parse(this.getAttribute('state')),
+            blocks: newBlocks
+          }
+        }, 'set block value')
+      } else if (this.lastSelectedChild) {
+          const newBlocks = blocks
+            .map(newBlock => {
+              const newChildren = newBlock.childBlocks
+                .map(child => {
+                  if (this.lastSelectedChild && child.id !== this.lastSelectedChild.id) {
+                    return {
+                      ...child,
+                      selected: false
+                    }
+                  }
+
+                  return child;
+                });
+              
+              const isActiveChild = newChildren.some(child => child.selected);
+
+              return {
+                ...newBlock,
+                childBlocks: newChildren,
+                selected: false,
+                activeChild: isActiveChild
+              }
+            });
+
+        Studio.utils.change({
+          view: {
+            ...JSON.parse(this.getAttribute('state')),
+            blocks: newBlocks
+          }
+        }, 'set block value')
+      }
+    }
+  }
+
   toggleSelected(prevBlocks, currBlocks) {
     const selectedBlocks = prevBlocks.filter(block => block.selected || block.activeChild);
     const toSelectBlocks = currBlocks.filter(block => block.selected || block.activeChild);
+
+    const isActiveChild = currBlocks.some(block => block.childBlocks.some(child => child.selected));
 
     selectedBlocks
       .forEach(selectedBlock => {
@@ -4671,23 +4935,33 @@ class StudioView extends HTMLElement {
         const currStateThisBlock = toSelectBlocks.find(block => block.id === selectedBlock.id);
 
         if (selected) {
-          if (currStateThisBlock !== selectedBlock.id) {
+          const nonActiveChilds = currStateThisBlock && isActiveChild && !currStateThisBlock.activeChild;
+
+          if (nonActiveChilds || !currStateThisBlock || (currStateThisBlock && !(currStateThisBlock.selected || currStateThisBlock.activeChild))) {
             selected.unselect();
           }
     
           if (selectedBlock.activeChild && !selectedBlock.selected) {
             const childJSON = selectedBlock.childBlocks.find(child => child.selected);
-    
+
             if (childJSON) {
               const child = this.querySelector(StudioView.selectors.childBlockById(childJSON.id));
-              
-              if (child) {
+
+              const currStateThisChild = currStateThisBlock
+                ? currStateThisBlock.childBlocks.find(tiny => tiny.id === childJSON.id)
+                : null;
+
+              const toUnselect = !currStateThisChild || (
+                currStateThisChild && !currStateThisChild.selected
+              );
+
+              if (child && toUnselect) {
                 child.unselect();
               }
             }
           }
         }
-      })
+      });
     
     toSelectBlocks
       .forEach(toSelectBlock => {
@@ -4696,18 +4970,21 @@ class StudioView extends HTMLElement {
         );
     
         if (toSelect) {
-          toSelect.select();
+          if (!(isActiveChild && !toSelect.activeChild)) {
+            toSelect.select();
+          }
+
     
           if (toSelectBlock.activeChild && !toSelectBlock.selected) {
-            const childJSON = toSelectBlock.childBlocks.find(child => child.selected);
-    
-            if (childJSON) {
+            const childrenJSON = toSelectBlock.childBlocks.filter(child => child.selected);
+
+            childrenJSON.forEach(childJSON => {
               const child = this.querySelector(StudioView.selectors.childBlockById(childJSON.id));
     
               if (child) {
                 child.select();
               }
-            }
+            })
           }
         }
       })
@@ -4900,7 +5177,7 @@ class StudioView extends HTMLElement {
     productElement.setAttribute('quantity', 1);
 
     productElement.addEventListener('click', (event) => {
-      this.setSelectedBlock(productElement);
+      this.setSelectedBlock(productElement, null, event.shiftKey);
     });
 
     block.append(productElement);
@@ -4925,7 +5202,10 @@ class StudioView extends HTMLElement {
       const someIsChild = childs.includes(event.target)
         || childs.some(child => child.contains(event.target));
 
-      this.setSelectedBlock(page, someIsChild);
+      if (!someIsChild) {
+        this.setSelectedBlock(page, someIsChild, event.shiftKey);
+      }
+
     });
 
     block.append(page);
@@ -4944,7 +5224,9 @@ class StudioView extends HTMLElement {
       const someIsChild = childs.includes(event.target)
         || childs.some(child => child.contains(event.target));
 
-      this.setSelectedBlock(polaroid, someIsChild, event.shiftKey);
+      if (!someIsChild) {
+        this.setSelectedBlock(polaroid, someIsChild, event.shiftKey);
+      }
     });
 
     block.append(polaroid);
@@ -4956,9 +5238,12 @@ class StudioView extends HTMLElement {
     const selectedBlock = this.getBlockJSON(block);
 
     this.lastSelected = selectedBlock;
+    this.lastSelectedChild = null;
     const { blocks } = JSON.parse(this.getAttribute('state'));
 
-    const turnOfChilds = activeChild ? !activeChild : true;
+    const isBlockSelected = blocks.some(block => block.selected);
+
+    const turnOfChilds = (activeChild ? !activeChild : true) && isBlockSelected;
 
     const newBlocks = blocks
       .map(sBlock => {
@@ -4986,7 +5271,7 @@ class StudioView extends HTMLElement {
         return {
           ...sBlock,
           selected: !activeChild,
-          activeChild: activeChild,
+          activeChild: activeChild && isBlockSelected,
           childBlocks: turnOfChilds
               ? sBlock.childBlocks.map(child => ({ ...child, selected: false }))
               : sBlock.childBlocks
@@ -5001,11 +5286,11 @@ class StudioView extends HTMLElement {
     });
   }
 
-  setSelectedChild(child) {
+  setSelectedChild(child, isBulk) {
     const childID = child.getAttribute('child-block');
 
     const { blocks } = JSON.parse(this.getAttribute('state'));
-
+    
     let childJSON;
 
     const blockJSON = blocks.find(block => {
@@ -5023,15 +5308,35 @@ class StudioView extends HTMLElement {
       selected: true
     }
 
-    const newChildBlocks = blockJSON.childBlocks.map(block => {
-      if (block.id === childID) {
-        return childJSON
+    this.lastSelectedChild = childJSON;
+    this.lastSelected = null;
+
+    const newChildBlocks = blockJSON.childBlocks.map(child => {
+      let isSelected;
+
+      if (isBulk) {
+        const childElement = this.querySelector(StudioView.selectors.childBlockById(child.id));
+        
+        if (childElement) {
+          isSelected = childElement.classList.contains('is-selected');
+        }
+      }
+      
+      if (child.id === childID) {
+        return {
+          ...childJSON,
+          selected: true
+        }
       }
 
-      return {
-        ...block,
-        selected: false
-      };
+      if (isBulk) {
+        return child
+      } else {
+        return {
+          ...child,
+          selected: false
+        }
+      }
     })
 
     const isActiveChild = newChildBlocks.some(children => children.selected);
@@ -5049,11 +5354,18 @@ class StudioView extends HTMLElement {
           return newBlock
         }
 
+        const newChildren = isBulk
+          ? block.childBlocks
+          : block.childBlocks
+            .map(child => ({ ...child, selected: false }));
+
+        const isActiveChild = newChildren.some(child => child.selected);
+
         const blockWithNoActiveChild = {
           ...block,
-          activeChild: false,
-          childBlocks: block.childBlocks
-            .map(child => ({ ...child, selected: false }))
+          selected: false,
+          activeChild: isActiveChild,
+          childBlocks: newChildren
         }
 
         return blockWithNoActiveChild
