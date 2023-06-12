@@ -13,6 +13,7 @@ import {
   SkeletonPage,
   SkeletonThumbnail,
   Text,
+  TextField,
   Thumbnail,
   Toast
 } from "@shopify/polaris";
@@ -75,6 +76,11 @@ export default function Product() {
 
   const [settings, setSettings] = useReducer(changeSettings, {});
 
+  const [productQuantity, setProductQuantity] = useState('single');
+  const handleProductQuantity = useCallback(value => setProductQuantity(value), []);
+
+  const [minimQuantity, setMininQuantity] = useState(0);
+
   const [isEdited, setIsEdited] = useState(false);
 
   const [isLoadingButtons, setIsLoadingButtons] = useState([]);
@@ -102,6 +108,21 @@ export default function Product() {
   const saveProduct = useCallback(async () => {
     setIsLoadingButtons(current => [...current, saveButtonId]);
 
+    let quantity = {
+      type: 'single'
+    };
+
+    if (productQuantity === 'multiply') {
+      quantity = {
+        type: 'multiply',
+        minimum: +minimQuantity
+      }
+    } else if (productQuantity === 'set-of') {
+      quantity = {
+        type: 'set-of'
+      }
+    }
+
     const response = await fetch(`api/products/update?id=${product.shopify_id}`, {
       method: 'POST',
       headers: {
@@ -111,7 +132,8 @@ export default function Product() {
         type: selectedType,
         status: selectedStatus,
         settings: settings,
-        relatedProducts: relatedProducts
+        relatedProducts: relatedProducts,
+        quantity
       })
     });
 
@@ -126,19 +148,25 @@ export default function Product() {
         status: newProduct.status,
         settings: newProduct.settings,
         relatedProducts: newProduct.relatedProducts,
+        quantity: newProduct.quantity,
         onStart: true
       });
 
       setIsLoadingButtons(current => current.filter(button => button !== saveButtonId));
     }
 
-  }, [selectedType, selectedStatus, product, settings, relatedProducts]);
+  }, [selectedType, selectedStatus, product, settings, relatedProducts, productQuantity, minimQuantity]);
 
   const discardChanges = useCallback(() => {
     setSelectedStatus(initialState.status);
     setSelectedType(initialState.type);
     setSettings({ settings: initialState.settings });
-    setRelatedProducts(initialState.relatedProducts)
+    setRelatedProducts(initialState.relatedProducts);
+    setProductQuantity(initialState.quantity.type);
+
+    if (initialState.quantity.type === 'multiply') {
+      setMininQuantity(initialState.quantity.minimum);
+    }
   }, [initialState]);
 
   useEffect(() => {
@@ -151,11 +179,16 @@ export default function Product() {
     discardAction.setOptions({
       onAction: discardChanges
     });
-  }, [product, settings, isLoadingButtons, selectedStatus, selectedType]);
+  }, [product, settings, isLoadingButtons, selectedStatus, selectedType, minimQuantity, productQuantity]);
 
   useEffect(() => {
     if (product && types) {
       setSelectedStatus(product.status);
+      setProductQuantity(product.quantity.type);
+
+      if (product.quantity.type === 'multiply') {
+        setMininQuantity(product.quantity.minimum);
+      }
 
       let settingsToSet;
       let typeToSet;
@@ -184,6 +217,7 @@ export default function Product() {
           status: product.status, 
           settings: settingsToSet,
           relatedProducts: product.relatedProducts,
+          quantity: product.quantity,
           onStart: true
         });
       }
@@ -232,10 +266,13 @@ export default function Product() {
 
   useEffect(() => {
     if (product && types) {
+      console.log(minimQuantity, initialState.quantity, initialState, productQuantity);
       const notEdited = initialState.type === selectedType
         && JSON.stringify(initialState.settings) === JSON.stringify(settings)
         && initialState.status === selectedStatus
-        && JSON.stringify(relatedProducts) === JSON.stringify(initialState.relatedProducts);
+        && JSON.stringify(relatedProducts) === JSON.stringify(initialState.relatedProducts)
+        && JSON.stringify(productQuantity) === JSON.stringify(initialState.quantity.type)
+        && (productQuantity === 'multiply' ? minimQuantity === initialState.quantity.minimum : true);
 
       if (notEdited) {
         setIsEdited(false);
@@ -245,7 +282,7 @@ export default function Product() {
         setIsEdited(true);
       }
     }
-  }, [selectedStatus, selectedType, settings, initialState, relatedProducts]);
+  }, [selectedStatus, selectedType, settings, initialState, relatedProducts, productQuantity, minimQuantity]);
 
   useEffect(() => {
     if (isEdited) {
@@ -425,6 +462,51 @@ export default function Product() {
                   onChange={handleSelectChange}
                   name='Type'
                 />
+              </LegacyCard.Section>
+
+              <LegacyCard.Section>
+                <div style={{ marginBottom: 10 }}>
+                  <Text
+                    alignment="start"
+                    as="h2"
+                    variant="headingMd"
+                  >
+                    Quantity type
+                  </Text>
+                </div>
+
+                <Select
+                  options={[
+                    {
+                      label: 'Multiply',
+                      value: 'multiply'
+                    },
+                    {
+                      label: 'Set of',
+                      value: 'set-of',
+                    },
+                    {
+                      label: 'Single',
+                      value: 'single'
+                    }
+                  ]}
+                  value={productQuantity}
+                  onChange={handleProductQuantity}
+                  name='Quantity'
+                />
+
+                {productQuantity === 'multiply' && (
+                  <div style={{ marginTop: 20 }}>
+                    <TextField
+                      label="Minim Quantity"
+                      type="number"
+                      value={minimQuantity}
+                      onChange={value => setMininQuantity(value)}
+                      autoComplete="off"
+                      min={0}
+                    />
+                  </div>
+                )}
               </LegacyCard.Section>
             </LegacyCard>
 

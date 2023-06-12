@@ -1233,18 +1233,40 @@ product-option-selector {
   display: flex;
   align-content: flex-start;
   flex-wrap: wrap;
-  gap: 50px 20px;
+  gap: 25px 20px;
   overflow-y: scroll;
 }
 
 .studio-view__block {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 15px;
+  user-select: none;
+  transition: opacity .3s;
 }
 
 .studio-view__block.block__photobook-page {
   width: 100%;
+}
+
+
+.studio-view__block:not(.block__photobook-page)::before {
+  content: '';
+  position: relative;
+  width: 100%;
+  right: 0;
+  left: 0;
+  top: 0;
+  height: 5px;
+  background-color: var(--product-element-is-selected);
+  border-radius: 20px;
+  opacity: 0;
+  transition: opacity .2s ease-out;
+}
+
+.studio-view__block:not(.block__photobook-page).is-selected::before {
+  opacity: 1;
 }
 
 /* Product Element */
@@ -1255,7 +1277,6 @@ product-element {
 .product-element {
   user-select: none;
   position: relative;
-  padding-top: 15px;
   opacity: 1;
   transition: opacity .3s;
   display: flex;
@@ -1267,21 +1288,19 @@ product-element {
   cursor: pointer;
 }
 
-.product-element::before {
+.product-element::after {
   content: '';
   position: absolute;
-  right: 0;
-  left: 0;
-  top: -10px;
-  height: 5px;
-  background-color: var(--product-element-is-selected);
-  border-radius: 20px;
-  opacity: 0;
-  transition: opacity .2s ease-out;
+  top: -20px;
+  left: -20px;
+  right: -20px;
+  bottom: -20px;
+  z-index: 1;
 }
 
-.product-element.is-selected::before {
-  opacity: 1;
+.product-element .editable-picture,
+.product-element .text-tool {
+  z-index: 5;
 }
 
 .product-element .product-element__picture {
@@ -1389,7 +1408,7 @@ product-controls {
   max-width: 100%;
   opacity: 0;
   transform: translate(-50%, -50%);
-  z-index: 10;
+  z-index: 25;
 }
 
 .editable-picture.is-selected:not(.is-empty):hover .product-controls--picture {
@@ -1397,7 +1416,9 @@ product-controls {
 }
 
 .studio-view__block:hover .product-builder__element + .product-controls,
-.studio-view__block > .product-builder__element.is-selected + .product-controls {
+.studio-view__block > .product-builder__element.is-selected + .product-controls,
+.studio-view__block:hover .product-element + .product-controls,
+.studio-view__block > .product-element.is-selected + .product-controls {
   pointer-events: all;
   opacity: 1;
 }
@@ -1412,12 +1433,17 @@ product-controls {
   border-radius: 50%;
   width: 24px;
   height: 24px;
-  transition: color .3s;
+  transition: color .3s, background-color .3s, opacity .3s;
 }
 
 .product-controls__button:hover {
   cursor: pointer;
   color: #000;
+}
+
+.product-controls .product-controls__quantity .product-controls__button[disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .product-controls__quantity {
@@ -1929,11 +1955,79 @@ view-controls {
   background-color: #fff;
   border-radius: 50%;
   border: 1px solid transparent;
-  transition: border-color .3s;
+  transition: border-color .3s, background-color .3s;
 }
 
 .view-controls__button:hover {
   border-color: #e4e4e4;
+}
+
+.view-controls__button.is-disabled {
+  background-color: #f4f4f4;
+  border-color: #fff;
+}
+
+/* Prints */
+product-prints {
+  display: block;
+}
+
+.prints {
+  border: 1px solid #00000022;
+}
+
+.prints[print-type] {
+  width: 200px;
+}
+
+.prints[print-type="9-13"] {
+  width: 150px;
+  aspect-ratio: 9 / 13;
+}
+
+.prints[print-type="10-15"] {
+  width: 180px;
+  aspect-ratio: 10 / 15;
+}
+
+.prints[print-type="15-21"] {
+  width: 200px;
+  aspect-ratio: 15 / 21;
+}
+
+.prints[print-type="20-30"] {
+  width: 250px;
+  aspect-ratio: 20 / 30;
+}
+
+.prints[print-type="30-40"] {
+  width: 300px;
+  aspect-ratio: 30 / 40;
+}
+
+/* Canvas */
+product-canvas {
+  display: block;
+}
+
+.canvas {
+  width: 300px;
+  border: 1px solid #00000022
+}
+
+.canvas[print-type="30-40"] {
+  width: 500px;
+  aspect-ratio: 3 / 4;
+}
+
+.canvas[print-type="30-30"] {
+  width: 500px;
+  aspect-ratio: 1 / 1;
+}
+
+.canvas[print-type="40-40"] {
+  width: 750px;
+  aspect-ratio: 1 / 1;
 }
 
 /* Prints - Polaroid */
@@ -1957,4 +2051,51 @@ polaroid-prints {
 .prints.prints__polaroid .editable-picture {
   width: 140px;
   height: 140px;
+}
+
+/* Puzzle */
+product-puzzle {
+  display: block;
+}
+
+.puzzle {
+  width: 400px;
+
+  border: 1px solid #00000088;
+}
+
+.puzzle[puzzle-type="192"] {
+  width: 500px;
+}
+
+.puzzle[puzzle-type="513"] {
+  width: 600px;
+}
+
+.puzzle .editable-picture {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  z-index: 15;
+}
+
+.puzzle[puzzle-type="192"] .editable-picture {
+  aspect-ratio: 3 / 4;
+}
+
+.puzzle[puzzle-type="513"] .editable-picture {
+  aspect-ratio: 5 / 7;
+}
+
+.puzzle .puzzle__template-container {
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 16;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  opacity: 0.6;
 }

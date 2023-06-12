@@ -597,7 +597,10 @@ app.post('/api/products', async (req, res) => {
     imageUrl: image?.url,
     handle, 
     status: 'active',
-    options
+    options,
+    quantity: {
+      type: 'single'
+    }
   });
 
   const isExists = await ProductModel.exists({ shopify_id: id });
@@ -651,10 +654,11 @@ app.post('/api/products/update', async (req, res) => {
     },
     status: state.status,
     settings: state.settings,
-    relatedProducts: state.relatedProducts
+    relatedProducts: state.relatedProducts,
+    quantity: state.quantity
   });
 
-  const product = await ProductModel.findOne({ shopify_id: id });
+  const product = await ProductModel.findOne({ shopify_id: id }); 
 
   res.status(200).send(product);
 })

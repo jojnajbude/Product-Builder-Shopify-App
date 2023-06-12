@@ -66,11 +66,34 @@ export const sharpImage = async (req, res) => {
 
   const path = join(process.cwd(), 'frontend/product-builder/src', ...pathArr.slice(startFrom));
 
-  const options = ['rotate', 'flip', 'flop', 'crop', 'resize', 'filter', 'thumbnail', 'format'];
+  const options = ['rotate', 'flip', 'flop', 'crop', 'resize', 'filter', 'thumbnail', 'format', 'container', 'background'];
 
   const config = Object.keys(req.query)
     .reduce((obj, key) => {
       if (options.includes(key) && req.query[key]) {
+        if (key === 'background') {
+          try {
+            const backgroundColor = JSON.stringify(req.query[key]);
+
+            if (backgroundColor.includes('rgb')) {
+              const rgb = backgroundColor.match(/\d+/g).map(item => +item);
+
+              obj[key] = {
+                r: rgb[0] ?? 255,
+                g: rgb[1] ?? 255,
+                b: rgb[2] ?? 255,
+                alpha: rgb[3] ?? 1
+              };
+            } else {
+              obj[key] = '#' + req.query[key];
+            }
+          } catch {
+            return obj;
+          }
+
+          return obj;
+        }
+
         try { 
           obj[key] = JSON.parse(req.query[key]);
         } catch {
@@ -80,7 +103,7 @@ export const sharpImage = async (req, res) => {
             obj[key] = req.query[key];
           }
         }
-      }
+      } 
 
       return obj;
     }, {})
@@ -96,18 +119,33 @@ export const sharpImage = async (req, res) => {
 
   const { width, height } = metadata;  
 
-  const { flip, flop, rotate = 0, crop = 1, resize = [width, height], thumbnail, format = 'jpeg' } = config;
+  const {
+    flip,
+    flop,
+    rotate = 0,
+    crop = 1,
+    resize = [width, height],
+    thumbnail,
+    format = 'jpeg',
+    container,
+    background = { r: 255, g: 255, b: 255, alpha: 1 }
+  } = config;
 
-  if (thumbnail && typeof thumbnail !== 'boolean') {
+  if (thumbnail && typeof thumbnail !== 'boolean') { 
     res.sendStatus(400);
     return;
   }
   
-  file = rotateImage(file, flip, flop, rotate);
+  file = rotateImage(file, flip, flop, rotate, background);
+
+  if (!resize || resize.some(item => !item)) {
+    res.sendStatus(400);
+    return;
+  }
 
   if (!thumbnail) {
-    file = await resizeImage(file, resize, width, height, rotate);
-  } else {
+    file = await resizeImage(file, resize, width, height, rotate, background); 
+  } else { 
     const [resizeWidth, resizeHeight] = resize;
 
     file = file.resize({
@@ -117,18 +155,18 @@ export const sharpImage = async (req, res) => {
 
     const readyFile = await file
     .withMetadata()
-    .webp()
+    .webp() 
     .toBuffer();
  
     res.send(readyFile);  
     return;
   }
 
-  file = await cropImage(file, crop);
+  file = await cropImage(file, crop, background); 
 
   switch (format) {
     case 'webp':
-      res.setHeader('Content-Type', 'image/webp');
+      res.setHeader('Content-Type', 'image/webp'); 
 
       file = file.webp() 
       break;
@@ -141,14 +179,28 @@ export const sharpImage = async (req, res) => {
         .jpeg()
       break;
   }
- 
-  const readyFile = await file
-    .toBuffer(); 
+
+  if (container && Array.isArray(container)) {
+    const [contWidth, contHeight] = container;
+
+    if (contWidth && contHeight || typeof contWidth === 'number' || typeof contHeight === 'number') {
+      file = await file
+        .toBuffer();
+  
+      file = sharp(file)
+        .resize({
+          width: contWidth,
+          height: contHeight
+        }); 
+    }
+  }
+
+  const readyFile = await file.toBuffer();
  
   res.send(readyFile);
 }
 
-const rotateImage = (file, flip, flop, rotate) => {
+const rotateImage = (file, flip, flop, rotate, background) => {
   if (flip && typeof flop === 'boolean') {
     file = file.flip();
   }
@@ -159,20 +211,22 @@ const rotateImage = (file, flip, flop, rotate) => {
 
   if (rotate && typeof rotate === 'number' && rotate > 0 && rotate < 360) {
     file = file
-      .rotate(rotate, { background: { r: 255, g: 255, b: 255, alpha: 1 } })
+      .rotate(rotate, { background: background })
   }
 
   return file;
 }
 
-const resizeImage = async (file, resize, width, height, rotate) => {
+const resizeImage = async (file, resize, width, height, rotate, background) => {
   const [resizeWidth, resizeHeight] = resize;
 
   const [rotateWidth, rotateHeight] = await new Promise(res => {
-        file.toBuffer((err, buffer, info) => res([info.width, info.height]));
+        file.toBuffer((err, buffer, info) => {
+          res([info.width, info.height])
+        });
     });
 
-  if (resize && Array.isArray(resize) && rotateWidth && rotateHeight) {
+  if (resize && Array.isArray(resize) && rotateWidth && rotateHeight) { 
 
     if (rotateWidth <= resizeWidth && rotateHeight <= resizeHeight) {
       const horizontal = rotateWidth > resizeWidth ? 0 : Math.round((resizeWidth - rotateWidth) / 2);
@@ -183,7 +237,7 @@ const resizeImage = async (file, resize, width, height, rotate) => {
         left: horizontal,
         right: horizontal, 
         bottom: vertical,
-        background: { r: 255, g: 255, b: 255, alpha: 1 },
+        background: background,
       }).resize({
         width: width,
         height: height
@@ -215,13 +269,13 @@ const resizeImage = async (file, resize, width, height, rotate) => {
     width: afterWidth,
     height: afterHeight,
     fit: 'contain',
-    background: { r: 255, g: 255, b: 255, alpha: 1 },
+    background: background,
   });
 
   return file;
 }
 
-const cropImage = async (file, crop) => {
+const cropImage = async (file, crop, background) => {
   const [width, height] = await new Promise(res => {
     file.toBuffer((err, buffer, info) => res([info.width, info.height]));
   });
@@ -238,10 +292,14 @@ const cropImage = async (file, crop) => {
 
     const newBuffer = await file.toBuffer();
 
-    file = sharp(newBuffer);
+    file = sharp(newBuffer, { limitInputPixels: false });
 
     const [newWidth, newHeight] = await new Promise(res => {
-      file.toBuffer((err, buffer, info) => res([info.width, info.height]));
+      file.toBuffer((err, buffer, info) => {
+        if (!err) {
+          res([info.width, info.height])
+        }
+      });
     });
 
     const extractWidth = Math.round(newWidth / zoom * 1);
@@ -262,4 +320,5 @@ const cropImage = async (file, crop) => {
   }
 
   return file
-}
+} 
+ 

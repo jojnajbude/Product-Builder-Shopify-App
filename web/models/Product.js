@@ -13,6 +13,7 @@ const ProductSchema = new mongoose.Schema({
     id: String,
     title: String
   },
+  quantity: Schema.Types.Mixed,
   settings: {
     hasLayout: Boolean,
     selectedLayouts: [String],
