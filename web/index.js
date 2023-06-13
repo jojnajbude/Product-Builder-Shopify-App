@@ -645,8 +645,6 @@ app.post('/api/products/update', async (req, res) => {
     return;
   }
 
-  console.log(state.relatedProducts); 
-
   await ProductModel.findOneAndUpdate({ shopify_id: id }, {
     type: {
       id: currType?.id,
@@ -655,7 +653,8 @@ app.post('/api/products/update', async (req, res) => {
     status: state.status,
     settings: state.settings,
     relatedProducts: state.relatedProducts,
-    quantity: state.quantity
+    quantity: state.quantity,
+    resolution: state.resolution
   });
 
   const product = await ProductModel.findOne({ shopify_id: id }); 

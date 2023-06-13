@@ -1222,6 +1222,10 @@ product-option-selector {
   overflow: hidden;
 }
 
+.studio-view.is-zoomed .studio-view__container {
+  overflow: hidden;
+}
+
 .studio-view__container {
   position: absolute;
   top: 35px;
@@ -1235,6 +1239,7 @@ product-option-selector {
   flex-wrap: wrap;
   gap: 25px 20px;
   overflow-y: scroll;
+  transform-origin: 0 0;
 }
 
 .studio-view__block {
@@ -1754,6 +1759,10 @@ editable-text {
   display: flex;
 }
 
+.product-element editable-text {
+  z-index: 10;
+}
+
 editable-text .textarea {
   border: 1px solid transparent;
   transition: border-color .3s;
@@ -2098,4 +2107,19 @@ product-puzzle {
   background-position: center;
   background-size: 100% 100%;
   opacity: 0.6;
+}
+
+/* Magnet */
+product-magnet {
+  display: block;
+}
+
+.magnet {
+  width: 250px;
+  aspect-ratio: 1 / 1;
+}
+
+.magnet.magnet--circle .editable-picture {
+  border-radius: 50%;
+  aspect-ratio: 1 / 1;
 }

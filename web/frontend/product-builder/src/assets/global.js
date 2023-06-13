@@ -3420,25 +3420,9 @@ class EditablePicture extends HTMLElement {
       return child;
     });
 
-    if (this.parentBlock.hasAttribute('photobook-page')) {
-      this.pageConfig = PhotobookPage.config[this.parentBlock.getAttribute('photobook-size')];
-    } else {
-      switch (this.parentBlock.getAttribute('block-type')) {
-        case 'prints':
-          this.pageConfig = Prints.getConfig(this.parentBlock.getAttribute('print-type'));
-          break;
-        case 'puzzle':
-          this.pageConfig = Puzzle.getConfig(this.parentBlock.getAttribute('puzzle-type'));
-          break;
-        case 'canvas':
-          this.pageConfig = Canvas.getConfig(this.parentBlock.getAttribute('print-type'));
-          break;
-        default:
-          this.pageConfig = [this.offsetWidth, this.offsetHeight]
-          break;
-      }
-    }
+    const { width: resolutionWidth, height: resolutionHeight } = Studio.product.resolution; 
 
+    this.pageConfig = getResolution(resolutionWidth, resolutionHeight);
 
     this.emptyState = this.querySelector(EditablePicture.selectors.emptyState);
     if (this.emptyState) {
@@ -4109,7 +4093,7 @@ class ProductControls extends HTMLElement {
     const { blocks } = Studio.state.view;
 
     const maxCount = Studio.product.quantity.maximum
-      ? Studio.state.quantity.maximum
+      ? Studio.product.quantity.maximum
       : Infinity;
 
     const prevCount = blocks.reduce((count, block) => count + block.count, 0);
@@ -4994,6 +4978,59 @@ class Puzzle extends ProductElement {
 }
 customElements.define('product-puzzle', Puzzle);
 
+class Magnet extends ProductElement {
+  static heartMask = `
+    <svg width="161" height="151" viewBox="0 0 161 151" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3.58381 28.0062C19.5838 -8.9946 63.0859 -9.49519 80.0859 28.5053C97.5859 -10.4952 141.586 -8.4952 156.586 28.5053C161.598 43.3284 162.409 51.8629 156.586 66.0054C153.5 73.5 150.893 77.0037 146.086 82.5053L90.5859 144.505C82.5859 153.005 77.0859 153.005 69.5859 144.505L14.5859 82.5053C11.6564 79.9656 7.97936 76.1178 3.58381 66.0054C-1.91412 51.5054 -0.416794 39.5054 3.58381 28.0062Z" fill="#D9D9D9"/>
+    </svg>  
+  `;
+
+  constructor() {
+    super();
+  }
+  
+  connectedCallback() {
+    this.classList.add('magnet', 'product-element');
+
+    if (!this.hasAttribute('block')) {
+      this.setAttribute('block', uniqueID.block());
+    }
+
+    switch(this.getAttribute('magnet-type')) {
+      case 'heart':
+        this.classList.add('magnet--heart');
+        break;
+      case 'circle':
+        this.classList.add('magnet--circle');
+        break;
+    }
+
+    this.controls = ProductControls.createBlockControls(this.getAttribute('block'));
+
+    this.setAttribute('block-type', 'magnet');
+
+    this.parentElement.append(this.controls);
+
+    this.setContent();
+  }
+
+  setContent() {
+    const editableQuery = this.editableQuery(this.editablePictures);
+  
+    const picture = this.getEditable(editableQuery());
+
+    if (this.getAttribute('magnet-type') === 'heart') {
+      picture.style.mask = `url('data:image/svg+xml;base64,${btoa(Magnet.heartMask)}') center center / contain no-repeat`;
+      picture.style.webkitMask = `url('data:image/svg+xml;base64,${btoa(Magnet.heartMask)}') center center / contain no-repeat`;
+    }
+
+    this.append(picture);
+  }
+
+  setValue(settings) {}
+}
+customElements.define('product-magnet', Magnet);
+
 class Tiles extends ProductElement {
   constructor() {
     super();
@@ -5019,6 +5056,11 @@ class ViewControls extends HTMLElement {
       redo: this.querySelector(ViewControls.selectors.redo)
     }
 
+    this.zoom = {
+      studio: document.querySelector('studio-view'),
+      studioContainer: document.querySelector('[data-studio-view-container]')
+    }
+
     this.element.undo.addEventListener('click', () => {
       Studio.utils.history.undoState();
     });
@@ -5026,12 +5068,133 @@ class ViewControls extends HTMLElement {
     this.element.redo.addEventListener('click', () => {
       Studio.utils.history.redoState();
     });
+
+    this.element.zoomIn.addEventListener('click', async () => {
+      this.zoom.studio.setAttribute('zoomed', true);
+      
+      this.zoom.studioContainer.style.scale = null;
+      this.zoom.studioContainer.style.translate = null;
+
+      this.zoom.studioContainer.style.transition = 'transform .3s, scale .3s, translate .3s';
+
+      const { blocks } = Studio.state.view;
+
+      let selectedElem, selected = blocks.find(block => block.selected);
+      const blockWithActiveChild = blocks.find(block => block.activeChild);
+
+      if (!selected && blockWithActiveChild) {
+        selected = blockWithActiveChild.childBlocks.find(child => child.selected);
+      }
+
+      let offsetScrollTop;
+
+      if (selected && selected.id.startsWith('block')) {
+        selectedElem = document.querySelector(StudioView.selectors.blockById(selected.id));
+        offsetScrollTop = selectedElem.offsetTop;
+      } else if (selected && selected.id.startsWith('child')) {
+        selectedElem = document.querySelector(StudioView.selectors.childBlockById(selected.id));
+        offsetScrollTop = document.querySelector(StudioView.selectors.blockById(blockWithActiveChild.id)).offsetTop;
+      } else {
+        return;
+      }
+
+      if (!selectedElem) {
+        return;
+      }
+
+      await new Promise(res => {
+        this.zoom.studioContainer.scrollTo({
+          top: offsetScrollTop - 35,
+          behavior: 'smooth'
+        });
+
+        let same = 0;
+        let lastPos = null;
+
+        const check = () => {
+          const newPos = selectedElem.getBoundingClientRect().top;
+ 
+          if (newPos === lastPos) {
+            if (same++ > 2) {
+              return res();
+            }
+          } else {
+            same = 0;
+            lastPos = newPos;
+          }
+
+          requestAnimationFrame(check);
+        }
+
+        requestAnimationFrame(check);
+      })
+
+      const scale = this.getScale(selectedElem);
+
+      const [offsetLeft, offsetTop] = this.getOffset(selectedElem);
+
+      this.zoom.studioContainer.style.scale = scale;
+      this.zoom.studioContainer.style.translate = `-${(offsetLeft) * scale}px -${(offsetTop) * scale}px`;
+
+      clearTimeout(this.untransitionTimer);
+
+      this.untransitionTimer = setTimeout(() => {
+        this.zoom.studioContainer.style.transition = null;
+      }, 500);
+    });
+
+    this.element.zoomOut.addEventListener('click', this.zoomOut.bind(this));
+  }
+
+  zoomOut() {
+    this.zoom.studio.setAttribute('zoomed', false);
+
+    this.zoom.studioContainer.style.transition = 'transform .3s, scale .3s, translate .3s';
+
+    this.zoom.studioContainer.style.scale = null;
+    this.zoom.studioContainer.style.translate = null;
+
+    clearTimeout(this.untransitionTimer);
+    this.untransitionTimer = setTimeout(() => {
+      this.zoom.studioContainer.style.transition = null;
+    }, 500);
+  }
+
+  getOffset(elem) {
+    const studioParams = this.zoom.studio.getBoundingClientRect();
+    const containerParams = this.zoom.studioContainer.getBoundingClientRect();
+
+    const elemParams = elem.getBoundingClientRect();
+
+    const coefficient = containerParams.width / studioParams.width;
+
+    const left = (elemParams.x - studioParams.x - (elemParams.width / 4)) * coefficient;
+    const top = (elemParams.y - studioParams.y - (elemParams.height / 4)) * coefficient;
+
+    return [left, top];
+  }
+
+  getScale(elem) {
+    if (!elem) {
+      return;
+    }
+
+    const containerParams = this.zoom.studio.getBoundingClientRect();
+
+    const elemParams = elem.getBoundingClientRect();
+
+    const compareSide = Math.max(elemParams.width, elemParams.height);
+
+    return compareSide === elemParams.width
+      ? +((containerParams.width / compareSide * 0.8).toFixed(2))
+      : +((containerParams.height / compareSide * 0.8).toFixed(2));
   }
 }
 customElements.define('view-controls', ViewControls);
 
 class StudioView extends HTMLElement {
   static selectors = {
+    studio: 'studio-view',
     sizeSelector: '[data-product-option-selector]',
     container: '[data-studio-view-container]',
     productElement: '[product-element]',
@@ -5052,7 +5215,7 @@ class StudioView extends HTMLElement {
   };
 
   static get observedAttributes() {
-    return ['state']
+    return ['state', 'zoomed'];
   }
 
   constructor() {
@@ -5069,6 +5232,14 @@ class StudioView extends HTMLElement {
   attributeChangedCallback(name, oldValue, newValue) {
     const prevState = JSON.parse(oldValue);
     const currState = JSON.parse(newValue);
+
+    if (name === 'zoomed') {
+      if (currState) {
+        this.classList.add('is-zoomed')
+      } else {
+        this.classList.remove('is-zoomed');
+      }
+    }
 
     this.state = currState;
 
@@ -5800,9 +5971,7 @@ class StudioView extends HTMLElement {
     productElement.classList.add('product-builder__element', 'product-element', 'is-default');
     productElement.setAttribute('quantity', 1);
 
-    productElement.addEventListener('click', (event) => {
-      this.setSelectedBlock(productElement, null, event.shiftKey);
-    });
+    this.blockClickedListener(productElement);
 
     block.append(productElement);
 
@@ -5820,17 +5989,8 @@ class StudioView extends HTMLElement {
     page.classList.add('photobook-page', 'product-builder__element');
     page.setAttribute('photobook-page', layout);
 
-    page.addEventListener('click', (event) => {
-      const childs = [...page.querySelectorAll(StudioView.selectors.childBlock)];
-
-      const someIsChild = childs.includes(event.target)
-        || childs.some(child => child.contains(event.target));
-
-      if (!someIsChild) {
-        this.setSelectedBlock(page, someIsChild, event.shiftKey);
-      }
-
-    });
+    
+    this.blockClickedListener(page);
 
     block.append(page);
 
@@ -5841,17 +6001,8 @@ class StudioView extends HTMLElement {
     const block = this.createStudioBlock('product-prints');
 
     const print = document.createElement('product-prints');
-
-    print.addEventListener('click', (event) => {
-      const childs = [...print.querySelectorAll(StudioView.selectors.childBlock)];
-
-      const someIsChild = childs.includes(event.target)
-        || childs.some(child => child.contains(event.target));
-
-      if (!someIsChild) {
-        this.setSelectedBlock(print, someIsChild, event.shiftKey);
-      }
-    });
+    
+    this.blockClickedListener(print);
 
     const type = Prints.printTypes.find(type => productHandle.includes(type));
 
@@ -5868,17 +6019,8 @@ class StudioView extends HTMLElement {
     const block = this.createStudioBlock('product-canvas');
 
     const canvas = document.createElement('product-canvas');
-
-    canvas.addEventListener('click', (event) => {
-      const childs = [...print.querySelectorAll(StudioView.selectors.childBlock)];
-
-      const someIsChild = childs.includes(event.target)
-        || childs.some(child => child.contains(event.target));
-
-      if (!someIsChild) {
-        this.setSelectedBlock(print, someIsChild, event.shiftKey);
-      }
-    });
+    
+    this.blockClickedListener(canvas);
 
     const type = Canvas.printTypes.find(type => productHandle.includes(type));
 
@@ -5896,16 +6038,7 @@ class StudioView extends HTMLElement {
 
     const polaroid = document.createElement('polaroid-prints');
 
-    polaroid.addEventListener('click', (event) => {
-      const childs = [...polaroid.querySelectorAll(StudioView.selectors.childBlock)];
-
-      const someIsChild = childs.includes(event.target)
-        || childs.some(child => child.contains(event.target));
-
-      if (!someIsChild) {
-        this.setSelectedBlock(polaroid, someIsChild, event.shiftKey);
-      }
-    });
+    this.blockClickedListener(polaroid);
 
     block.append(polaroid);
 
@@ -5916,17 +6049,8 @@ class StudioView extends HTMLElement {
     const block = this.createStudioBlock('product-puzzle');
 
     const puzzle = document.createElement('product-puzzle');
-
-    puzzle.addEventListener('click', (event) => {
-      const childs = [...puzzle.querySelectorAll(StudioView.selectors.childBlock)];
-
-      const someIsChild = childs.includes(event.target)
-        || childs.some(child => child.contains(event.target));
-
-      if (!someIsChild) {
-        this.setSelectedBlock(puzzle, someIsChild, event.shiftKey);
-      }
-    });
+    
+    this.blockClickedListener(puzzle);
 
     if (productHandle) {
       const puzzleType = Puzzle.types.find(type => productHandle.includes(type));
@@ -5937,6 +6061,47 @@ class StudioView extends HTMLElement {
     block.append(puzzle);
 
     this.elements.container.append(block);
+  }
+
+  createMagnets(productHandle) {
+    const block = this.createStudioBlock('product-magnet');
+
+    const magnet = document.createElement('product-magnet');
+
+    this.blockClickedListener(magnet);
+
+    block.append(magnet);
+
+    const type = productHandle.includes('heart')
+      ? 'heart'
+      : productHandle.includes('circle')
+        ? 'circle'
+        : 'square';
+
+    magnet.setAttribute('magnet-type', type);
+
+    this.elements.container.append(block);
+  }
+
+  blockClickedListener(element, callback) {
+    if (!element) {
+      return;
+    }
+
+    element.addEventListener('click', (event) => {
+      const childs = [...element.querySelectorAll(StudioView.selectors.childBlock)];
+
+      const someIsChild = childs.includes(event.target)
+        || childs.some(child => child.contains(event.target));
+
+      if (!someIsChild) {
+        this.setSelectedBlock(element, someIsChild, event.shiftKey);
+      }
+    });
+
+    if (callback) {
+      element.addEventListener('click', callback);
+    }
   }
 
   clearViewSync(size, toRemove) {
@@ -6048,6 +6213,9 @@ class StudioView extends HTMLElement {
           break;
         case 'canvas':
           this.createCanvas(product.handle);
+          break;
+        case 'magnets':
+          this.createMagnets(product.handle);
           break;
         case 'boxes':
           if (product.handle.includes('polaroid')) {
@@ -6240,12 +6408,12 @@ class StudioView extends HTMLElement {
   }
 
   addBlock() {
-    const prevBlockCount = Studio.state.panel.blockCount;
+    const prevCount = Studio.state.view.blockCount;
 
     Studio.utils.change({
       panel: {
         ...Studio.state.panel,
-        blockCount: prevBlockCount + 1
+        blockCount: prevCount + 1
       }
     });
   }

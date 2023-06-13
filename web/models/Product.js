@@ -14,6 +14,7 @@ const ProductSchema = new mongoose.Schema({
     title: String
   },
   quantity: Schema.Types.Mixed,
+  resolution: Schema.Types.Mixed,
   settings: {
     hasLayout: Boolean,
     selectedLayouts: [String],

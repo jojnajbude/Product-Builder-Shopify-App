@@ -2,6 +2,7 @@ import { useAuthenticatedFetch, useContextualSaveBar } from "@shopify/app-bridge
 import {
   Button,
   ButtonGroup,
+  Checkbox,
   Columns,
   Frame,
   Layout,
@@ -81,6 +82,23 @@ export default function Product() {
 
   const [minimQuantity, setMininQuantity] = useState(0);
 
+  const [hasMaximum, setHasMaximum] = useState(false);
+  const [maximumQuantity, setMaximumQuantity] = useState(0);
+
+  const [resolution, setResolution] = useState({
+    width: 0,
+    height: 0
+  });
+  const [resolutionError, setResolutionError] = useState(false);
+  const resolutionErrorMarkup = useMemo(() => resolutionError
+    ? <Toast
+        content="Resolution can't be zero"
+        error
+        onDismiss={() => setResolutionError(false)}
+        duration={4500}
+      />
+    : null);
+
   const [isEdited, setIsEdited] = useState(false);
 
   const [isLoadingButtons, setIsLoadingButtons] = useState([]);
@@ -115,12 +133,23 @@ export default function Product() {
     if (productQuantity === 'multiply') {
       quantity = {
         type: 'multiply',
-        minimum: +minimQuantity
+        minimum: minimQuantity
+      }
+
+      if (hasMaximum && productQuantity === 'multiply') {
+        quantity.maximum = maximumQuantity >= minimQuantity ? maximumQuantity : null;
       }
     } else if (productQuantity === 'set-of') {
       quantity = {
         type: 'set-of'
       }
+    }
+
+    if (resolution.width <= 0 || resolution.height <= 0) {
+      setResolutionError(true);
+      discardChanges();
+      setIsLoadingButtons([]);
+      return;
     }
 
     const response = await fetch(`api/products/update?id=${product.shopify_id}`, {
@@ -133,7 +162,8 @@ export default function Product() {
         status: selectedStatus,
         settings: settings,
         relatedProducts: relatedProducts,
-        quantity
+        quantity,
+        resolution
       })
     });
 
@@ -149,13 +179,14 @@ export default function Product() {
         settings: newProduct.settings,
         relatedProducts: newProduct.relatedProducts,
         quantity: newProduct.quantity,
+        resolution: newProduct.resolution,
         onStart: true
       });
 
       setIsLoadingButtons(current => current.filter(button => button !== saveButtonId));
     }
 
-  }, [selectedType, selectedStatus, product, settings, relatedProducts, productQuantity, minimQuantity]);
+  }, [selectedType, selectedStatus, product, settings, relatedProducts, productQuantity, minimQuantity, maximumQuantity, resolution]);
 
   const discardChanges = useCallback(() => {
     setSelectedStatus(initialState.status);
@@ -164,8 +195,14 @@ export default function Product() {
     setRelatedProducts(initialState.relatedProducts);
     setProductQuantity(initialState.quantity.type);
 
+    setResolution(initialState.resolution);
+
     if (initialState.quantity.type === 'multiply') {
       setMininQuantity(initialState.quantity.minimum);
+
+      if (hasMaximum && initialState.quantity.maximum) {
+        setMaximumQuantity(initialState.quantity.maximum)
+      }
     }
   }, [initialState]);
 
@@ -179,7 +216,7 @@ export default function Product() {
     discardAction.setOptions({
       onAction: discardChanges
     });
-  }, [product, settings, isLoadingButtons, selectedStatus, selectedType, minimQuantity, productQuantity]);
+  }, [product, settings, isLoadingButtons, selectedStatus, selectedType, minimQuantity, productQuantity, maximumQuantity, hasMaximum, resolution]);
 
   useEffect(() => {
     if (product && types) {
@@ -188,7 +225,14 @@ export default function Product() {
 
       if (product.quantity.type === 'multiply') {
         setMininQuantity(product.quantity.minimum);
+
+        if (product.quantity.maximum) {
+          setHasMaximum(true);
+          setMaximumQuantity(product.quantity.maximum);
+        }
       }
+
+      setResolution(product.resolution ? product.resolution : { width: 0, height: 0 });
 
       let settingsToSet;
       let typeToSet;
@@ -213,15 +257,15 @@ export default function Product() {
 
       if (!initialState.onStart) {
         setInitialState({
-          type: typeToSet,
+          type: typeToSet, 
           status: product.status, 
           settings: settingsToSet,
           relatedProducts: product.relatedProducts,
           quantity: product.quantity,
+          resolution: product.resolution,
           onStart: true
         });
       }
-
 
       setSelectedType(typeToSet);
       setRelatedProducts(product.relatedProducts);
@@ -265,14 +309,15 @@ export default function Product() {
   }, [selectedType]);
 
   useEffect(() => {
-    if (product && types) {
-      console.log(minimQuantity, initialState.quantity, initialState, productQuantity);
+    if (product && types) { 
       const notEdited = initialState.type === selectedType
         && JSON.stringify(initialState.settings) === JSON.stringify(settings)
         && initialState.status === selectedStatus
         && JSON.stringify(relatedProducts) === JSON.stringify(initialState.relatedProducts)
         && JSON.stringify(productQuantity) === JSON.stringify(initialState.quantity.type)
-        && (productQuantity === 'multiply' ? minimQuantity === initialState.quantity.minimum : true);
+        && (productQuantity === 'multiply' ? minimQuantity === initialState.quantity.minimum : true)
+        && (productQuantity === 'multiply' && hasMaximum ? maximumQuantity === initialState.quantity.maximum : true)
+        && JSON.stringify(resolution) === JSON.stringify(initialState.resolution);
 
       if (notEdited) {
         setIsEdited(false);
@@ -282,15 +327,21 @@ export default function Product() {
         setIsEdited(true);
       }
     }
-  }, [selectedStatus, selectedType, settings, initialState, relatedProducts, productQuantity, minimQuantity]);
+  }, [selectedStatus, selectedType, settings, initialState, relatedProducts, productQuantity, minimQuantity, maximumQuantity, hasMaximum, resolution]);
 
-  useEffect(() => {
+  useEffect(() => { 
     if (isEdited) {
       show();
     } else {
       hide();
-    }
+    } 
   }, [isEdited]);
+
+  useEffect(() => {
+    if (hasMaximum && maximumQuantity < minimQuantity) {
+      setMaximumQuantity(minimQuantity)
+    }
+  }, [hasMaximum]);
 
   // Return states
 
@@ -496,17 +547,86 @@ export default function Product() {
                 />
 
                 {productQuantity === 'multiply' && (
-                  <div style={{ marginTop: 20 }}>
-                    <TextField
-                      label="Minim Quantity"
-                      type="number"
-                      value={minimQuantity}
-                      onChange={value => setMininQuantity(value)}
-                      autoComplete="off"
-                      min={0}
-                    />
-                  </div>
+                  <>
+                    <div style={{ marginTop: 20 }}>
+                      <TextField
+                        label="Minim Quantity"
+                        type="number"
+                        value={minimQuantity}
+                        onChange={value => setMininQuantity(+value)}
+                        autoComplete="off"
+                        min={0}
+                      />
+                    </div>
+
+                    <div style={{ marginTop: 20 }}>
+                      <Checkbox
+                        label='Set maximum quantity'
+                        checked={hasMaximum}
+                        onChange={value => setHasMaximum(value)}
+                      />
+                    </div>
+
+                    {hasMaximum && (
+                      <div style={{ marginTop: 20 }}>
+                        <TextField
+                          label="Maximum Quantity"
+                          type="number"
+                          value={maximumQuantity}
+                          onChange={value => setMaximumQuantity(+value)}
+                          autoComplete="off"
+                          min={minimQuantity}
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
+              </LegacyCard.Section>
+            </LegacyCard>
+
+            <LegacyCard>
+              <LegacyCard.Section>
+                <div style={{ marginBottom: 10 }}>
+                  <Text
+                    alignment="start"
+                    as="h2"
+                    variant="headingMd"
+                  >
+                    Size
+                  </Text>
+                </div>
+
+                <div style={{ marginTop: 20 }}>
+                  <TextField
+                    label="Width, cm"
+                    type="number"
+                    value={resolution.width}
+                    onChange={value => setResolution(prev => ({
+                      ...prev, 
+                      width: parseFloat(value)
+                    }))}
+                    autoComplete="off"
+                    min={0}
+                    step={0.1}
+                    error={resolution.width === 0 && initialState.resolution && resolution.width !== initialState.resolution.width}
+                  />
+                </div>
+
+                <div style={{ marginTop: 20 }}>
+                  <TextField
+                    label="Height, cm"
+                    type="number"
+                    value={resolution.height}
+                    onChange={value => setResolution(prev => ({
+                      ...prev,
+                      height: parseFloat(value)
+                    }))}
+                    autoComplete="off"
+                    min={0}
+                    step={0.1}
+                    error={resolution.height === 0 && initialState.resolution && resolution.height !== initialState.resolution.height}
+                  />
+                </div>
               </LegacyCard.Section>
             </LegacyCard>
 
@@ -571,6 +691,7 @@ export default function Product() {
         </div>
 
         {saveToastMarkup}
+        {resolutionErrorMarkup}
       </Page>
     </Frame>
   );
