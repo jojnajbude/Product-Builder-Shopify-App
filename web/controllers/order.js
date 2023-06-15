@@ -8,12 +8,12 @@ export const getCustomer = (path) => {
     fs.mkdirSync(path);
 
     fs.mkdirSync(uploads);
-  }
+  } 
 
-  const draftPath = join(path, 'drafts');
+  const draftPath = join(path, 'orders');
 
   if (!path.includes('anonims') && !fs.existsSync(draftPath)) {
-    fs.mkdirSync(join(path, 'drafts'));
+    fs.mkdirSync(join(path, 'orders'));
   }
 
   return uploads;

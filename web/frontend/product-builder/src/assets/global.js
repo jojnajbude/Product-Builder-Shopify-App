@@ -315,7 +315,8 @@ const productParams = new URLSearchParams(location.search);
 class ProductBuilder extends HTMLElement {
   static selectors = {
     panel: '[customization-panel]',
-    studioView: '[studio-view]'
+    studioView: '[studio-view]',
+    errorToast: 'error-toast'
   };
 
   static get observedAttributes() {
@@ -342,6 +343,8 @@ class ProductBuilder extends HTMLElement {
       this.draft.id = uniqueID.draft();
     }
 
+    this.errorToast = document.querySelector(ProductBuilder.selectors.errorToast);
+
     this.init();
   }
 
@@ -357,11 +360,11 @@ class ProductBuilder extends HTMLElement {
       return;
     }
 
-    if (!currState.productId && !productParams.get('id')) {
+    if (prevState.productId !== currState.productId && !currState.productId) {
       this.panel.tools.focusOnTab('products');
     }
 
-    if (prevState.productId !== currState.productId) {
+    if (prevState.productId !== currState.productId && !currState.product) {
       this.getProduct(currState.productId)
         .then(product => {
           switch(product.type.id) {
@@ -391,10 +394,6 @@ class ProductBuilder extends HTMLElement {
       this.draft.product = currState.product;
 
       this.panel.setState({ product: currState.product });
-    }
-
-    if (prevState.panel.blockCount !== currState.panel.blockCount && prevState.view.blockCount === currState.view.blockCount) {
-      this.studioView.setState({ blockCount: currState.panel.blockCount });
     }
 
     if (!compareObjects(prevState.panel, currState.panel)) {
@@ -766,6 +765,42 @@ class ProductBuilder extends HTMLElement {
       this.panel.tools.uploadedImages(this.uploaded);
     }
 
+    const anonimOrderId = localStorage.getItem('product-builder-anonim-order-state');
+
+    if (!this.anonimCustomerId) {
+      if (!productParams.get('order-id')) {
+        this.orderId = await this.createOrder();
+
+        console.log(this.orderId);
+
+        const nextURL = location.origin + location.pathname + `?order-id=${this.orderId}`;
+        const nextTitle = document.title;
+        const nextState = { additionalInformation: 'Product builder with order history' };
+
+        window.history.replaceState(nextState, nextTitle, nextURL);
+      } else if (productParams.get('order-id')) {
+        this.orderId = productParams.get('order-id');
+  
+        const state = await this.getOrderState(this.orderId);
+  
+        console.log(state);
+  
+        if (!state.error) {
+          Studio.utils.change(state);
+        } else {
+          this.orderId = await this.createOrder();
+          localStorage.setItem('product-builder-order-id', this.orderId);
+        }
+      }
+    } else if (anonimOrderId) {
+      const state = JSON.parse(anonimOrderId);
+
+      this.addEventListener('studio:inited', () => {
+        console.log(Studio.product);
+        Studio.utils.change(state);
+      })
+    }
+
     this.draft.customer = customer;
 
     window.oauthInstagram = JSON.parse(localStorage.getItem('oauthInstagram'));
@@ -773,6 +808,7 @@ class ProductBuilder extends HTMLElement {
     this.addEventListener('image:check', this.checkImages.bind(this));
 
     this.dispatchEvent(new CustomEvent('studio:inited'));
+    this.inited = true;
   }
 
   async getProduct(id) {
@@ -785,6 +821,50 @@ class ProductBuilder extends HTMLElement {
 
     return fetch(`product-builder/product?id=${productId}`)
       .then(res => res.json());
+  }
+
+  async createOrder() {
+    const id = Studio.customer
+      ? Studio.customer.shopify_id
+      : Studio.anonimCustomerId;
+
+    if (!id) {
+      return;
+    }
+
+    return fetch(`product-builder/orders/create?id=${id}`).then(res => res.text());
+  }
+
+  async getOrderState(id) {
+    const customerId = Studio.customer
+      ? Studio.customer.shopify_id
+      : Studio.anonimCustomerId;
+
+    if (!id || !customerId) {
+      return;
+    }
+
+    return fetch(`product-builder/orders/${id}?id=${customerId}`).then(res => {
+      return res.json();
+    });
+  }
+
+  async updateOrder(id) {
+    const customerId = Studio.customer
+      ? Studio.customer.shopify_id
+      : Studio.anonimCustomerId;
+
+    if (!id || !customerId) {
+      return;
+    }
+
+    return fetch(`product-builder/orders/update/${id}?id=${customerId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(Studio.state)
+    });
   }
 
   getCustomer() {
@@ -867,6 +947,13 @@ const utils = {
       utils.history.setEnabledButtons();
   
       localStorage.setItem('product-builder-history', JSON.stringify(history));
+
+      if (Studio.customer && !Studio.anonimCustomerId && Studio.orderId && Studio.inited) {
+        console.log('save');
+        Studio.updateOrder(Studio.orderId);
+      } else if (Studio.anonimCustomerId && Studio.inited) {
+        localStorage.setItem('product-builder-anonim-order-state', JSON.stringify(Studio.state));
+      } 
     },
     allowSave: true,
     position: 1,
@@ -992,7 +1079,7 @@ class ErrorToast extends HTMLElement {
   createError(text) {
     const errorWrapper = document.createElement('span');
     errorWrapper.toggleAttribute('data-text');
-
+ 
     errorWrapper.textContent = text;
 
     this.errorContainer.appendChild(errorWrapper);
@@ -1337,10 +1424,12 @@ class ProductInfo extends HTMLElement {
 
     const { product } = currState;
 
-    this.setProduct(product);
+    if (!compareObjects(prevState.product, currState.product)) {
+      this.setProduct(product);
 
-    if (!this.elements.selector.style.display === 'none') {
-      this.showSelector();
+      if (!this.elements.selector.style.display === 'none') {
+        this.showSelector();
+      }
     }
   }
 
@@ -2909,10 +2998,11 @@ class Tools extends HTMLElement {
 
     const openProductBtn = this.querySelector(Tools.selectors.pages.products.openProduct);
     openProductBtn.addEventListener('click', () => {
-      if (this.pages.products.selected) {
+      if (this.pages.products.selected) {        
         Studio.utils.change({
           productId: this.pages.products.selected.dataset.id,
-        })
+          product: null
+        });
       }
     })
 
@@ -3154,7 +3244,7 @@ class Tools extends HTMLElement {
               localStorage.setItem('product-builder-anonim-id', Studio.anonimCustomerId);
             }
 
-            const fetchURL = baseURL + `/product-builder/drafts/uploads${Studio.customer ? `?customerId=${Studio.customer.shopify_id}` : `?anonimId=${Studio.anonimCustomerId}`}&shop=${shop}`;
+            const fetchURL = baseURL + `/product-builder/orders/uploads${Studio.customer ? `?customerId=${Studio.customer.shopify_id}` : `?anonimId=${Studio.anonimCustomerId}`}&shop=${shop}`;
   
             const response = await fetch(fetchURL, {
               method: 'POST',
@@ -3359,7 +3449,19 @@ class Panel extends HTMLElement {
           return obj;
         }, {});
 
-      this.tools.setToolsState(toSet)
+      this.tools.setToolsState(toSet);
+    }
+
+      
+    if (prevState.blockCount !== currState.blockCount) {
+      this.productInfo.setQuantity(currState.blockCount);
+
+      Studio.utils.change({
+        view: {
+          ...Studio.state.view,
+          blockCount: currState.blockCount
+        }
+      }, 'panel - blockCount: ' + currState.blockCount)
     }
   }
 
@@ -3554,7 +3656,7 @@ class EditablePicture extends HTMLElement {
 
 
     const [width, height] = this.pageConfig ? getParams() : [this.offsetWidth, this.offsetHeight];
-    const [containerWidth, containerHeight] = [Math.ceil(this.offsetWidth * 1.2), Math.ceil(this.offsetHeight * 1.2)]
+    const [containerWidth, containerHeight] = [Math.ceil(this.offsetWidth * 1.5), Math.ceil(this.offsetHeight * 1.5)]
 
     this.defaultImageUrl = imageOriginalURL + `?resize=[${width},${height}]&container=[${containerWidth},${containerHeight}]`;
 
@@ -4112,9 +4214,14 @@ class ProductControls extends HTMLElement {
     });
 
     Studio.utils.change({
+      panel: {
+        ...Studio.state.panel,
+        blockCount: Studio.state.panel.blockCount + 1
+      },
       view: {
         ...Studio.state.view,
-        blocks: newBlocks
+        blocks: newBlocks,
+        blockCount: Studio.state.panel.blockCount + 1
       }
     }, 'controls - increase');
   }
@@ -4139,9 +4246,14 @@ class ProductControls extends HTMLElement {
     });
 
     Studio.utils.change({
+      panel: {
+        ...Studio.state.panel,
+        blockCount: Studio.state.panel.blockCount - 1
+      },
       view: {
         ...Studio.state.view,
         blocks: newBlocks,
+        blockCount: Studio.state.panel.blockCount - 1
       }
     }, 'controls - decrease');
   }
@@ -4151,6 +4263,14 @@ class ProductControls extends HTMLElement {
       this.elements.decreaseQuantity.toggleAttribute('disabled');
     } else if (!isDisable && this.elements.decreaseQuantity.hasAttribute('disabled')) {
       this.elements.decreaseQuantity.toggleAttribute('disabled');
+    }
+  }
+
+  setStateIncreaseBtn(isDisable) {
+    if (isDisable && !this.elements.increaseQuantity.hasAttribute('disabled')) {
+      this.elements.increaseQuantity.toggleAttribute('disabled');
+    } else if (!isDisable && this.elements.increaseQuantity.hasAttribute('disabled')) {
+      this.elements.increaseQuantity.toggleAttribute('disabled');
     }
   }
 
@@ -5058,8 +5178,13 @@ class ViewControls extends HTMLElement {
 
     this.zoom = {
       studio: document.querySelector('studio-view'),
-      studioContainer: document.querySelector('[data-studio-view-container]')
+      studioPlayground: document.querySelector('[data-playground]'),
+      studioContainer: document.querySelector('[data-studio-view-container]'),
+      anchor: document.querySelector('[data-view-anchor]')
     }
+
+    this.studioPositionX = 0;
+    this.studioPositionY = 0;
 
     this.element.undo.addEventListener('click', () => {
       Studio.utils.history.undoState();
@@ -5069,108 +5194,166 @@ class ViewControls extends HTMLElement {
       Studio.utils.history.redoState();
     });
 
-    this.element.zoomIn.addEventListener('click', async () => {
-      this.zoom.studio.setAttribute('zoomed', true);
-      
-      this.zoom.studioContainer.style.scale = null;
-      this.zoom.studioContainer.style.translate = null;
+    this.element.zoomIn.addEventListener('click', this.zoomIn.bind(this));
 
-      this.zoom.studioContainer.style.transition = 'transform .3s, scale .3s, translate .3s';
+    this.element.zoomOut.addEventListener('click', this.zoomOut.bind(this));
 
-      const { blocks } = Studio.state.view;
+    this.mouseListener = this.studioDrag.bind(this);
 
-      let selectedElem, selected = blocks.find(block => block.selected);
-      const blockWithActiveChild = blocks.find(block => block.activeChild);
-
-      if (!selected && blockWithActiveChild) {
-        selected = blockWithActiveChild.childBlocks.find(child => child.selected);
-      }
-
-      let offsetScrollTop;
-
-      if (selected && selected.id.startsWith('block')) {
-        selectedElem = document.querySelector(StudioView.selectors.blockById(selected.id));
-        offsetScrollTop = selectedElem.offsetTop;
-      } else if (selected && selected.id.startsWith('child')) {
-        selectedElem = document.querySelector(StudioView.selectors.childBlockById(selected.id));
-        offsetScrollTop = document.querySelector(StudioView.selectors.blockById(blockWithActiveChild.id)).offsetTop;
-      } else {
+    this.zoom.studio.addEventListener('mousedown', (event) => {
+      if (!JSON.parse(this.zoom.studio.getAttribute('zoomed'))) {
         return;
       }
 
-      if (!selectedElem) {
-        return;
-      }
+      this.prevXPosition = event.clientX;
+      this.prevYPosition = event.clientY;
 
-      await new Promise(res => {
-        this.zoom.studioContainer.scrollTo({
-          top: offsetScrollTop - 35,
-          behavior: 'smooth'
-        });
+      this.zoom.studioPlayground.addEventListener('mousemove', this.mouseListener);
+    });
 
-        let same = 0;
-        let lastPos = null;
+    window.addEventListener('mouseup', () => {
+      if (!JSON.parse(this.zoom.studio.getAttribute('zoomed'))) {
+      return;
+    }
 
-        const check = () => {
-          const newPos = selectedElem.getBoundingClientRect().top;
- 
-          if (newPos === lastPos) {
-            if (same++ > 2) {
-              return res();
-            }
-          } else {
-            same = 0;
-            lastPos = newPos;
+    this.zoom.studioPlayground.removeEventListener('mousemove', this.mouseListener);
+    this.zoom.studioContainer.classList.remove('on-drag');
+    })
+  }
+
+  studioDrag(event) {
+    this.zoom.studioContainer.classList.add('on-drag');
+
+    const scale = JSON.parse(this.zoom.studioPlayground.style.scale);
+
+    const xMove = (event.clientX - this.prevXPosition) / scale;
+    const yMove = (event.clientY - this.prevYPosition) / scale;
+
+    this.studioPositionX = ((this.studioPositionX * -1) - xMove) * -1;
+    this.studioPositionY =((this.studioPositionY * -1) - yMove) * -1;
+
+    this.zoom.studioContainer.style.translate = `${this.studioPositionX}px ${this.studioPositionY}px`;
+
+    this.prevXPosition = event.clientX;
+    this.prevYPosition = event.clientY;
+  }
+
+  async zoomIn() {
+    this.zoom.studio.setAttribute('zoomed', true);
+    this.zoom.studioPlayground.style.overflow = 'hidden';
+    
+    this.zoom.studioPlayground.style.scale = null;
+    this.zoom.studioContainer.style.translate = null;
+
+    this.zoom.studioContainer.style.transition = 'transform .3s, scale .3s, translate .3s';
+    this.zoom.studioPlayground.style.transition = 'scale .3s';
+
+    const { blocks } = Studio.state.view;
+
+    let selectedElem, selected = blocks.find(block => block.selected);
+    const blockWithActiveChild = blocks.find(block => block.activeChild);
+
+    if (!selected && blockWithActiveChild) {
+      selected = blockWithActiveChild.childBlocks.find(child => child.selected);
+    }
+
+    let offsetScrollTop;
+
+    if (selected && selected.id.startsWith('block')) {
+      selectedElem = document.querySelector(StudioView.selectors.blockById(selected.id));
+      offsetScrollTop = selectedElem.offsetTop;
+    } else if (selected && selected.id.startsWith('child')) {
+      selectedElem = document.querySelector(StudioView.selectors.childBlockById(selected.id));
+      offsetScrollTop = document.querySelector(StudioView.selectors.blockById(blockWithActiveChild.id)).offsetTop;
+    } else {
+      return;
+    }
+
+    if (!selectedElem) {
+      return;
+    }
+    
+    const [offsetLeft, offsetTop] = this.getOffset(selectedElem);
+    
+    this.toScroll(offsetScrollTop - 35, selectedElem);
+    
+    const scale = this.getScale(selectedElem);
+    
+    this.zoom.studioPlayground.style.scale = scale;
+
+    this.studioPositionX = offsetLeft;
+    this.studioPositionY = offsetTop;
+
+    this.zoom.studioContainer.style.translate = `${this.studioPositionX}px ${this.studioPositionY}px`;
+
+    clearTimeout(this.untransitionTimer);
+
+    this.untransitionTimer = setTimeout(() => {
+      this.zoom.studioContainer.style.transition = null;
+      this.zoom.studioPlayground.style.transition = null;
+    }, 500);
+  
+  }
+
+  toScroll(position, selectedElem) {
+    return new Promise(res => {
+      this.zoom.studioPlayground.scrollTo({
+        top: position,
+        behavior: 'smooth'
+      });
+
+      let same = 0;
+      let lastPos = null;
+
+      const check = () => {
+        const newPos = selectedElem.getBoundingClientRect().top;
+
+        if (newPos === lastPos) {
+          if (same > 2) {
+            return res();
           }
 
-          requestAnimationFrame(check);
+          same++;
+        } else {
+          same = 0;
+          lastPos = newPos;
         }
 
         requestAnimationFrame(check);
-      })
+      }
 
-      const scale = this.getScale(selectedElem);
-
-      const [offsetLeft, offsetTop] = this.getOffset(selectedElem);
-
-      this.zoom.studioContainer.style.scale = scale;
-      this.zoom.studioContainer.style.translate = `-${(offsetLeft) * scale}px -${(offsetTop) * scale}px`;
-
-      clearTimeout(this.untransitionTimer);
-
-      this.untransitionTimer = setTimeout(() => {
-        this.zoom.studioContainer.style.transition = null;
-      }, 500);
-    });
-
-    this.element.zoomOut.addEventListener('click', this.zoomOut.bind(this));
+      requestAnimationFrame(check);
+    })
   }
 
-  zoomOut() {
+  async zoomOut() {
     this.zoom.studio.setAttribute('zoomed', false);
+    this.zoom.studioPlayground.style.overflow = null;
 
     this.zoom.studioContainer.style.transition = 'transform .3s, scale .3s, translate .3s';
+    this.zoom.studioPlayground.style.transition = 'scale .3s';
 
-    this.zoom.studioContainer.style.scale = null;
+    this.zoom.studioPlayground.style.scale = null;
     this.zoom.studioContainer.style.translate = null;
 
     clearTimeout(this.untransitionTimer);
     this.untransitionTimer = setTimeout(() => {
       this.zoom.studioContainer.style.transition = null;
+      this.zoom.studioPlayground.style.transition = null;
     }, 500);
   }
 
   getOffset(elem) {
-    const studioParams = this.zoom.studio.getBoundingClientRect();
     const containerParams = this.zoom.studioContainer.getBoundingClientRect();
+    const studioParams = this.zoom.studio.getBoundingClientRect();
 
     const elemParams = elem.getBoundingClientRect();
 
-    const coefficient = containerParams.width / studioParams.width;
+    const leftOffset = elemParams.x - studioParams.x - (elemParams.width / 2);
 
-    const left = (elemParams.x - studioParams.x - (elemParams.width / 4)) * coefficient;
-    const top = (elemParams.y - studioParams.y - (elemParams.height / 4)) * coefficient;
-
+    const left = ((containerParams.width / 2) - (elemParams.width / 2) - leftOffset);
+    const top = ((containerParams.height / 2) - (elemParams.height / 2));
+  
     return [left, top];
   }
 
@@ -5185,9 +5368,13 @@ class ViewControls extends HTMLElement {
 
     const compareSide = Math.max(elemParams.width, elemParams.height);
 
-    return compareSide === elemParams.width
-      ? +((containerParams.width / compareSide * 0.8).toFixed(2))
-      : +((containerParams.height / compareSide * 0.8).toFixed(2));
+    const compare = elemParams.width
+    ? +((containerParams.width / compareSide).toFixed(2))
+    : +((containerParams.height / compareSide).toFixed(2));
+
+    return compare > 4
+      ? compare * 0.4
+      : compare;
   }
 }
 customElements.define('view-controls', ViewControls);
@@ -5264,23 +5451,20 @@ class StudioView extends HTMLElement {
     }
 
     if (!compareObjects(prevState.blocks, currState.blocks)) {
-      const prevCounts = this.getBlocksCount(prevState.blocks);
-      const currCounts = this.getBlocksCount(currState.blocks);
-
-      if (prevState.blockCount === currState.blockCount
-        && prevCounts !== currCounts
-        && compareObjects(currState.product, prevState.product)
-      ) {
-        this.setProductElements(currState.blocks.length, currState.blocks);
-      }
-
       this.toggleSelected(prevState.blocks, currState.blocks);
 
       this.setBlocksValue(prevState.blocks, currState.blocks);
-    } 
+    }
     
     if (currState.product && prevState.blockCount !== currState.blockCount) {
-      this.setProductElements(currState.blockCount, currState.blocks);
+      const prevCounts = this.getBlocksCount(prevState.blocks);
+      const currCounts = this.getBlocksCount(currState.blocks);
+
+      let additionBlock = prevCounts && prevCounts === currCounts ? 1 : 0;
+
+      const size = currState.blockCount - (currState.blockCount - currState.blocks.length) + additionBlock;
+
+      this.setProductElements(size !== 0 ? size : currState.blockCount, currState.blocks);
     }
 
     if (currState.imagesToDownload && !compareObjects(currState.imagesToDownload, prevState.imagesToDownload)) {      
@@ -5673,7 +5857,8 @@ class StudioView extends HTMLElement {
 
     const countPerBlock = this.getBlocksCount(currBlocks);
 
-    const disableDecreaseButton = countPerBlock === this.state.blockCount;
+    const disableDecreaseButton = countPerBlock <= Studio.product.quantity.minimum;
+    const disableIncreaseButton = countPerBlock >= Studio.product.quantity.maximum;
 
     const newBlocks = currBlocks
       .map(block => {
@@ -5684,6 +5869,7 @@ class StudioView extends HTMLElement {
           elementControls.setValue(block.count);
 
           elementControls.setStateDecreaseBtn(disableDecreaseButton);
+          elementControls.setStateIncreaseBtn(disableIncreaseButton);
         }
 
         let prevSettings = {};
@@ -5771,26 +5957,21 @@ class StudioView extends HTMLElement {
               case 'editable-picture':
                 const pictureElement = this.querySelector(StudioView.selectors.childBlockById(child.id));
 
-                if (!child.imageUrl && pictureElement.hasImage()) {
+                if (!child.imageUrl && pictureElement && pictureElement.hasImage()) {
                   pictureElement.removeImage();
-                } else if (child.imageUrl && !pictureElement.hasImage()) {
+                } else if (child.imageUrl && pictureElement && !pictureElement.hasImage()) {
                   pictureElement.setImage(child.imageUrl);
                 }
 
-                pictureElement.setValue(child.settings);
+                if (pictureElement) {
+                  pictureElement.setValue(child.settings);
+                }
                 break;
             }
           })
 
         return block;
       })
-
-    Studio.utils.change({
-      view: {
-        ...this.state,
-        blocks: newBlocks
-      }
-    }, 'set childs value')
   }
 
   setSelectedBlock(block, activeChild, isBulk) {
@@ -6233,7 +6414,6 @@ class StudioView extends HTMLElement {
     let toUpdate = false;
 
     const blocksCount = this.querySelectorAll(StudioView.selectors.studioBlock).length;
-    const countPerBlock = this.getBlocksCount(blocks);
 
     if (!options.clearAll) {
       if (size > blocksCount) {

@@ -54,7 +54,7 @@ productBuilder.get('/customer', async (req, res) => {
   }
 });
  
-productBuilder.use('/drafts', orders);
+productBuilder.use('/orders', orders);
  
 productBuilder.get('/uploads/list', getCustomerUploads);
 

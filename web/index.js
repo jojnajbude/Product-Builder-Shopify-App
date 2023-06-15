@@ -636,7 +636,7 @@ app.post('/api/products', async (req, res) => {
 app.post('/api/products/update', async (req, res) => {
   const state = req.body;
 
-  const { id } = req.query; 
+  const { id } = req.query;
 
   const currType = productTypes[state.type];
 

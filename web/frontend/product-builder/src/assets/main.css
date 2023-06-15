@@ -1222,11 +1222,17 @@ product-option-selector {
   overflow: hidden;
 }
 
-.studio-view.is-zoomed .studio-view__container {
-  overflow: hidden;
+/* .studio-view.is-zoomed .studio-view__container {
+  overflow-y: visible;
+} */
+
+.studio-view.is-zoomed .studio-view__container:hover,
+.studio-view.is-zoomed .studio-view__container .studio-view__block:hover,
+.studio-view.is-zoomed .studio-view__container .product-element:hover {
+  cursor: move;
 }
 
-.studio-view__container {
+.product-builder__playground-container {
   position: absolute;
   top: 35px;
   left: 35px;
@@ -1234,12 +1240,33 @@ product-option-selector {
   bottom: 35px;
   padding: 15px;
   padding-right: 100px;
+  overflow-y: scroll;
+}
+
+.studio-view__container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 100px;
+  bottom: 0;
+  padding: 0;
   display: flex;
   align-content: flex-start;
   flex-wrap: wrap;
   gap: 25px 20px;
-  overflow-y: scroll;
-  transform-origin: 0 0;
+  overflow: visible;
+  transform-origin: 50% 50%;
+}
+
+.studio-view__container.on-drag > * {
+  pointer-events: none;
+} 
+
+.studio-view__anchor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
 }
 
 .studio-view__block {
@@ -1495,6 +1522,7 @@ error-toast {
   align-items: center;
   justify-content: center;
   max-width: 500px;
+  z-index: 1000;
 }
 
 .error-toast[show] {
@@ -1985,31 +2013,27 @@ product-prints {
   border: 1px solid #00000022;
 }
 
-.prints[print-type] {
-  width: 200px;
-}
-
-.prints[print-type="9-13"] {
+.prints[print-type="9-13"] .editable-picture {
   width: 150px;
   aspect-ratio: 9 / 13;
 }
 
-.prints[print-type="10-15"] {
+.prints[print-type="10-15"] .editable-picture {
   width: 180px;
   aspect-ratio: 10 / 15;
 }
 
-.prints[print-type="15-21"] {
+.prints[print-type="15-21"] .editable-picture {
   width: 200px;
   aspect-ratio: 15 / 21;
 }
 
-.prints[print-type="20-30"] {
+.prints[print-type="20-30"] .editable-picture {
   width: 250px;
   aspect-ratio: 20 / 30;
 }
 
-.prints[print-type="30-40"] {
+.prints[print-type="30-40"] .editable-picture {
   width: 300px;
   aspect-ratio: 30 / 40;
 }
@@ -2020,21 +2044,20 @@ product-canvas {
 }
 
 .canvas {
-  width: 300px;
   border: 1px solid #00000022
 }
 
-.canvas[print-type="30-40"] {
+.canvas[print-type="30-40"] .editable-picture {
   width: 500px;
   aspect-ratio: 3 / 4;
 }
 
-.canvas[print-type="30-30"] {
+.canvas[print-type="30-30"] .editable-picture {
   width: 500px;
   aspect-ratio: 1 / 1;
 }
 
-.canvas[print-type="40-40"] {
+.canvas[print-type="40-40"] .editable-picture {
   width: 750px;
   aspect-ratio: 1 / 1;
 }
