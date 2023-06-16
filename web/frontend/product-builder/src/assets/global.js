@@ -57,7 +57,7 @@ function getResolution(width, height) {
 const subscribeToActionController = ActiveActionsController();
 
 (function() {
-  let counter = 0;
+  window.blockCounter = 0;
 
   const getCode = (l) => {
     let result = '';
@@ -86,11 +86,11 @@ const subscribeToActionController = ActiveActionsController();
   }
 
   const childBlock = () => {
-    return 'childBlock-' + counter++;
+    return 'childBlock-' + window.blockCounter++;
   }
 
   const block = () => {
-    return 'block-' + counter++;
+    return 'block-' + window.blockCounter++;
   }
 
   window.uniqueID = {
@@ -365,6 +365,8 @@ class ProductBuilder extends HTMLElement {
     }
 
     if (prevState.productId !== currState.productId && !currState.product) {
+      this.studioView.clearViewSync();
+
       this.getProduct(currState.productId)
         .then(product => {
           switch(product.type.id) {
@@ -561,6 +563,18 @@ class ProductBuilder extends HTMLElement {
     if (this.product && !compareObjects(prevState.view.blocks, currState.view.blocks)) {
       const { blocks } =  currState.view;
 
+      if (!this.orderId && !productParams.get('order-id')) {
+        const someImages = blocks.some(block => block.childBlocks.some(child => child.imageUrl));
+
+        if (someImages) {
+          this.createOrder().then(order => {
+            this.orderId = order.id;
+
+            this.setOrderPath();
+          })
+        }
+        console.log('here', someImages);
+      }
 
       const selectedBlock = blocks.find(block => block.selected);
       const blockWithActiveChild = blocks.find(block => block.activeChild);
@@ -768,28 +782,17 @@ class ProductBuilder extends HTMLElement {
     const anonimOrderId = localStorage.getItem('product-builder-anonim-order-state');
 
     if (!this.anonimCustomerId) {
-      if (!productParams.get('order-id')) {
-        this.orderId = await this.createOrder();
-
-        console.log(this.orderId);
-
-        const nextURL = location.origin + location.pathname + `?order-id=${this.orderId}`;
-        const nextTitle = document.title;
-        const nextState = { additionalInformation: 'Product builder with order history' };
-
-        window.history.replaceState(nextState, nextTitle, nextURL);
-      } else if (productParams.get('order-id')) {
+      if (productParams.get('order-id')) {
         this.orderId = productParams.get('order-id');
   
         const state = await this.getOrderState(this.orderId);
-  
-        console.log(state);
   
         if (!state.error) {
           Studio.utils.change(state);
         } else {
           this.orderId = await this.createOrder();
-          localStorage.setItem('product-builder-order-id', this.orderId);
+
+          this.setOrderPath();
         }
       }
     } else if (anonimOrderId) {
@@ -800,8 +803,6 @@ class ProductBuilder extends HTMLElement {
         Studio.utils.change(state);
       })
     }
-
-    this.draft.customer = customer;
 
     window.oauthInstagram = JSON.parse(localStorage.getItem('oauthInstagram'));
 
@@ -832,7 +833,31 @@ class ProductBuilder extends HTMLElement {
       return;
     }
 
-    return fetch(`product-builder/orders/create?id=${id}`).then(res => res.text());
+    return fetch(`product-builder/orders/create?id=${id}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(Studio.state)
+    }).then(res => res.json());
+  }
+
+  setOrderPath() {
+    const nextURL = location.origin + location.pathname + `?order-id=${this.orderId}`;
+    const nextTitle = document.title;
+    const nextState = { additionalInformation: 'Product builder with order history' };
+
+    window.history.replaceState(nextState, nextTitle, nextURL);
+  }
+
+  defaultBuilderPath() {
+    const nextURL = location.origin + location.pathname;
+    const nextTitle = document.title;
+    const nextState = { additionalInformation: 'Product builder with order history' };
+
+    this.orderId = null;
+
+    window.history.pushState(nextState, nextTitle, nextURL);
   }
 
   async getOrderState(id) {
@@ -844,7 +869,7 @@ class ProductBuilder extends HTMLElement {
       return;
     }
 
-    return fetch(`product-builder/orders/${id}?id=${customerId}`).then(res => {
+    return fetch(`product-builder/orders/state/${id}?id=${customerId}`).then(res => {
       return res.json();
     });
   }
@@ -2998,10 +3023,14 @@ class Tools extends HTMLElement {
 
     const openProductBtn = this.querySelector(Tools.selectors.pages.products.openProduct);
     openProductBtn.addEventListener('click', () => {
-      if (this.pages.products.selected) {        
+      if (this.pages.products.selected) {     
+        Studio.defaultBuilderPath();
+
         Studio.utils.change({
           productId: this.pages.products.selected.dataset.id,
-          product: null
+          product: null,
+          panel: globalState.panel,
+          view: globalState.view
         });
       }
     })
@@ -6286,6 +6315,10 @@ class StudioView extends HTMLElement {
   }
 
   clearViewSync(size, toRemove) {
+    if (!this.elements || !this.elements.container) {
+      return;
+    }
+
     const blocks =  this.elements.container.querySelectorAll(StudioView.selectors.studioBlock);
 
     if (!size && toRemove && Array.isArray(toRemove)) {

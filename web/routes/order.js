@@ -2,9 +2,8 @@ import { Router, json } from 'express';
 import multer from "multer";
 import fs from 'fs';
 
-import { getCustomer } from '../controllers/order.js';
+import { createOrder, getCustomer, getOrderInfo, getOrderPath, getOrderState, updateOrder } from '../controllers/order.js';
 
-import makeCode from '../utils/makeCode.js';
 import { join } from 'path';
 import { shopifyApp } from '@shopify/shopify-app-express';
 
@@ -58,122 +57,9 @@ const cdnPath = join(process.cwd(), 'frontend', 'product-builder', 'src', 'uploa
 
 const orders = Router();
 
-orders.get('/', (req, res) => {
-  res.sendStatus(201);
-});
+orders.post('/create', json(), getOrderPath, createOrder);
 
-
-orders.get('/create', async (req, res) => {
-  const { id, shop } = req.query;
-
-  if (!id) {
-    res.send({
-      error: {
-        message: 'Id or anonimId has not provided'
-      }
-    });
-  }
-
-  const isLoggedCustomer = fs.existsSync(join(cdnPath, shop, id));
-
-  const isAnoninCustomer = isLoggedCustomer
-    ? false
-    : fs.existsSync(join(cdnPath, shop, 'anonims', id));
-
-  if (!isLoggedCustomer && !isAnoninCustomer) {
-    res.send({
-      error: {
-        message: "User's id doesn't exists"
-      }
-    })
-  }
-
-  const createdAt = Date.now();
-
-  const orderId = `draft-${createdAt}-${makeCode(5)}`;
-
-  const ordersPath = isLoggedCustomer
-    ? join(cdnPath, shop, id, 'orders', orderId)
-    : join(cdnPath, shop, 'anonims', id, 'orders', orderId);
-
-  const isExist = fs.existsSync(ordersPath);
-
-  if (isExist) {
-    res.send({
-      error: {
-        message: 'Order is exists'
-      }
-    })
-  }
-
-  fs.mkdirSync(ordersPath);
-
-  fs.writeFileSync(join(ordersPath, 'state.json'), '{}');
-  fs.writeFileSync(join(ordersPath, 'info.json'), JSON.stringify({
-    id: orderId,
-    createdAt: createdAt,
-    updatedAt: createdAt
-  }));
-
-  res.send(orderId);
-});
-
-orders.post('/update/:id', json(), async (req, res) => {
-  const { id: orderId } = req.params;
-  const { id: customerId, shop } = req.query;
-
-  if (!customerId) {
-    res.send({
-      error: {
-        message: 'Id or anonimId has not provided'
-      }
-    });
-    return;
-  }
-
-  const isLoggedCustomer = fs.existsSync(join(cdnPath, shop, customerId));
-
-  const isAnoninCustomer = isLoggedCustomer
-    ? false
-    : fs.existsSync(join(cdnPath, shop, 'anonims', customerId));
-
-  if (!isLoggedCustomer && !isAnoninCustomer) {
-    res.send({
-      error: {
-        message: "User's id doesn't exists"
-      }
-    });
-    return;
-  }
-
-  const ordersPath = isLoggedCustomer
-    ? join(cdnPath, shop, customerId, 'orders', orderId)
-    : join(cdnPath, shop, 'anonims', customerId, 'orders', orderId);
-
-  const statePath = join(ordersPath, 'state.json');
-  const infoPath = join(ordersPath, 'info.json');
-
-  const state = req.body;
-
-  const info = JSON.parse(fs.readFileSync(infoPath));
-
-  const { product } = state;
-
-  console.log(product);
-
-  if (product) {
-    const { imageUrl, handle, type, title, status, shopify_id } = product;
-
-    info.product = { imageUrl, handle, type, title, status, shopify_id };
-  }
-
-  info.updatedAt = Date.now();
-
-  fs.writeFileSync(statePath, JSON.stringify(state));
-  fs.writeFileSync(infoPath, JSON.stringify(info));
-
-  res.send(200); 
-})
+orders.post('/update/:orderId', json(), getOrderPath, updateOrder)
 
 orders.get('/list/:customerId', (req, res) => {
   const { customerId } = req.params;
@@ -183,7 +69,7 @@ orders.get('/list/:customerId', (req, res) => {
   if (!customerId) {
     res.send({
       error: {
-        message: 'Id or anonimId has not provided'
+        message: 'Id or anonimId has not provided' 
       }
     });
     return;
@@ -205,66 +91,51 @@ orders.get('/list/:customerId', (req, res) => {
   }
 
   const ordersPath = isLoggedCustomer
-    ? join(cdnPath, shop, customerId, 'orders', orderId)
-    : join(cdnPath, shop, 'anonims', customerId, 'orders', orderId);
+    ? join(cdnPath, shop, customerId, 'orders')
+    : join(cdnPath, shop, 'anonims', customerId, 'orders');
+
+  const orders = fs.readdirSync(ordersPath, { withFileTypes: true })
+    .filter(dir => dir.name.startsWith('draft'))
+    .map(dir => {
+      const infoPath = join(ordersPath, dir.name, 'info.json');
+      const isExistInfo = fs.existsSync(infoPath)
+
+      if (isExistInfo) {
+        return fs.readFileSync(infoPath);
+      }
+
+      return false;
+    }).filter(buff => buff)
+    .map(buff => JSON.parse(buff));
+
+  res.setHeader('Content-Type', 'application/json');
+
+  res.send(orders);
 });
 
-orders.get('/info/:orderId', (req, res)   => {
-  const { orderId } = req.params;
+orders.get('/info/:orderId', getOrderPath, getOrderInfo);
 
-  console.log(orderId, req.query);
+orders.get('/state/:orderId', getOrderPath, getOrderState);
 
-  res.send(id);
-});
+orders.delete('/delete/:orderId', getOrderPath, (req, res) => {
+  const orderPath = req.ordersPath;
 
-orders.get('/:id', async (req, res) => {
-  const { id: orderId } = req.params;
-  const { id: customerId, shop } = req.query;
-
-  if (!customerId) {
-    res.send({
-      error: {
-        message: 'Id or anonimId has not provided'
-      }
-    });
-    return;
-  }
-
-  const isLoggedCustomer = fs.existsSync(join(cdnPath, shop, customerId));
-
-  const isAnoninCustomer = isLoggedCustomer
-    ? false
-    : fs.existsSync(join(cdnPath, shop, 'anonims', customerId));
-
-  if (!isLoggedCustomer && !isAnoninCustomer) {
-    res.send({
-      error: {
-        message: "User's id doesn't exists"
-      }
-    });
-    return;
-  }
-
-  const ordersPath = isLoggedCustomer
-    ? join(cdnPath, shop, customerId, 'orders', orderId)
-    : join(cdnPath, shop, 'anonims', customerId, 'orders', orderId);
-
-
-  const isExist = fs.existsSync(ordersPath, 'state.json');
+  const isExist = fs.existsSync(orderPath);
 
   if (!isExist) {
     res.send({
       error: {
-        message: 'No such order in directory'
+        message: "Order's id is incorrect, can't to delete order"
       }
-    });
-    return;
+    })
   }
 
-  const state = fs.readFileSync(join(ordersPath, 'state.json'));
+  fs.rmSync(orderPath, { recursive: true });
 
-  res.send(state);
-})
+  res.send({
+    correct: 'Deleted'
+  });
+}) 
 
 orders.post('/uploads', imageUpload.single('images'), (req, res) => {
   const file = req.file;
@@ -285,8 +156,10 @@ orders.post('/uploads', imageUpload.single('images'), (req, res) => {
   }  
 });
 
-orders.use('/*', () => {
-  res.sendStatus(400);
-})
+orders.get('/*', (req, res) => {
+  res.setHeader('Content-Type', 'application/liquid');
+
+  res.sendFile(join(process.cwd(), 'frontend', 'product-builder/src', 'orders.liquid'));
+});
 
 export default orders; 

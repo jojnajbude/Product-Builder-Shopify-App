@@ -1,0 +1,122 @@
+<script src="./assets/orders.js" defer></script>
+<link rel="stylesheet" href="./assets/orders.css">
+
+<div class="page-width orders">
+  <div class="orders__heading">
+    <h1 class="orders__title">My saved drafts</h1>
+
+    <div class="orders__subheading text">
+      <p>
+        Find here your saved designs and not already added to the basket.
+      </p>
+      <p>For products already ordered, find them in “My account”.</p>
+    </div>
+  </div>
+
+  <ul class="orders__list is-loading" data-drafts-list="{{ customer.id }}">
+    <li class="order">
+      <div class="order__info">
+        <div 
+          class="order__image skeleton-frame" 
+        >
+        <div class="skeleton-block" style="border-radius: 10px;"></div>
+        </div>
+        <div class="order__subinfo">
+          <div class="order__title skeleton-frame" style="width: 100px; height: 30px">
+            <div class="skeleton-block"></div>
+          </div>
+          <div class="text skeleton-frame" style="width: 168px; height: 25px;">
+            <div class="skeleton-block"></div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="order__line"></div>
+      
+      <div class="order__button-group">
+        <div class="skeleton-frame skeleton-button">
+          <div class="skeleton-block"></div>
+        </div>
+        
+        <div class="skeleton-frame skeleton-button">
+          <div class="skeleton-block"></div>
+        </div>
+      </div>
+    </li>
+
+    <li class="order">
+      <div class="order__info">
+        <div 
+          class="order__image skeleton-frame" 
+        >
+        <div class="skeleton-block" style="border-radius: 10px;"></div>
+        </div>
+        <div class="order__subinfo">
+          <div class="order__title skeleton-frame" style="width: 100px; height: 30px">
+            <div class="skeleton-block"></div>
+          </div>
+          <div class="text skeleton-frame" style="width: 168px; height: 25px;">
+            <div class="skeleton-block"></div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="order__line"></div>
+      
+      <div class="order__button-group">
+        <div class="skeleton-frame skeleton-button">
+          <div class="skeleton-block"></div>
+        </div>
+        
+        <div class="skeleton-frame skeleton-button">
+          <div class="skeleton-block"></div>
+        </div>
+      </div>
+    </li>
+
+    <li class="order">
+      <div class="order__info">
+        <div 
+          class="order__image skeleton-frame" 
+        >
+        <div class="skeleton-block" style="border-radius: 10px;"></div>
+        </div>
+        <div class="order__subinfo">
+          <div class="order__title skeleton-frame" style="width: 100px; height: 30px">
+            <div class="skeleton-block"></div>
+          </div>
+          <div class="text skeleton-frame" style="width: 168px; height: 25px;">
+            <div class="skeleton-block"></div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="order__line"></div>
+      
+      <div class="order__button-group">
+        <div class="skeleton-frame skeleton-button">
+          <div class="skeleton-block"></div>
+        </div>
+        
+        <div class="skeleton-frame skeleton-button">
+          <div class="skeleton-block"></div>
+        </div>
+      </div>
+    </li>
+  </ul>
+
+  <div class="orders__actions">
+    <a class="button button--card-product" href="/apps/product-builder">
+      <span>Add more products</span>
+
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="6" cy="5.99976" r="6" fill="#FF8714"/>
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M6.45669 3.49976C6.45669 3.22361 6.23284 2.99976 5.95669 2.99976C5.68055 2.99976 5.45669 3.22361 5.45669 3.49976V5.45672H3.5C3.22386 5.45672 3 5.68057 3 5.95672C3 6.23286 3.22386 6.45672 3.5 6.45672H5.45669V8.41355C5.45669 8.68969 5.68055 8.91355 5.95669 8.91355C6.23284 8.91355 6.45669 8.68969 6.45669 8.41355V6.45672H8.41379C8.68994 6.45672 8.91379 6.23286 8.91379 5.95672C8.91379 5.68057 8.68994 5.45672 8.41379 5.45672H6.45669V3.49976Z" fill="white"/>
+      </svg>
+    </a>
+  </div>
+</div>
+
+<confirm-modal state="close">
+      
+</confirm-modal>
