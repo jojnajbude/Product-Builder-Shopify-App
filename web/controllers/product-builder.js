@@ -320,5 +320,5 @@ const cropImage = async (file, crop, background) => {
   }
 
   return file
-} 
+}
   

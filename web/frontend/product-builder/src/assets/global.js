@@ -310,7 +310,7 @@ const compareObjects = (obj1, obj2) => {
   return JSON.stringify(obj1) === JSON.stringify(obj2);
 }
 
-const productParams = new URLSearchParams(location.search); 
+let productParams = new URLSearchParams(location.search); 
 
 class ProductBuilder extends HTMLElement {
   static selectors = {
@@ -369,22 +369,9 @@ class ProductBuilder extends HTMLElement {
 
       this.getProduct(currState.productId)
         .then(product => {
-          switch(product.type.id) {
-            case 'puzzle':
-              Puzzle.puzzleSvg()
-                .then(svg => {
-                  this.productSvgTemplate = svg;
-                  Studio.utils.change({
-                    product: product
-                  })
-                });
-              break;
-            default:
-              Studio.utils.change({
-                product: product
-              })
-              break;
-          }
+          Studio.utils.change({
+            product: product
+          })
         });
 
       return;
@@ -563,17 +550,18 @@ class ProductBuilder extends HTMLElement {
     if (this.product && !compareObjects(prevState.view.blocks, currState.view.blocks)) {
       const { blocks } =  currState.view;
 
-      if (!this.orderId && !productParams.get('order-id')) {
+      if (!this.orderId && !productParams.get('order-id') && !this.orderCreating) {
         const someImages = blocks.some(block => block.childBlocks.some(child => child.imageUrl));
 
         if (someImages) {
+          this.orderCreating = true;
           this.createOrder().then(order => {
             this.orderId = order.id;
 
             this.setOrderPath();
+            this.orderCreating = false;
           })
         }
-        console.log('here', someImages);
       }
 
       const selectedBlock = blocks.find(block => block.selected);
@@ -667,7 +655,7 @@ class ProductBuilder extends HTMLElement {
           ...JSON.parse(Studio.panel.getAttribute('state')),
           tools: updatedTools
         }
-      });
+      }, 'product builder - set tools');
 
       return;
     }
@@ -685,7 +673,7 @@ class ProductBuilder extends HTMLElement {
         ...JSON.parse(Studio.panel.getAttribute('state')),
         tools: updatedTools
       }
-    });
+    }, 'produt builder - set tools for block');
   }
 
   downloadFacebookAPI() {
@@ -883,12 +871,23 @@ class ProductBuilder extends HTMLElement {
       return;
     }
 
+    const stateToSave = {
+      ...Studio.state,
+      imagesToDownload: null,
+      view: {
+        ...Studio.state.view,
+        imagesToDownload: null
+      }
+    };
+
+    console.log(stateToSave);
+
     return fetch(`product-builder/orders/update/${id}?id=${customerId}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(Studio.state)
+      body: JSON.stringify(stateToSave)
     });
   }
 
@@ -955,6 +954,7 @@ const utils = {
       }
     
       let history = JSON.parse(historyString);
+      let prevHistory = [ ...history ];
   
       if (utils.history.position === history.length && !compareObjects(history.at(-1), Studio.state)) {
         history.push(Studio.state);
@@ -973,8 +973,7 @@ const utils = {
   
       localStorage.setItem('product-builder-history', JSON.stringify(history));
 
-      if (Studio.customer && !Studio.anonimCustomerId && Studio.orderId && Studio.inited) {
-        console.log('save');
+      if (Studio.customer && !Studio.anonimCustomerId && Studio.orderId && Studio.inited && history.length > 1) {
         Studio.updateOrder(Studio.orderId);
       } else if (Studio.anonimCustomerId && Studio.inited) {
         localStorage.setItem('product-builder-anonim-order-state', JSON.stringify(Studio.state));
@@ -1433,7 +1432,7 @@ class ProductInfo extends HTMLElement {
           ...JSON.parse(Studio.panel.getAttribute('state')),
           blockCount: event.detail.value
         }
-      });
+      }, 'set blockCount by event');
     }).bind(this));
 
     this.parent = this.parentNode;
@@ -1524,6 +1523,7 @@ class ProductInfo extends HTMLElement {
       view: {
         ...JSON.parse(Studio.studioView.getAttribute('state')),
         product: { type, settings, shopify_id, handle, quantity },
+        blocks: [],
         blockCount
       }
     }, 'product-info');
@@ -1865,7 +1865,7 @@ class LayoutTool extends Tool {
             }
           }
         }
-      });
+      }, 'layout tool');
     }
 
     const unselect = () => {
@@ -1902,7 +1902,7 @@ class LayoutTool extends Tool {
           }
         }
       }
-    })
+    }, 'layout tool - reset')
   }
 }
 
@@ -2226,7 +2226,7 @@ class TextTool extends Tool {
                 }
               }
             }
-          })
+          }, 'text tool')
         break;
       }
 
@@ -2246,7 +2246,7 @@ class TextTool extends Tool {
           }
         }
       }
-    })    
+    }, 'font style changed')    
   }
 
   onFontChange() {
@@ -2261,7 +2261,7 @@ class TextTool extends Tool {
           }
         }
       }
-    })
+    }, 'font change')
   }
 
   onTextInput() {
@@ -2301,7 +2301,7 @@ class TextTool extends Tool {
           }
         }
       }
-    })
+    }, 'text tool - on text input')
   }
 
   getStateValue(state) {
@@ -2375,7 +2375,7 @@ class TextTool extends Tool {
           }
         }
       }
-    })
+    }, 'text tool - reset')
   }
 }
 
@@ -2426,7 +2426,7 @@ class RotateTool extends Tool {
           }
         }
       }
-    })
+    }, 'rotate tool - reset')
   }
 
   setContent() {
@@ -2494,7 +2494,7 @@ class RotateTool extends Tool {
             }
           }
         }
-      })
+      }, 'rotate tool - set value')
     })
 
     wrapper.append(againstClock, slider.container, byClock);
@@ -2547,7 +2547,7 @@ class CropTool extends Tool {
           }
         }
       }
-    })
+    }, 'crop tool - reset')
   }
 
   setContent() {
@@ -2608,7 +2608,7 @@ class CropTool extends Tool {
             }
           }
         }
-      })
+      }, 'crop tool - set value')
     })
 
     wrapper.append(slider.container, cropValue.container);
@@ -2727,7 +2727,7 @@ class BackgroundColorTool extends Tool {
                 }
               }
             }
-          });
+          }, 'background tool - set value');
         })
 
         return button;
@@ -2805,7 +2805,7 @@ class BackgroundColorTool extends Tool {
           }
         }
       }
-    })
+    }, 'background tool - reset')
   }
 }
 
@@ -3026,12 +3026,16 @@ class Tools extends HTMLElement {
       if (this.pages.products.selected) {     
         Studio.defaultBuilderPath();
 
+        console.log(globalState.view);
+
+        productParams = new URLSearchParams(location.search);
+
         Studio.utils.change({
           productId: this.pages.products.selected.dataset.id,
           product: null,
-          panel: globalState.panel,
-          view: globalState.view
-        });
+          panel: {},
+          view: {}
+        }, 'product change');
       }
     })
 
@@ -3368,7 +3372,7 @@ class Tools extends HTMLElement {
     Studio.utils.change({ panel: {
       ...JSON.parse(Studio.panel.getAttribute('state')),
       tools: editStateTools
-    }})
+    }}, 'init edit page')
   }
 
   setToolsState(tools) {
@@ -3415,7 +3419,7 @@ class Tools extends HTMLElement {
       return [...arr, ...editablePictures ];
     }, []);
 
-    const imagesToSet = [...Studio.uploaded.map(upload => baseURL + '/' + upload.original)]
+    const imagesToSet = [...Studio.uploaded.map(upload => upload.original)]
       .slice(0, childs.length)
       .map((image, idx) => {
         const child = childs[idx];
@@ -3528,6 +3532,16 @@ class EditablePicture extends HTMLElement {
     </div>
   `;
 
+  static defaultValue = {
+    crop: CropTool.defaultValue,
+    rotate: RotateTool.defaultValue,
+    backgroundColor: {
+      value: BackgroundColorTool.defaultValue.value
+    }
+  }
+
+  static ToolsList = ['rotate', 'crop', 'filter'];
+
   static selectors = {
     emptyState: '[data-empty-state]'
   }
@@ -3623,6 +3637,7 @@ class EditablePicture extends HTMLElement {
   
   
   setImage(imageUrl) {
+    console.log(imageUrl);
     if (this.image) {
       this.oldImage = this.image;
       this.oldImage.remove();
@@ -3788,6 +3803,10 @@ class EditablePicture extends HTMLElement {
 customElements.define('editable-picture', EditablePicture);
 
 class EditableText extends HTMLElement {
+  static defaultValue = TextTool.defaultValue;
+
+  static ToolList = ['text'];
+
   constructor() {
     super();
 
@@ -4217,7 +4236,7 @@ class ProductControls extends HTMLElement {
         ...Studio.state.view,
         blocks: newBlocks
       }
-    })
+    }, 'remove picture')
   }
 
   increaseQuantity() {
@@ -4859,7 +4878,7 @@ class Prints extends ProductElement {
 
     this.controls = ProductControls.createBlockControls(this.getAttribute('block'));
 
-    this.setAttribute('block-type', 'prints');
+    // this.setAttribute('block-type', 'prints');
 
     if (!this.hasAttribute('background-color')) {
       this.setAttribute('background-color', '#fff');
@@ -5003,11 +5022,13 @@ class PolaroidPrints extends Prints {
       }
     }
 
-    this.editablePictures = block.childBlocks
+    if (block) {
+      this.editablePictures = block.childBlocks
       .filter(child => child.type === 'editable-picture');
     
-    this.editableText = block.childBlocks
-      .filter(child => child.type === 'text');
+      this.editableText = block.childBlocks
+        .filter(child => child.type === 'text');
+    }
   }
 
   setBackgroundColor() {
@@ -5047,8 +5068,6 @@ class Puzzle extends ProductElement {
 
   constructor() {
     super();
-
-    this.svgTemplate = Studio.productSvgTemplate;
   }
 
   connectedCallback() {
@@ -5089,7 +5108,10 @@ class Puzzle extends ProductElement {
       svgContainer.style.backgroundImage = `url(${reader.result})`;
     }
 
-    reader.readAsDataURL(this.svgTemplate);
+    Puzzle.puzzleSvg()
+      .then(blob => {
+        reader.readAsDataURL(blob);
+      })
 
     const editableQuery = this.editableQuery(this.editablePictures);
 
@@ -5474,7 +5496,7 @@ class StudioView extends HTMLElement {
       this.clearViewSync();
 
       if (prevState.blockCount === currState.blockCount) {
-        this.setProductElements(currState.blockCount, currState.blocks);
+        // this.setProductElements(currState.blockCount, []);
       }
 
     }
@@ -5483,6 +5505,8 @@ class StudioView extends HTMLElement {
       this.toggleSelected(prevState.blocks, currState.blocks);
 
       this.setBlocksValue(prevState.blocks, currState.blocks);
+
+      this.setProductElements(currState.blockCount, currState.blocks);
     }
     
     if (currState.product && prevState.blockCount !== currState.blockCount) {
@@ -5493,7 +5517,11 @@ class StudioView extends HTMLElement {
 
       const size = currState.blockCount - (currState.blockCount - currState.blocks.length) + additionBlock;
 
-      this.setProductElements(size !== 0 ? size : currState.blockCount, currState.blocks);
+      if (compareObjects(prevState.product, currState.product)) {
+        this.setProductElements(currState.blockCount, currState.blocks);
+      } else {
+        this.setProductElements(currState.blockCount, []);
+      }
     }
 
     if (currState.imagesToDownload && !compareObjects(currState.imagesToDownload, prevState.imagesToDownload)) {      
@@ -5512,7 +5540,6 @@ class StudioView extends HTMLElement {
       .forEach(({ pictureIds, imageUrl }) => {
         pictureIds.forEach(pictureId => {
           const picture = this.querySelector(StudioView.selectors.childBlockById(pictureId));
-    
           if (picture) {
             picture.setImage(imageUrl);
           }
@@ -5861,6 +5888,7 @@ class StudioView extends HTMLElement {
   }
 
   setBlocksValue(prevBlocks, currBlocks) {
+    console.log('here');
     const initiateNewChildren = (element, selectedChildrenIds, prevChildrens) => {
       if (!element) {
         return;
@@ -5981,10 +6009,16 @@ class StudioView extends HTMLElement {
               case 'text':
                 const textElement = this.querySelector(StudioView.selectors.childBlockById(child.id));
 
-                textElement.setValue(child.settings.text);
+                if (textElement) {
+                  textElement.setValue(child.settings.text);
+                }
                 break;
               case 'editable-picture':
                 const pictureElement = this.querySelector(StudioView.selectors.childBlockById(child.id));
+                
+                if (!pictureElement) {
+                  break;
+                }
 
                 if (!child.imageUrl && pictureElement && pictureElement.hasImage()) {
                   pictureElement.removeImage();
@@ -6052,7 +6086,7 @@ class StudioView extends HTMLElement {
         ...JSON.parse(this.getAttribute('state')),
         blocks: newBlocks
       }
-    });
+    }, 'set selected blocks');
   }
 
   setSelectedChild(child, isBulk) {
@@ -6145,7 +6179,7 @@ class StudioView extends HTMLElement {
         ...JSON.parse(this.getAttribute('state')),
         blocks: newBlocksList
       }
-    })
+    }, 'set selected child')
   }
 
   initEventListeners() {
@@ -6207,56 +6241,77 @@ class StudioView extends HTMLElement {
     this.elements.container.append(block);
   }
 
-  createPrint(productHandle) {
-    const block = this.createStudioBlock('product-prints');
+  createPrint(block, productHandle) {
+    const { id, type, settings } = block;
+
+    const studioBlock = this.createStudioBlock('product-prints');
 
     const print = document.createElement('product-prints');
     
     this.blockClickedListener(print);
 
-    const type = Prints.printTypes.find(type => productHandle.includes(type));
+    const printType = Prints.printTypes.find(ftype => productHandle.includes(ftype));
 
-    if (type) {
-      print.setAttribute('print-type', type);
+    if (printType) {
+      print.setAttribute('print-type', printType);
     }
 
-    block.append(print);
-
-    this.elements.container.append(block);
+    print.setAttribute('block', id);
+    print.setAttribute('block-type', type);
+    
+    print.setValue(settings, block);
+    
+    studioBlock.append(print);
+    
+    this.elements.container.append(studioBlock);
   }
 
-  createCanvas(productHandle) {
-    const block = this.createStudioBlock('product-canvas');
+  createCanvas(block, productHandle) {
+    const { id, type, settings } = block;
+    const studioBlock = this.createStudioBlock('product-canvas');
 
     const canvas = document.createElement('product-canvas');
     
     this.blockClickedListener(canvas);
 
-    const type = Canvas.printTypes.find(type => productHandle.includes(type));
+    const canvasType = Canvas.printTypes.find(type => productHandle.includes(type));
 
     if (type) {
-      canvas.setAttribute('print-type', type);
+      canvas.setAttribute('print-type', canvasType);
     }
 
-    block.append(canvas);
+    canvas.setAttribute('block', id);
+    canvas.setAttribute('block-type', type);
 
-    this.elements.container.append(block);
+    canvas.setValue(settings, block);
+    
+    studioBlock.append(canvas);
+    
+    this.elements.container.append(studioBlock);
   }
 
-  createPolaroidPrints() {
-    const block = this.createStudioBlock('polaroid-prints');
+  createPolaroidPrints(block) {
+    const { id, type, settings } = block;
+
+    const studioBlock = this.createStudioBlock('polaroid-prints');
 
     const polaroid = document.createElement('polaroid-prints');
 
+    polaroid.setAttribute('block', id);
+    polaroid.setAttribute('block-type', type);
+
     this.blockClickedListener(polaroid);
-
-    block.append(polaroid);
-
-    this.elements.container.append(block);
+    
+    studioBlock.append(polaroid);
+    polaroid.setValue(settings, block);
+    
+    this.elements.container.append(studioBlock);    
   }
 
-  createPuzzle(productHandle) {
-    const block = this.createStudioBlock('product-puzzle');
+  createPuzzle(block, productHandle) {
+    const { id, type, settings } = block;
+
+    const studioBlock = this.createStudioBlock('product-puzzle');
 
     const puzzle = document.createElement('product-puzzle');
     
@@ -6268,29 +6323,40 @@ class StudioView extends HTMLElement {
       puzzle.setAttribute('puzzle-type', puzzleType);
     }
 
-    block.append(puzzle);
-
-    this.elements.container.append(block);
+    puzzle.setAttribute('block', id);
+    puzzle.setAttribute('block-type', type);
+    
+    puzzle.setValue(settings,block);
+    
+    studioBlock.append(puzzle);
+    
+    this.elements.container.append(studioBlock);
   }
 
-  createMagnets(productHandle) {
-    const block = this.createStudioBlock('product-magnet');
+  createMagnets(block, productHandle) {
+    const { id, type, settings } = block;
+    const studioBlock = this.createStudioBlock('product-magnet');
 
     const magnet = document.createElement('product-magnet');
 
     this.blockClickedListener(magnet);
 
-    block.append(magnet);
+    studioBlock.append(magnet);
 
-    const type = productHandle.includes('heart')
+    const MagnetType = productHandle.includes('heart')
       ? 'heart'
       : productHandle.includes('circle')
         ? 'circle'
         : 'square';
 
-    magnet.setAttribute('magnet-type', type);
+    magnet.setAttribute('magnet-type', MagnetType);
 
-    this.elements.container.append(block);
+    magnet.setAttribute('block', id);
+    magnet.setAttribute('block-type', type);
+
+    magnet.setValue(settings, block);
+    
+    this.elements.container.append(studioBlock);
   }
 
   blockClickedListener(element, callback) {
@@ -6332,12 +6398,19 @@ class StudioView extends HTMLElement {
     if (!size) {
       blocks.forEach(block => block.remove());
     } else {
-      blocks
+      const newBlocks = blocks
         .forEach((block, idx) => {
           if (idx >= size) {
             block.remove();
           }
         })
+
+      Studio.utils.change({
+        view: {
+          ...this.state,
+          blocks: []
+        }
+      }, 'clear view sync')
     }
   }
 
@@ -6394,6 +6467,121 @@ class StudioView extends HTMLElement {
       }, 0) || 0;
   }
 
+  getBlocksJSON() {
+    const { product } = JSON.parse(this.getAttribute('state'));
+
+    let type;
+    let childList;
+
+    switch (product.type.id) {
+      case 'photobook':
+        type = 'photobook-page';
+        childList = [];
+        break;
+      case 'prints':
+        if (product.handle.includes('polaroid')) {
+          type = 'polaroid';
+          childList = ['editable-picture', 'text'];
+        } else {
+          type = 'prints'
+          childList = ['editable-picture'];
+        }
+        break;
+      case 'puzzle':
+        type = 'puzzle';
+        childList = ['editable-picture'];
+        break;
+      case 'canvas':
+        type = 'canvas';
+        childList = ['editable-picture'];
+        break;
+      case 'magnets':
+        type = 'magnet';
+        childList = ['editable-picture'];
+        break;
+      case 'boxes':
+        if (product.handle.includes('polaroid')) {
+          type = 'polaroid';
+          childList = ['editable-picture', 'text'];
+        } else {
+          type = 'prints';
+          childList = ['editable-picture'];
+        }
+        break;
+      default:
+        type = 'default-product'
+        childList = ['editable-picture'];
+        break;
+    }
+
+    const { settings } = Studio.product;
+
+    const blockSettings = Object.keys(settings)
+      .reduce((obj, tool) => {
+        switch(tool) {
+          case 'hasLayout':
+            if (settings[tool]) {
+              obj.layout = LayoutTool.defaultValue;
+            }
+            break;
+          case 'hasBackground':
+            if (settings[tool]) {
+              obj.backgroundColor = BackgroundColorTool.defaultValue;
+            }
+            break;
+        }
+
+        return obj;
+      }, {});
+
+    const childrenJSON = childList
+      .map(child => this.getChildsJSON(child));
+
+    return {
+      id: uniqueID.block(),
+      type,
+      count: 1,
+      selected: false,
+      activeChild: false,
+      settings: blockSettings,
+      childBlocks: [
+        ...childrenJSON
+      ]
+    };
+  }
+
+  getChildsJSON(type, options = {}) {
+    const id = uniqueID.childBlock();
+
+    const { isLine = false } = options;
+
+    switch (type) {
+      case 'editable-picture':
+        return {
+          type,
+          id,
+          selected: false,
+          tools: EditablePicture.ToolsList,
+          settings: EditablePicture.defaultValue
+        }
+      case 'text':
+        return {
+          type,
+          id,
+          isLine: isLine,
+          selected: false,
+          tools: EditableText.ToolList,
+          settings: EditableText.defaultValue
+        }
+      default:
+        return {
+          type: 'default',
+          id,
+          settings: {}
+        }
+    }
+  }
+
   setProductElements(
     size,
     blocks,
@@ -6401,41 +6589,39 @@ class StudioView extends HTMLElement {
   ) {
     const { product } = JSON.parse(this.getAttribute('state'));
 
+    const productHandle = product.handle;
+
     const waitToClear = [];
 
     if (!product) {
       return;
     } 
 
-    const createBlock = () => {
-      switch(product.type.id) {
+    const createBlock = (block) => {
+      switch(block.type) {
         case 'photobook':
-          this.createPhotobookPage('whole');
+          this.createPhotobookPage(block);
           break;
         case 'prints':
-          switch(product.handle) {
-            case 'polaroid':
-              this.createPolaroidPrints();
-              break;
-            default:
-              this.createPrint(product.handle);
-              break;
-          }
+          this.createPrint(block, productHandle);
+          break;
+        case 'polaroid':
+          this.createPolaroidPrints(block);
           break;
         case 'puzzle':
-          this.createPuzzle(product.handle);
+          this.createPuzzle(block, productHandle);
           break;
         case 'canvas':
-          this.createCanvas(product.handle);
+          this.createCanvas(block, productHandle);
           break;
         case 'magnets':
-          this.createMagnets(product.handle);
+          this.createMagnets(block, productHandle);
           break;
         case 'boxes':
           if (product.handle.includes('polaroid')) {
             this.createPolaroidPrints();
           } else if (product.handle.includes('10-15')) {
-            this.createPrint('10-15');
+            this.createPrint(block, '10-15');
           }
           break;
         default:
@@ -6444,24 +6630,31 @@ class StudioView extends HTMLElement {
       }
     }
 
-    let toUpdate = false;
+    let toUpdate = false, newBlocks = [ ...blocks ];
 
-    const blocksCount = this.querySelectorAll(StudioView.selectors.studioBlock).length;
+    const blockElements = [...this.querySelectorAll(StudioView.selectors.block)];
+
+    const studioBlocksLength = this.querySelectorAll(StudioView.selectors.studioBlock).length;
 
     if (!options.clearAll) {
-      if (size > blocksCount) {
+      if (size > studioBlocksLength) {
         toUpdate = true;
 
         const nowLength = this.querySelectorAll(StudioView.selectors.studioBlock).length;
         for (let i = 0; i < size - nowLength; i++) {
-          createBlock();
+          // createBlock();
+          newBlocks.push(this.getBlocksJSON());
         }
-      } else if (size < blocksCount) {
+      } else if (size < studioBlocksLength) {
         toUpdate = true;
+
+        const toRemove = newBlocks.slice(size);
+
+        console.log(toRemove);
 
         this.clearViewSync(size);
         // waitToClear.push(this.clearView(size));
-      } 
+      }
 
       // const emptyBlocks = blocks.filter(block => block.count === 0);
 
@@ -6470,38 +6663,36 @@ class StudioView extends HTMLElement {
       toUpdate = true;
 
       this.clearViewSync();
+      newBlocks = [];
       // waitToClear.push(this.clearView());
 
       for (let i = 0; i < size; i++) {
-        createBlock();
+        // createBlock();
+        newBlocks.push(this.getBlocksJSON());
       }
     }
 
-    if (!toUpdate) {
-      return;
+    const blocksToCreate = newBlocks.filter(block => !blockElements.some(elem => {
+      return elem.getAttribute('block') === block.id;
+    }));
+
+    const blocksCount = blocksToCreate.length;
+
+    if (blocksCount !== 0) {
+      this.clearViewSync();
+
+      toUpdate = true;
     }
 
-    const blockElements = [...this.querySelectorAll(StudioView.selectors.block)];
-
-      const sameProduct = blocks.length > 0
-        && blocks.every(block => {
-          const element = blockElements.find(elem => elem.getAttribute('block') === block.id);
-
-          if (element) {
-            return element.getAttribute('block-type') === block.type
-          }
-
-          return false;
-        });
-
-      const blocksJSON = !sameProduct
-        ? blockElements.map(block => this.getBlockJSON(block))
-        : blockElements
-            .map((block, idx) => this.getBlockJSON(block, blocks[idx]));
+    if (!toUpdate || blocksToCreate.length === 0) {
+      return;
+    }
+    
+    blocksToCreate.forEach(block => createBlock(block));
 
       Studio.utils.change({ view: {
         ...JSON.parse(this.getAttribute('state')),
-        blocks: blocksJSON
+        blocks: newBlocks
       }}, 'set product elements');
 
     Promise.all(waitToClear).then(_ => {
@@ -6628,7 +6819,7 @@ class StudioView extends HTMLElement {
         ...Studio.state.panel,
         blockCount: prevCount + 1
       }
-    });
+    }, 'block add');
   }
 }
 customElements.define('studio-view', StudioView);

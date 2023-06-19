@@ -139,7 +139,7 @@ export const updateOrder = async (req, res) => {
   fs.writeFileSync(statePath, JSON.stringify(state));
   fs.writeFileSync(infoPath, JSON.stringify(info));
 
-  res.send(200); 
+  res.sendStatus(200); 
 };
  
 export const getOrderInfo = (req, res) => {
