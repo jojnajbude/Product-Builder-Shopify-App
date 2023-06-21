@@ -25,7 +25,8 @@ const ProductSchema = new mongoose.Schema({
     hasRotate: Boolean,
     hasFilter: Boolean
   },
-  relatedProducts: [Schema.Types.Mixed]
+  relatedProducts: [Schema.Types.Mixed],
+  price: Number
 });
 
 const ProductModel = mongoose.model('Product', ProductSchema);

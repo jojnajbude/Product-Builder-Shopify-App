@@ -2146,3 +2146,26 @@ product-magnet {
   border-radius: 50%;
   aspect-ratio: 1 / 1;
 }
+/* Tile */
+product-tile {
+  display: block;
+}
+
+.tile {
+  width: 160px;
+  padding: 20px;
+  aspect-ratio: 1;
+  background-color: #fff;
+}
+
+.tile__frame {
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}

@@ -360,7 +360,7 @@ class ProductBuilder extends HTMLElement {
       return;
     }
 
-    if (prevState.productId !== currState.productId && !currState.productId) {
+    if (!productParams.get('id') && !productParams.get('order-id') && !currState.product) {
       this.panel.tools.focusOnTab('products');
     }
 
@@ -387,6 +387,34 @@ class ProductBuilder extends HTMLElement {
 
     if (!compareObjects(prevState.panel, currState.panel)) {
       this.panel.setState(currState.panel);
+
+      if (prevState.panel.blockCount !== currState.panel.blockCount
+        && currState.panel.blockCount !== currState.view.blocks.length) {
+        const { blocks } = currState.view;
+
+        const count = currState.panel.blockCount;
+
+        if (prevState.panel.blockCount < count) {
+          const newBlocks = Array(count - prevState.panel.blockCount)
+            .fill(null).map(_ => this.studioView.getBlocksJSON());
+
+          console.log(newBlocks);
+
+          Studio.utils.change({
+            view: {
+              ...currState.view,
+              blocks: [ ...blocks, ...newBlocks ]
+            }
+          });
+        } else if (prevState.panel.blockCount > count) {
+          Studio.utils.change({
+            view: {
+              ...currState.view,
+              blocks: blocks.slice(0, count)
+            }
+          });
+        }
+      }
     }
 
     if (!compareObjects(prevState.imagesToDownload, currState.imagesToDownload)) {
@@ -647,6 +675,12 @@ class ProductBuilder extends HTMLElement {
                 value: getValue(tool)
               }
               break;
+          case 'frame':
+            updatedTools[tool] = {
+              ...updatedTools[tool],
+              show: settings.hasFrame,
+              value: getValue(tool)
+            }
         }
       }
 
@@ -787,7 +821,6 @@ class ProductBuilder extends HTMLElement {
       const state = JSON.parse(anonimOrderId);
 
       this.addEventListener('studio:inited', () => {
-        console.log(Studio.product);
         Studio.utils.change(state);
       })
     }
@@ -879,8 +912,6 @@ class ProductBuilder extends HTMLElement {
         imagesToDownload: null
       }
     };
-
-    console.log(stateToSave);
 
     return fetch(`product-builder/orders/update/${id}?id=${customerId}`, {
       method: 'POST',
@@ -1852,7 +1883,11 @@ class LayoutTool extends Tool {
 
       this.selected = layoutIcon;
 
-      const panelState = JSON.parse(Studio.panel.getAttribute('state'));
+      if (!Studio.state) {
+        return;
+      }
+
+      const panelState = Studio.state.panel;
 
       Studio.utils.change({
         panel: {
@@ -2817,6 +2852,146 @@ class FilterTool extends Tool {
   }
 }
 
+class FrameTool extends Tool {
+  static frames = {
+    black: {
+      label: 'Black',
+      value: 'black',
+      default: true
+    },
+    white: {
+      label: 'White',
+      value: 'white',
+    }
+  }
+
+  static defaultValue = {
+    value: 'black'
+  }
+
+  constructor() {
+    super();
+
+    const icon = `
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M11 1.5C11 1.22386 10.7761 1 10.5 1C10.2239 1 10 1.22386 10 1.5V4H5V1.5C5 1.22386 4.77614 1 4.5 1C4.22386 1 4 1.22386 4 1.5V4H1.5C1.22386 4 1 4.22386 1 4.5C1 4.77614 1.22386 5 1.5 5H4V10H1.5C1.22386 10 1 10.2239 1 10.5C1 10.7761 1.22386 11 1.5 11H4V13.5C4 13.7761 4.22386 14 4.5 14C4.77614 14 5 13.7761 5 13.5V11H10V13.5C10 13.7761 10.2239 14 10.5 14C10.7761 14 11 13.7761 11 13.5V11H13.5C13.7761 11 14 10.7761 14 10.5C14 10.2239 13.7761 10 13.5 10H11V5H13.5C13.7761 5 14 4.77614 14 4.5C14 4.22386 13.7761 4 13.5 4H11V1.5ZM10 10V5H5V10H10Z" fill="black"/>
+      </svg>
+    `;
+
+    this.label.setLabel('Frame');
+
+    this.icon.setIcon(icon);
+  }
+
+  setContent() {
+    const wrapper = document.createElement('div');
+    wrapper.classList.add('background-tool');
+
+    const frameButtons = this.buttons = Object.keys(FrameTool.frames)
+      .map((color) => this.frameOptionTemplate(FrameTool.frames[color]))
+      .map(button => {
+        button.addEventListener('click', () => {
+          const toUnselect = wrapper.querySelector('button.is-selected');
+
+          if (toUnselect) {
+            toUnselect.classList.remove('is-selected');
+          }
+
+          button.classList.add('is-selected');
+
+          Studio.utils.change({
+            panel: {
+              ...Studio.state.panel,
+              tools: {
+                ...Studio.state.panel.tools,
+                frame: {
+                  ...Studio.state.panel.tools.frame,
+                  value: this.getValue()
+                }
+              }
+            }
+          }, 'frame tool - set value');
+        })
+
+        return button;
+      });
+
+    wrapper.append(...frameButtons);
+
+    this.collapsible.inner.append(wrapper);
+  }
+
+  frameOptionTemplate(color) {
+    const { label, value } = color;
+
+    const button = document.createElement('button');
+    button.classList.add('background-tool__button');
+    button.setAttribute('data-frame', JSON.stringify(color));
+    button.setAttribute('data-frame-value', value);
+
+    const icon = document.createElement('div');
+    icon.classList.add('background-tool__icon');
+    icon.style.backgroundColor = value;
+
+    if (color.default) {
+      button.classList.add('is-selected');
+    }
+
+    const title = document.createElement('div');
+    title.classList.add('background-tool__title');
+    title.textContent = label;
+
+    button.append(icon, title);
+
+    return button;
+  }
+
+  setValue(state) {
+    const { value } = state;
+
+    const toUnselect = this.collapsible.inner.querySelector(`button.is-selected`);
+
+    if (toUnselect) {
+      toUnselect.classList.remove('is-selected');
+    }
+
+    const btnToSelect = this.collapsible.inner.querySelector(`button[data-frame-value="${value}"`);
+
+    if (btnToSelect) {
+      btnToSelect.classList.add('is-selected');
+    }
+  }
+
+  getValue() {
+    const selectedFrame = this.collapsible.container.querySelector('button.is-selected');
+
+    if (selectedFrame) {
+      const frame = JSON.parse(selectedFrame.getAttribute('data-frame'));
+
+      return {
+        ...frame
+      }
+    }
+  }
+
+  reset() {
+    this.close();
+
+    Studio.utils.change({
+      panel: {
+        ...Studio.state.panel,
+        tools: {
+          ...Studio.state.panel.tools,
+          frame: {
+            ...Studio.state.panel.tools.backgroundColor,
+            value: FrameTool.defaultValue
+          }
+        }
+      }
+    }, 'frame tool - reset')
+  }
+}
+
 class Tools extends HTMLElement {
   static selectors = {
     playground: '[studio-view]',
@@ -3026,8 +3201,6 @@ class Tools extends HTMLElement {
       if (this.pages.products.selected) {     
         Studio.defaultBuilderPath();
 
-        console.log(globalState.view);
-
         productParams = new URLSearchParams(location.search);
 
         Studio.utils.change({
@@ -3053,7 +3226,7 @@ class Tools extends HTMLElement {
     const container = document.createElement('div');
     container.classList.add('page__product');
     container.dataset.id = product.shopify_id.split('/').pop();
-    
+
     const productInner = `
       <img
         src="${product.imageUrl
@@ -3069,7 +3242,7 @@ class Tools extends HTMLElement {
       <div class="page__product-info">
         <div class="page__product-title">${product.title}</div>
 
-        <div class="page__product-price">$10,90</div>
+        <div class="page__product-price">${product.price !== undefined ? `$${product.price}` : '$10,90'}</div>
       </div>
     `;
 
@@ -3355,7 +3528,8 @@ class Tools extends HTMLElement {
         rotate: new RotateTool(),
         crop: new CropTool(),
         backgroundColor: new BackgroundColorTool(),
-        filter: new FilterTool()
+        filter: new FilterTool(),
+        frame: new FrameTool(),
       }
     }
 
@@ -3367,7 +3541,7 @@ class Tools extends HTMLElement {
         }
 
         return obj
-      }, {})
+      }, {});
 
     Studio.utils.change({ panel: {
       ...JSON.parse(Studio.panel.getAttribute('state')),
@@ -3376,7 +3550,7 @@ class Tools extends HTMLElement {
   }
 
   setToolsState(tools) {
-    const state = JSON.parse(this.getAttribute('state'));
+    const state = { ...JSON.parse(this.getAttribute('state')) };
 
     for (const tool in tools) {
       state[tool] = {
@@ -3399,6 +3573,10 @@ class Tools extends HTMLElement {
 
         case 'text':
           this.edit.tools.text.create();
+          break;
+        case 'frame':
+          this.edit.tools.frame.create();
+          break;
       }
     }
   }
@@ -3637,7 +3815,6 @@ class EditablePicture extends HTMLElement {
   
   
   setImage(imageUrl) {
-    console.log(imageUrl);
     if (this.image) {
       this.oldImage = this.image;
       this.oldImage.remove();
@@ -3677,7 +3854,7 @@ class EditablePicture extends HTMLElement {
     this.image.draggable = false;
     this.image.toggleAttribute('crossOrigin');
     
-    this.image.onloadend = () => {
+    this.image.onload = () => {
       this.image.style.opacity = null;
     }
 
@@ -4041,7 +4218,7 @@ class ProductControls extends HTMLElement {
 
     editBtn.append(editTooltip);
 
-    if (blockElem && blockElem.getAttribute('block-type', 'photobook-page') || Studio.product.quantity.type === 'single') {
+    if (blockElem && blockElem.getAttribute('block-type') === 'photobook-page' || Studio.product.quantity.type === 'single') {
       productControls.append(removeBtn, editBtn);
     } else {
       productControls.toggleAttribute('is-quantitative');
@@ -4954,6 +5131,16 @@ class Canvas extends Prints {
 
     this.setContent();
   }
+
+  setValue(settings, block) {
+    if (block) {
+      this.editablePictures = block.childBlocks
+        .filter(child => child.type === 'editable-picture');
+    
+      this.editableText = block.childBlocks
+        .filter(child => child.type === 'text');
+    }
+  }
 }
 customElements.define('product-canvas', Canvas);
 
@@ -5024,7 +5211,7 @@ class PolaroidPrints extends Prints {
 
     if (block) {
       this.editablePictures = block.childBlocks
-      .filter(child => child.type === 'editable-picture');
+        .filter(child => child.type === 'editable-picture');
     
       this.editableText = block.childBlocks
         .filter(child => child.type === 'text');
@@ -5135,8 +5322,10 @@ class Puzzle extends ProductElement {
       }
     }
 
-    this.editablePictures = block.childBlocks
-      .filter(child => child.type === 'editable-picture');
+    if (block) {
+      this.editablePictures = block.childBlocks
+        .filter(child => child.type === 'editable-picture');
+    }
   }
 
   setBackgroundColor() {
@@ -5198,13 +5387,100 @@ class Magnet extends ProductElement {
     this.append(picture);
   }
 
-  setValue(settings) {}
+  setValue(settings, block) {
+    if (block) {
+      this.editablePictures = block.childBlocks
+        .filter(child => child.type === 'editable-picture');
+    
+      this.editableText = block.childBlocks
+        .filter(child => child.type === 'text');
+    }
+  }
 }
 customElements.define('product-magnet', Magnet);
 
 class Tiles extends ProductElement {
+  static frames = {
+    black: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0.5 161 161"><path fill="#373737" fill-rule="evenodd" d="M0 .5h161v161H0V.5Zm151.45 8.54H8.55v142.7H9v.26h143V10h-.55v-.96Z" clip-rule="evenodd"/><path fill="#000" d="M1.22 1.72V161.5H161V1.72H1.22Zm151.24 151.24H9.76V10.26h142.7v142.7Z"/></svg>`,
+    white: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="20 30.5 161 161"><g clip-path="url(#a)" filter="url(#b)"><path fill="#ECECEC" d="M21.22 31.72V191.5H181V31.72H21.22Zm151.24 151.24H29.76V40.26h142.7v142.7Z"/></g><defs><clipPath id="a"><path fill="#fff" d="M20 30.5h161v161H20z"/></clipPath><filter id="b" width="249" height="249" x="-11" y="-.5" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feColorMatrix in="SourceAlpha" result="hardAlpha" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"/><feOffset dx="13" dy="13"/><feGaussianBlur stdDeviation="22"/><feComposite in2="hardAlpha" operator="out"/><feColorMatrix values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/><feBlend in2="BackgroundImageFix" result="effect1_dropShadow_806_20103"/><feBlend in="SourceGraphic" in2="effect1_dropShadow_806_20103" result="shape"/></filter></defs></svg>`
+  }
+
+  static get observedAttributes() {
+    return ['frame']
+  }
+
   constructor() {
     super();
+  }
+
+  connectedCallback() {
+    this.classList.add('tile', 'product-element');
+
+    if (!this.hasAttribute('block')) {
+      this.setAttribute('block', uniqueID.block());
+    }
+
+    this.controls = ProductControls.createBlockControls(this.getAttribute('block'));
+
+    if (!this.hasAttribute('block-type')) {
+      this.setAttribute('block-type', 'tile');
+    }
+
+    this.parentElement.append(this.controls);
+
+    this.setContent();
+
+    if (!this.hasAttribute('frame')) {
+      this.setAttribute('frame', 'black');
+    }
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    switch(name) {
+      case 'frame':
+        this.setFrame(newValue);
+        break;
+    }
+  }
+
+  setContent() {
+    const editableQuery = this.editableQuery(this.editablePictures);
+
+    const frame = document.createElement('div');
+    this.frame = frame;
+    frame.classList.add('tile__frame');
+
+    // this.setFrame(this.getAttribute('frame'));
+    
+    const picture = this.getEditable(editableQuery());
+
+    this.append(picture, frame);
+  }
+
+  setFrame(frame) {
+    const frameSvg = Tiles.frames[frame];
+
+    if (!frameSvg || !this.frame) {
+      return;
+    }
+
+    this.frame.style.backgroundImage = `url('data:image/svg+xml;base64,${btoa(frameSvg)}')`;
+  }
+
+  setValue(settings, block) {
+    const { frame } = settings;
+
+    if (frame) {
+      this.setAttribute('frame', frame.value);
+    }
+
+    if (block) {
+      this.editablePictures = block.childBlocks
+        .filter(child => child.type === 'editable-picture');
+    
+      this.editableText = block.childBlocks
+        .filter(child => child.type === 'text');
+    }
   }
 }
 customElements.define('product-tiles', Tiles);
@@ -5495,18 +5771,20 @@ class StudioView extends HTMLElement {
 
       this.clearViewSync();
 
-      if (prevState.blockCount === currState.blockCount) {
-        // this.setProductElements(currState.blockCount, []);
-      }
-
+      this.setProductElements(currState.blockCount, []);
     }
 
     if (!compareObjects(prevState.blocks, currState.blocks)) {
+      const prevCounts = this.getBlocksCount(prevState.blocks);
+      const currCounts = this.getBlocksCount(currState.blocks);
+
+
+      console.log('here', currState.blocks, currCounts);
       this.toggleSelected(prevState.blocks, currState.blocks);
 
       this.setBlocksValue(prevState.blocks, currState.blocks);
 
-      this.setProductElements(currState.blockCount, currState.blocks);
+      this.setProductElements(null, currState.blocks);
     }
     
     if (currState.product && prevState.blockCount !== currState.blockCount) {
@@ -5515,13 +5793,15 @@ class StudioView extends HTMLElement {
 
       let additionBlock = prevCounts && prevCounts === currCounts ? 1 : 0;
 
-      const size = currState.blockCount - (currState.blockCount - currState.blocks.length) + additionBlock;
+      const size = currState.blockCount - (currCounts);
 
-      if (compareObjects(prevState.product, currState.product)) {
-        this.setProductElements(currState.blockCount, currState.blocks);
-      } else {
-        this.setProductElements(currState.blockCount, []);
-      }
+      // console.log(size, currCounts, currState.blockCount, currState.blocks, prevCounts)
+
+      // if (compareObjects(prevState.product, currState.product) && size !== 0) {
+      //   this.setProductElements(size, currState.blocks);
+      // } else if (size !== 0) {
+      //   this.setProductElements(size, []);
+      // }
     }
 
     if (currState.imagesToDownload && !compareObjects(currState.imagesToDownload, prevState.imagesToDownload)) {      
@@ -5888,7 +6168,6 @@ class StudioView extends HTMLElement {
   }
 
   setBlocksValue(prevBlocks, currBlocks) {
-    console.log('here');
     const initiateNewChildren = (element, selectedChildrenIds, prevChildrens) => {
       if (!element) {
         return;
@@ -6015,7 +6294,7 @@ class StudioView extends HTMLElement {
                 break;
               case 'editable-picture':
                 const pictureElement = this.querySelector(StudioView.selectors.childBlockById(child.id));
-                
+
                 if (!pictureElement) {
                   break;
                 }
@@ -6301,11 +6580,29 @@ class StudioView extends HTMLElement {
     polaroid.setAttribute('block-type', type);
 
     this.blockClickedListener(polaroid);
-    
-    studioBlock.append(polaroid);
     polaroid.setValue(settings, block);
     
+    studioBlock.append(polaroid);
     this.elements.container.append(studioBlock);    
+    
+
+    const children = polaroid.querySelectorAll(StudioView.selectors.childBlock);
+
+    children.forEach(child => {
+      const childJSON = block.childBlocks.find(fChildJSON => fChildJSON.id === child.getAttribute('child-block'));
+
+      if (childJSON) {
+        const { imageUrl, settings } = childJSON;
+
+        if (imageUrl) {
+          child.setImage(imageUrl);
+        }
+
+        if (settings) {
+          child.setValue(childJSON.settings);
+        }
+      }
+    })
   }
 
   createPuzzle(block, productHandle) {
@@ -6359,6 +6656,24 @@ class StudioView extends HTMLElement {
     this.elements.container.append(studioBlock);
   }
 
+  createTiles(block) {
+    const { id, type, settings } = block;
+    const studioBlock = this.createStudioBlock('product-tile');
+
+    const tile = document.createElement('product-tiles');
+
+    this.blockClickedListener(tile);
+
+    studioBlock.append(tile);
+
+    tile.setAttribute('block', id);
+    tile.setAttribute('block-type', type);
+
+    tile.setValue(settings, block);
+    
+    this.elements.container.append(studioBlock);
+  }
+
   blockClickedListener(element, callback) {
     if (!element) {
       return;
@@ -6385,11 +6700,13 @@ class StudioView extends HTMLElement {
       return;
     }
 
+
     const blocks =  this.elements.container.querySelectorAll(StudioView.selectors.studioBlock);
 
     if (!size && toRemove && Array.isArray(toRemove)) {
+      console.log('cleared', toRemove);
       toRemove
-        .map(blockJSON => this.querySelector(StudioView.selectors.blockById(blockJSON.id)).parentElement)
+        .map(id => this.querySelector(StudioView.selectors.blockById(id)).parentElement)
         .forEach(block => block && block.remove());
 
       return Boolean(toRemove.length);
@@ -6508,6 +6825,10 @@ class StudioView extends HTMLElement {
           childList = ['editable-picture'];
         }
         break;
+      case 'tiles':
+        type = 'tiles';
+        childList = ['editable-picture'];
+        break;
       default:
         type = 'default-product'
         childList = ['editable-picture'];
@@ -6527,6 +6848,11 @@ class StudioView extends HTMLElement {
           case 'hasBackground':
             if (settings[tool]) {
               obj.backgroundColor = BackgroundColorTool.defaultValue;
+            }
+            break;
+          case 'hasFrame':
+            if (settings[tool]) {
+              obj.frame = FrameTool.defaultValue
             }
             break;
         }
@@ -6595,7 +6921,7 @@ class StudioView extends HTMLElement {
 
     if (!product) {
       return;
-    } 
+    }
 
     const createBlock = (block) => {
       switch(block.type) {
@@ -6614,7 +6940,7 @@ class StudioView extends HTMLElement {
         case 'canvas':
           this.createCanvas(block, productHandle);
           break;
-        case 'magnets':
+        case 'magnet':
           this.createMagnets(block, productHandle);
           break;
         case 'boxes':
@@ -6623,6 +6949,9 @@ class StudioView extends HTMLElement {
           } else if (product.handle.includes('10-15')) {
             this.createPrint(block, '10-15');
           }
+          break;
+        case 'tiles':
+          this.createTiles(block);
           break;
         default:
           this.createDefaultProductElement();
@@ -6634,10 +6963,8 @@ class StudioView extends HTMLElement {
 
     const blockElements = [...this.querySelectorAll(StudioView.selectors.block)];
 
-    const studioBlocksLength = this.querySelectorAll(StudioView.selectors.studioBlock).length;
-
-    if (!options.clearAll) {
-      if (size > studioBlocksLength) {
+    if (!options.clearAll && size) {
+      if (size > blocks.length) {
         toUpdate = true;
 
         const nowLength = this.querySelectorAll(StudioView.selectors.studioBlock).length;
@@ -6645,7 +6972,7 @@ class StudioView extends HTMLElement {
           // createBlock();
           newBlocks.push(this.getBlocksJSON());
         }
-      } else if (size < studioBlocksLength) {
+      } else if (size < blocks.length) {
         toUpdate = true;
 
         const toRemove = newBlocks.slice(size);
@@ -6659,7 +6986,7 @@ class StudioView extends HTMLElement {
       // const emptyBlocks = blocks.filter(block => block.count === 0);
 
       // toUpdate = this.clearViewSync(null, emptyBlocks);
-    } else {
+    } else if (options.clearAll) {
       toUpdate = true;
 
       this.clearViewSync();
@@ -6676,17 +7003,25 @@ class StudioView extends HTMLElement {
       return elem.getAttribute('block') === block.id;
     }));
 
+    const elemsToRemove = blockElements.filter(elem => !newBlocks
+        .some(block => block.id === elem.getAttribute('block'))
+      ).map(elem => elem.getAttribute('block'));
+
+    console.log('new blocks', newBlocks, blockElements);
+
     const blocksCount = blocksToCreate.length;
 
-    if (blocksCount !== 0) {
-      this.clearViewSync();
+    this.clearViewSync(null, elemsToRemove);
 
+    if (blocksToCreate !== 0) {
       toUpdate = true;
     }
 
-    if (!toUpdate || blocksToCreate.length === 0) {
+    if (!toUpdate) {
       return;
     }
+
+    console.log('to create', blocksToCreate);
     
     blocksToCreate.forEach(block => createBlock(block));
 
@@ -6724,6 +7059,11 @@ class StudioView extends HTMLElement {
           case 'hasBackground':
             if (settings[tool]) {
               obj.backgroundColor = BackgroundColorTool.defaultValue;
+            }
+            break;
+          case 'hasFrame':
+            if (settings[tool]) {
+              obj.frame = FrameTool.defaultValue
             }
             break;
         }
@@ -6798,26 +7138,28 @@ class StudioView extends HTMLElement {
 
     button.textContent = 'Add block';
 
+    const addBlockCallback = this.addBlock.bind(this);
+
     return {
       container: button,
       create: () => {
         this.elements.container.append(button);
-        button.addEventListener('click', this.addBlock);
+        button.addEventListener('click', addBlockCallback);
       },
       remove: () => {
         button.remove();
-        button.removeEventListener('click', this.addBlock);
+        button.removeEventListener('click', addBlockCallback);
       }
     }
   }
 
   addBlock() {
-    const prevCount = Studio.state.view.blockCount;
+    const newBlock = this.getBlocksJSON();
 
     Studio.utils.change({
-      panel: {
-        ...Studio.state.panel,
-        blockCount: prevCount + 1
+      view: {
+        ...Studio.state.view,
+        blocks: [ ...Studio.state.view.blocks, newBlock ]
       }
     }, 'block add');
   }

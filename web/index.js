@@ -533,6 +533,11 @@ app.get('/api/shopify/products', async (req, res) => {
               id,
               name,
               values
+            },
+            priceRangeV2 {
+              minVariantPrice {
+                amount
+              }
             }
           }
         }
@@ -548,7 +553,7 @@ app.get('/api/shopify/products', async (req, res) => {
     const customProducts = await ProductModel.find({}); 
 
     const noRelatedProducts = products
-      .filter(product => customProducts.every(cProd => cProd.shopify_id !== product.id));
+      .filter(product => customProducts.every(cProd => cProd.shopify_id !== product.id))
 
     res.status(200).send(noRelatedProducts);
     return;
@@ -584,9 +589,9 @@ app.post('/api/products', async (req, res) => {
     session: res.locals.shopify.session,
     apiVersion: LATEST_API_VERSION
   });
-  console.log(res.locals.shopify.session);
+  const { id, title, image, handle, options, priceRangeV2 } = req.body;
 
-  const { id, title, image, handle, options } = req.body;
+  const price = priceRangeV2.minVariantPrice.amount;
 
   const shop = await Shop.findOne({ name: res.locals.shopify.session.shop });
 
@@ -600,7 +605,8 @@ app.post('/api/products', async (req, res) => {
     options,
     quantity: {
       type: 'single'
-    }
+    },
+    price
   });
 
   const isExists = await ProductModel.exists({ shopify_id: id });

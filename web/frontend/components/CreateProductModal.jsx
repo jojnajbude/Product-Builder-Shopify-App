@@ -39,6 +39,10 @@ export function CreateProductModal({
   }, [setProductsList, setIsLoading, products]);
 
   useEffect(() => {
+    console.log(productsList);
+  })
+
+  useEffect(() => {
     if (!isOpen) {
       setProductsList([]);
       setSelectedProduct(null);
