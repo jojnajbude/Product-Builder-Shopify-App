@@ -607,7 +607,7 @@ app.post('/api/products', async (req, res) => {
       type: 'single'
     },
     price
-  });
+  }); 
 
   const isExists = await ProductModel.exists({ shopify_id: id });
 

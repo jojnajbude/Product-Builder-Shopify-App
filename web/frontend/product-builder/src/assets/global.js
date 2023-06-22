@@ -86,11 +86,23 @@ const subscribeToActionController = ActiveActionsController();
   }
 
   const childBlock = () => {
-    return 'childBlock-' + window.blockCounter++;
+    let childID;
+
+    do {
+      childID = 'childBlock-' + window.blockCounter++;
+    } while (document.querySelector(StudioView.selectors.childBlockById(childID)));
+
+    return childID;
   }
 
   const block = () => {
-    return 'block-' + window.blockCounter++;
+    let blockID;
+
+    do {
+      blockID = 'block-' + window.blockCounter++;
+    } while (document.querySelector(StudioView.selectors.childBlockById(blockID)));
+
+    return blockID;
   }
 
   window.uniqueID = {
@@ -397,8 +409,6 @@ class ProductBuilder extends HTMLElement {
         if (prevState.panel.blockCount < count) {
           const newBlocks = Array(count - prevState.panel.blockCount)
             .fill(null).map(_ => this.studioView.getBlocksJSON());
-
-          console.log(newBlocks);
 
           Studio.utils.change({
             view: {
@@ -1554,7 +1564,6 @@ class ProductInfo extends HTMLElement {
       view: {
         ...JSON.parse(Studio.studioView.getAttribute('state')),
         product: { type, settings, shopify_id, handle, quantity },
-        blocks: [],
         blockCount
       }
     }, 'product-info');
@@ -5450,7 +5459,7 @@ class Tiles extends ProductElement {
     this.frame = frame;
     frame.classList.add('tile__frame');
 
-    // this.setFrame(this.getAttribute('frame'));
+    this.setFrame(this.getAttribute('frame'));
     
     const picture = this.getEditable(editableQuery());
 
@@ -5778,8 +5787,6 @@ class StudioView extends HTMLElement {
       const prevCounts = this.getBlocksCount(prevState.blocks);
       const currCounts = this.getBlocksCount(currState.blocks);
 
-
-      console.log('here', currState.blocks, currCounts);
       this.toggleSelected(prevState.blocks, currState.blocks);
 
       this.setBlocksValue(prevState.blocks, currState.blocks);
@@ -5788,20 +5795,6 @@ class StudioView extends HTMLElement {
     }
     
     if (currState.product && prevState.blockCount !== currState.blockCount) {
-      const prevCounts = this.getBlocksCount(prevState.blocks);
-      const currCounts = this.getBlocksCount(currState.blocks);
-
-      let additionBlock = prevCounts && prevCounts === currCounts ? 1 : 0;
-
-      const size = currState.blockCount - (currCounts);
-
-      // console.log(size, currCounts, currState.blockCount, currState.blocks, prevCounts)
-
-      // if (compareObjects(prevState.product, currState.product) && size !== 0) {
-      //   this.setProductElements(size, currState.blocks);
-      // } else if (size !== 0) {
-      //   this.setProductElements(size, []);
-      // }
     }
 
     if (currState.imagesToDownload && !compareObjects(currState.imagesToDownload, prevState.imagesToDownload)) {      
@@ -6704,7 +6697,6 @@ class StudioView extends HTMLElement {
     const blocks =  this.elements.container.querySelectorAll(StudioView.selectors.studioBlock);
 
     if (!size && toRemove && Array.isArray(toRemove)) {
-      console.log('cleared', toRemove);
       toRemove
         .map(id => this.querySelector(StudioView.selectors.blockById(id)).parentElement)
         .forEach(block => block && block.remove());
@@ -6977,8 +6969,6 @@ class StudioView extends HTMLElement {
 
         const toRemove = newBlocks.slice(size);
 
-        console.log(toRemove);
-
         this.clearViewSync(size);
         // waitToClear.push(this.clearView(size));
       }
@@ -7003,15 +6993,16 @@ class StudioView extends HTMLElement {
       return elem.getAttribute('block') === block.id;
     }));
 
+    
     const elemsToRemove = blockElements.filter(elem => !newBlocks
-        .some(block => block.id === elem.getAttribute('block'))
+          .some(block => block.id === elem.getAttribute('block'))
       ).map(elem => elem.getAttribute('block'));
-
-    console.log('new blocks', newBlocks, blockElements);
-
+      
     const blocksCount = blocksToCreate.length;
 
     this.clearViewSync(null, elemsToRemove);
+
+    newBlocks = newBlocks.filter(block => !elemsToRemove.includes(block.id));
 
     if (blocksToCreate !== 0) {
       toUpdate = true;
@@ -7021,8 +7012,6 @@ class StudioView extends HTMLElement {
       return;
     }
 
-    console.log('to create', blocksToCreate);
-    
     blocksToCreate.forEach(block => createBlock(block));
 
       Studio.utils.change({ view: {
