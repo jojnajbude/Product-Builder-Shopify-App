@@ -6,7 +6,7 @@ import {
   Text, 
   Checkbox
 } from "@shopify/polaris";
-import classNames from "classnames";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 export function ProductSettings({
@@ -19,25 +19,25 @@ export function ProductSettings({
   const [selectedLayouts, setSelectedLayouts] = useState(product ? product.settings.selectedLayouts : []);
 
 
-  const LayoutCard = useCallback((layout) => (
-    <div
-      key={layout.id}
-      className={classNames('layouts__item', {
-        "is-selected": selectedLayouts.includes(layout.id)
-      })}
-      onClick={() => {
-        if (!selectedLayouts.includes(layout.id)) {
-          setSelectedLayouts([...selectedLayouts, layout.id])
-        } else {
-          setSelectedLayouts(selectedLayouts.filter(item => item !== layout.id));
-        }
-      }}
-    >
-      <div className="layout__item-wrapper">
-        {layout.image}
-      </div>
-    </div>
-  ), [selectedLayouts]);
+  // const LayoutCard = useCallback((layout) => (
+  //   <div
+  //     key={layout.id}
+  //     className={classNames('layouts__item', {
+  //       "is-selected": selectedLayouts.includes(layout.id)
+  //     })}
+  //     onClick={() => {
+  //       if (!selectedLayouts.includes(layout.id)) {
+  //         setSelectedLayouts([...selectedLayouts, layout.id])
+  //       } else {
+  //         setSelectedLayouts(selectedLayouts.filter(item => item !== layout.id));
+  //       }
+  //     }}
+  //   >
+  //     <div className="layout__item-wrapper">
+  //       {layout.image}
+  //     </div>
+  //   </div>
+  // ), [selectedLayouts]);
 
   const layouts = useMemo(() => [
     {
@@ -148,7 +148,7 @@ export function ProductSettings({
         </Text>
       </div>
 
-      {typeSettings.hasLayout && (
+      {/* {typeSettings.hasLayout && (
         <LegacyCard.Section>
           <div className="layouts">
             <div className="product-settings__heading">
@@ -165,7 +165,7 @@ export function ProductSettings({
             </div>
           </div>
         </LegacyCard.Section>
-      )}
+      )} */}
 
       {typeSettings.hasText && (
         <LegacyCard.Section>

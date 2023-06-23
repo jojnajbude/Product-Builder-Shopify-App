@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { join } from 'path';
 
-import sharp from 'sharp'; 
+import sharp from 'sharp';
 
 const PROXY_PATH = `${process.cwd()}/frontend/product-builder/src`;
 

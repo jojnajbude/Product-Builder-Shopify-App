@@ -12,7 +12,7 @@ import Shop from './models/Shop.js';
 
 import * as dotenv from 'dotenv';
 import { productTypes } from "./models/ProductTypes.js";
-import cors from 'cors';
+import cors from 'cors'; 
 
 import GetCode from "./utils/makeCode.js";
 import { encryptPassword, decryptPassword } from "./utils/password_hashing.js";
@@ -582,7 +582,7 @@ app.get('/api/products', async (req, res) => {
   const products = await ProductModel.find({ shop: shop?._id});
 
   res.status(200).send(products);
-});
+}); 
 
 app.post('/api/products', async (req, res) => {
   const client = new shopify.api.clients.Graphql({

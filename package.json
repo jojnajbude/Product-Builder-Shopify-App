@@ -7,6 +7,7 @@
     "shopify": "shopify",
     "build": "shopify app build",
     "dev": "shopify app dev",
+    "dev-tunnel": "npm run dev -- --tunnel-url https://product-builder.dev-test.pro:3005",
     "info": "shopify app info",
     "generate": "shopify app generate",
     "deploy": "shopify app deploy"
@@ -14,17 +15,7 @@
   "dependencies": {
     "@googleapis/docs": "^2.0.1",
     "@shopify/app": "3.44.1",
-    "@shopify/cli": "3.44.1",
-    "classnames": "^2.3.2",
-    "cors": "^2.8.5",
-    "crypto-js": "^4.1.1",
-    "dotenv": "^16.0.3",
-    "googleapis": "^118.0.0",
-    "mongodb": "^5.2.0",
-    "mongoose": "^7.0.5",
-    "multer": "^1.4.5-lts.1",
-    "sharp": "^0.32.1",
-    "url": "^0.11.0"
+    "@shopify/cli": "3.44.1"
   },
   "author": "andriihladkevych"
 }

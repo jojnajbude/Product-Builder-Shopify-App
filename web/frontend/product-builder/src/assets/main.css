@@ -2169,3 +2169,23 @@ product-tile {
   background-repeat: no-repeat;
   background-position: center;
 }
+
+/* Add block button */
+.studio-view__button-add-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.studio-view__button-add {
+  cursor: pointer;
+  appearance: none;
+  padding: 0;
+  margin: 0;
+  background-color: transparent;
+  outline: none;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}

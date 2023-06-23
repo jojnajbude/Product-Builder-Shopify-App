@@ -377,16 +377,14 @@ class ProductBuilder extends HTMLElement {
     }
 
     if (prevState.productId !== currState.productId && !currState.product) {
-      this.studioView.clearViewSync();
-
       this.getProduct(currState.productId)
         .then(product => {
+          this.product = product;
+
           Studio.utils.change({
             product: product
           })
-        });
-
-      return;
+        }, 'set product');
     }
 
     if (!compareObjects(prevState.product, currState.product) && currState.product) {
@@ -401,7 +399,8 @@ class ProductBuilder extends HTMLElement {
       this.panel.setState(currState.panel);
 
       if (prevState.panel.blockCount !== currState.panel.blockCount
-        && currState.panel.blockCount !== currState.view.blocks.length) {
+        && currState.panel.blockCount !== currState.view.blocks.length
+        && currState.product.quantity.type === 'set-of') {
         const { blocks } = currState.view;
 
         const count = currState.panel.blockCount;
@@ -415,14 +414,14 @@ class ProductBuilder extends HTMLElement {
               ...currState.view,
               blocks: [ ...blocks, ...newBlocks ]
             }
-          });
+          }, 'block count set of - increase');
         } else if (prevState.panel.blockCount > count) {
           Studio.utils.change({
             view: {
               ...currState.view,
               blocks: blocks.slice(0, count)
             }
-          });
+          }, 'block count set of - decrease');
         }
       }
     }
@@ -816,7 +815,7 @@ class ProductBuilder extends HTMLElement {
     if (!this.anonimCustomerId) {
       if (productParams.get('order-id')) {
         this.orderId = productParams.get('order-id');
-  
+
         const state = await this.getOrderState(this.orderId);
   
         if (!state.error) {
@@ -889,6 +888,8 @@ class ProductBuilder extends HTMLElement {
     this.orderId = null;
 
     window.history.pushState(nextState, nextTitle, nextURL);
+
+    productParams = new URLSearchParams(location.search);
   }
 
   async getOrderState(id) {
@@ -961,7 +962,7 @@ customElements.define('product-builder', ProductBuilder);
 
 const utils = {
   change: (state, initiator) => {
-    // console.log(initiator);
+    // console.log(initiator, state);
 
     const changeEvent = new CustomEvent('studio:change', {
       detail: {
@@ -1556,6 +1557,28 @@ class ProductInfo extends HTMLElement {
 
     const { type, settings, shopify_id, handle, quantity } = product;
 
+    console.log(Studio.state.view);
+
+    const newBlocks = Studio.state.view.blocks.map(block => {
+        const newChildren = block.childBlocks.map(child => {
+          if (child.type === 'text') {
+            return child;
+          }
+
+          if (child.type === 'editable-picture') {
+            return {
+              ...child,
+              imageUrl: null
+            }
+          }
+        });
+
+        return {
+          ...block,
+          childBlocks: newChildren
+        }
+    });
+
     Studio.utils.change({
       panel: {
         ...JSON.parse(Studio.panel.getAttribute('state')),
@@ -1564,6 +1587,7 @@ class ProductInfo extends HTMLElement {
       view: {
         ...JSON.parse(Studio.studioView.getAttribute('state')),
         product: { type, settings, shopify_id, handle, quantity },
+        blocks: newBlocks,
         blockCount
       }
     }, 'product-info');
@@ -3212,11 +3236,13 @@ class Tools extends HTMLElement {
 
         productParams = new URLSearchParams(location.search);
 
+        console.log('PRODUCT CHANGED');
+
         Studio.utils.change({
           productId: this.pages.products.selected.dataset.id,
           product: null,
-          panel: {},
-          view: {}
+          panel: globalState.panel,
+          view: globalState.view
         }, 'product change');
       }
     })
@@ -3357,7 +3383,7 @@ class Tools extends HTMLElement {
       if (event.target !== toDeleteBtn && !toDeleteBtn.contains(event.target)) {
         Studio.utils.change({
           imagesToDownload: image.src
-        })
+        }, 'set images to downloads');
       }
     });
 
@@ -5778,9 +5804,9 @@ class StudioView extends HTMLElement {
     if (!compareObjects(prevState.product, currState.product)) {
       this.init(currState.product);
 
-      this.clearViewSync();
+      // this.clearViewSync();
 
-      this.setProductElements(currState.blockCount, []);
+      this.setProductElements(currState.blockCount, currState.blocks);
     }
 
     if (!compareObjects(prevState.blocks, currState.blocks)) {
@@ -5802,7 +5828,7 @@ class StudioView extends HTMLElement {
 
       Studio.utils.change({
         imagesToDownload: null
-      })
+      }, 'reset images to download')
     }
   }
 
@@ -6463,7 +6489,11 @@ class StudioView extends HTMLElement {
 
     block.classList.add('studio-view__block');
 
-    block.toggleAttribute('data-studio-block');
+    if (id) {
+      block.setAttribute('data-studio-block', id);
+    } else {
+      block.toggleAttribute('data-studio-block');
+    }
 
     switch(type) {
       case 'photobook-page':
@@ -6693,13 +6723,16 @@ class StudioView extends HTMLElement {
       return;
     }
 
-
     const blocks =  this.elements.container.querySelectorAll(StudioView.selectors.studioBlock);
 
     if (!size && toRemove && Array.isArray(toRemove)) {
       toRemove
         .map(id => this.querySelector(StudioView.selectors.blockById(id)).parentElement)
-        .forEach(block => block && block.remove());
+        .forEach(block => {
+          if (block) {
+            block.remove();
+          }
+        });
 
       return Boolean(toRemove.length);
     }
@@ -6713,13 +6746,6 @@ class StudioView extends HTMLElement {
             block.remove();
           }
         })
-
-      Studio.utils.change({
-        view: {
-          ...this.state,
-          blocks: []
-        }
-      }, 'clear view sync')
     }
   }
 
@@ -6777,7 +6803,7 @@ class StudioView extends HTMLElement {
   }
 
   getBlocksJSON() {
-    const { product } = JSON.parse(this.getAttribute('state'));
+    const product = Studio.product;
 
     let type;
     let childList;
@@ -6907,13 +6933,13 @@ class StudioView extends HTMLElement {
   ) {
     const { product } = JSON.parse(this.getAttribute('state'));
 
-    const productHandle = product.handle;
-
-    const waitToClear = [];
-
     if (!product) {
       return;
     }
+
+    const productHandle = product.handle;
+
+    const waitToClear = [];
 
     const createBlock = (block) => {
       switch(block.type) {
@@ -6954,37 +6980,35 @@ class StudioView extends HTMLElement {
     let toUpdate = false, newBlocks = [ ...blocks ];
 
     const blockElements = [...this.querySelectorAll(StudioView.selectors.block)];
+    
+    const elemsToRemove = blockElements
+      .filter(elem => {
+        const blockJSON = newBlocks.find(block => block.id === elem.getAttribute('block'));
+
+        return (
+          !blockJSON
+          || (blockJSON && !blockJSON.count)
+        );
+      })
+      .map(elem => elem.getAttribute('block'));
+
+    this.clearViewSync(null, elemsToRemove);
 
     if (!options.clearAll && size) {
-      if (size > blocks.length) {
+      if (size > newBlocks.length) {
         toUpdate = true;
 
-        const nowLength = this.querySelectorAll(StudioView.selectors.studioBlock).length;
-        for (let i = 0; i < size - nowLength; i++) {
-          // createBlock();
+        for (let i = 0; i < size; i++) {
           newBlocks.push(this.getBlocksJSON());
         }
-      } else if (size < blocks.length) {
-        toUpdate = true;
-
-        const toRemove = newBlocks.slice(size);
-
-        this.clearViewSync(size);
-        // waitToClear.push(this.clearView(size));
-      }
-
-      // const emptyBlocks = blocks.filter(block => block.count === 0);
-
-      // toUpdate = this.clearViewSync(null, emptyBlocks);
+      } 
     } else if (options.clearAll) {
       toUpdate = true;
 
       this.clearViewSync();
-      newBlocks = [];
       // waitToClear.push(this.clearView());
 
       for (let i = 0; i < size; i++) {
-        // createBlock();
         newBlocks.push(this.getBlocksJSON());
       }
     }
@@ -6992,15 +7016,6 @@ class StudioView extends HTMLElement {
     const blocksToCreate = newBlocks.filter(block => !blockElements.some(elem => {
       return elem.getAttribute('block') === block.id;
     }));
-
-    
-    const elemsToRemove = blockElements.filter(elem => !newBlocks
-          .some(block => block.id === elem.getAttribute('block'))
-      ).map(elem => elem.getAttribute('block'));
-      
-    const blocksCount = blocksToCreate.length;
-
-    this.clearViewSync(null, elemsToRemove);
 
     newBlocks = newBlocks.filter(block => !elemsToRemove.includes(block.id));
 
@@ -7013,6 +7028,11 @@ class StudioView extends HTMLElement {
     }
 
     blocksToCreate.forEach(block => createBlock(block));
+
+    const { offsetHeight, offsetWidth } = this.querySelector(StudioView.selectors.block);
+    const { offsetWidth: controlsWidth } = this.querySelector(StudioView.selectors.blockControls);
+
+    this.addBlockBtn.setSize(offsetWidth > controlsWidth ? offsetWidth : controlsWidth, offsetHeight);
 
       Studio.utils.change({ view: {
         ...JSON.parse(this.getAttribute('state')),
@@ -7120,24 +7140,51 @@ class StudioView extends HTMLElement {
   }
 
   initAddBlockBtn() {
+    const container = document.createElement('div');
+    container.classList.add('studio-view__button-add-wrapper');
+
     const button = document.createElement('button');
+    button.classList.add('studio-view__button-add');
+
+    container.style.paddingTop = '20px';
+
+    const icon = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="91" height="91" fill="none"><path fill="#FFD9D9" fill-rule="evenodd" d="M45.5 91a45.5 45.5 0 1 0 0-91 45.5 45.5 0 0 0 0 91Zm0-10a35.5 35.5 0 1 0 0-71 35.5 35.5 0 0 0 0 71Z" clip-rule="evenodd"/><path fill="#FFD9D9" d="M40 22h10v47H40z"/><path fill="#FFD9D9" d="M22 50v-9h48v9z"/></svg>
+    `;
 
     button.toggleAttribute('data-add-block');
-    button.style.order = '1';
+    container.style.order = '1';
 
-    button.textContent = 'Add block';
+    button.innerHTML = icon;
 
     const addBlockCallback = this.addBlock.bind(this);
 
+    container.append(button);
+
     return {
-      container: button,
+      container: container,
       create: () => {
-        this.elements.container.append(button);
+        this.elements.container.append(container);
         button.addEventListener('click', addBlockCallback);
       },
       remove: () => {
-        button.remove();
+        container.remove();
         button.removeEventListener('click', addBlockCallback);
+      },
+      setSize: (width, height) => {
+        if (!width) {
+          return;
+        }
+
+        if (width) {
+          container.style.width = width + 'px';
+        }
+
+        if (height) {
+          container.style.height = height + 'px';
+        } else if (width) {
+          container.style.height = width + 'px';
+        } 
       }
     }
   }

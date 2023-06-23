@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import { dirname, resolve } from "path";
+import { dirname } from "path";
 import { fileURLToPath } from "url";
 import https from "https";
 import react from "@vitejs/plugin-react";
@@ -42,8 +42,6 @@ if (host === "localhost") {
   };
 }
 
-console.log(process.cwd());
-
 export default defineConfig({
   root: dirname(fileURLToPath(import.meta.url)),
   plugins: [react()],
@@ -52,16 +50,6 @@ export default defineConfig({
   },
   resolve: {
     preserveSymlinks: true,
-  },
-  build: {
-    target: 'esnext',
-    outDir: 'product-builder/dist',
-    assetsDir: 'product-builder/src/assets',
-    rollupOptions: {
-      input: {
-        main: 'product-builder/src/index.html'
-      }
-    }
   },
   server: {
     host: "localhost",
@@ -74,3 +62,4 @@ export default defineConfig({
     },
   },
 });
+
