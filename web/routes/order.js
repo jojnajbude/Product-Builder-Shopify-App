@@ -2,7 +2,7 @@ import { Router, json } from 'express';
 import multer from "multer";
 import fs from 'fs';
 
-import { createOrder, getCustomer, getOrderInfo, getOrderPath, getOrderState, updateOrder } from '../controllers/order.js';
+import { createOrder, deleteOrder, getCustomer, getOrderInfo, getOrderPath, getOrderState, updateOrder } from '../controllers/order.js';
 
 import { join } from 'path';
 import { shopifyApp } from '@shopify/shopify-app-express';
@@ -59,12 +59,26 @@ const orders = Router();
 
 orders.post('/create', json(), getOrderPath, createOrder);
 
-orders.post('/update/:orderId', json(), getOrderPath, updateOrder)
+orders.post('/update/:orderId', json(), getOrderPath, updateOrder);
+
+orders.get('/checkout/:orderId', getOrderPath, (req, res) => {
+  const { path: ordersPath, id } = req.order;
+
+  const infoPath = join(ordersPath, 'info.json');
+
+  const info = JSON.parse(fs.readFileSync(infoPath)); 
+
+  info.status = 'active';
+
+  fs.writeFileSync(infoPath, JSON.stringify(info));
+
+  res.sendStatus(200);
+})
 
 orders.get('/list/:customerId', (req, res) => {
   const { customerId } = req.params;
 
-  const { shop } = req.query;
+  const { shop, status } = req.query;
 
   if (!customerId) {
     res.send({
@@ -106,7 +120,8 @@ orders.get('/list/:customerId', (req, res) => {
 
       return false;
     }).filter(buff => buff)
-    .map(buff => JSON.parse(buff));
+    .map(buff => JSON.parse(buff))
+    .filter(order => status ? order.status === 'active' : true);
 
   res.setHeader('Content-Type', 'application/json');
 
@@ -117,25 +132,7 @@ orders.get('/info/:orderId', getOrderPath, getOrderInfo);
 
 orders.get('/state/:orderId', getOrderPath, getOrderState);
 
-orders.delete('/delete/:orderId', getOrderPath, (req, res) => {
-  const orderPath = req.ordersPath;
-
-  const isExist = fs.existsSync(orderPath);
-
-  if (!isExist) {
-    res.send({
-      error: {
-        message: "Order's id is incorrect, can't to delete order"
-      }
-    })
-  }
-
-  fs.rmSync(orderPath, { recursive: true });
-
-  res.send({
-    correct: 'Deleted'
-  });
-}) 
+orders.delete('/delete/:orderId', getOrderPath, deleteOrder); 
 
 orders.post('/uploads', imageUpload.single('images'), (req, res) => {
   const file = req.file;

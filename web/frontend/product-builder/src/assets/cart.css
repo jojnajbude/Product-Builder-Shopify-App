@@ -1,0 +1,41 @@
+.cart-item__draft-control {
+  min-width: 140px;
+  justify-content: center;
+}
+
+confirm-modal {
+  display: none;
+  position: relative;
+}
+
+confirm-modal[state="open"] {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  border-radius: 20px;
+  background-color: #fff;
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+confirm-modal .confirm-modal__content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  justify-content: center;
+  align-items: center;
+}
+
+confirm-modal .content__button-group {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+confirm-modal .content__button-group .button {
+  flex-grow: 1;
+}

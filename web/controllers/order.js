@@ -81,6 +81,8 @@ export const getOrderPath = (req, res, next) => {
 export const createOrder = async (req, res) => {
   const { path: ordersPath, id: orderId, createdAt } = req.order;
 
+  const { status } = req.query;
+
   const isExist = fs.existsSync(ordersPath);
 
   if (isExist) {
@@ -88,7 +90,7 @@ export const createOrder = async (req, res) => {
       error: {
         message: 'Order is exists'
       }
-    })
+    }) 
   }
 
   fs.mkdirSync(ordersPath);
@@ -97,10 +99,14 @@ export const createOrder = async (req, res) => {
 
   fs.writeFileSync(join(ordersPath, 'state.json'), JSON.stringify(state));
 
+  const quantity = state.view.blocks.reduce((sum, block) => sum + block.count, 0);
+
   const info = {
     id: orderId,
+    status: status ? status : 'draft',
     createdAt: createdAt,
-    updatedAt: createdAt
+    updatedAt: createdAt,
+    quantity
   }
 
   const { product } = state;
@@ -129,10 +135,12 @@ export const updateOrder = async (req, res) => {
   const { product } = state;
 
   if (product) {
-    const { imageUrl, handle, type, title, status, shopify_id } = product;
+    const { imageUrl, handle, type, title, status, shopify_id, price } = product;
 
-    info.product = { imageUrl, handle, type, title, status, shopify_id };
+    info.product = { imageUrl, handle, type, title, status, shopify_id, price };
   }
+
+  info.quantity = state.view.blocks.reduce((sum, block) => sum + block.count, 0);
 
   info.updatedAt = Date.now();
 
@@ -170,3 +178,42 @@ export const getOrderState = async (req, res) => {
 
   res.send(state);
 }
+
+export const deleteOrder = (req, res) => {
+  const orderPath = req.ordersPath;
+
+  const { inactive } = req.query;
+
+  const isExist = fs.existsSync(orderPath);
+
+  if (!isExist) {
+    res.send({
+      error: {
+        message: "Order's id is incorrect, can't to delete order"
+      }
+    })
+  }
+
+  if (inactive) {
+    const infoPath = join(orderPath, 'info.json');
+
+    const info = JSON.parse(fs.readFileSync(infoPath));
+
+    if (info) {
+      info.status = 'draft';
+    }
+
+    fs.writeFileSync(infoPath, JSON.stringify(info));
+
+    res.send({
+      correct: 'Set status of order to draft'
+    });
+    return;
+  }
+
+  fs.rmSync(orderPath, { recursive: true });
+
+  res.send({
+    correct: 'Deleted'
+  });
+};

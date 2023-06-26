@@ -53,6 +53,33 @@ productBuilder.get('/customer', async (req, res) => {
     })
   }
 });
+
+productBuilder.get('/cart/checkProduct', async (req, res) => {
+  const { id } = req.query;
+
+  const shopify_id = "gid://shopify/Product/" + id;
+
+  const isExist = await ProductModel.findOne({
+    shopify_id
+  });
+
+  if (!isExist) {
+    res.send({
+      allowed: 'yes'
+    });
+    return;
+  }
+
+  res.send({
+    allowed: 'no'
+  })
+});
+
+productBuilder.get('/cart', (req, res) => {
+  res.setHeader('Content-Type', 'application/liquid');
+
+  res.sendFile(join(process.cwd(), 'frontend', 'product-builder/src', 'card.liquid'));
+});
  
 productBuilder.use('/orders', orders);
  

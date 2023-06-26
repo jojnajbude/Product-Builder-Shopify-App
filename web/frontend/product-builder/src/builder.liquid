@@ -21,6 +21,10 @@
     window.shop = {{ shop.domain | json }}
   </script>
 
+  <script>
+    window.money_format = {{ shop.money_format | json }};
+  </script>
+
   <script src="./product-builder/assets/global.js" defer></script>
 </head>
   <body>
@@ -71,7 +75,7 @@
         </svg>          
       </a>
 
-      <button class="header__checkout-button button button--primary-action">
+      <button data-checkout-button class="header__checkout-button button button--primary-action">
         <span>Checkout</span>
 
         <svg class="button__icon" width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">

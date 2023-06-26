@@ -7,6 +7,84 @@ if (backButton) {
   })
 }
 
+const checkoutButton = document.querySelector('[data-checkout-button]');
+if (checkoutButton) {
+  checkoutButton.addEventListener('click', async () => {
+    const orderId = productParams.get('order-id');
+
+    if (orderId) {
+      const shopifyProduct = await fetch(location.origin + `/products/${Studio.product.handle}.js`)
+        .then(res => res.json());
+
+      const { product } = Studio.state;
+
+      let currVariant = shopifyProduct.variants[0]
+
+      if (shopifyProduct.variants.length > 1) {
+        currVariant = shopifyProduct.variants.find(variant => variant.options.includes('Set of 3')) || currVariant;
+      }
+
+      let quantityToAdd;
+
+      if (product.quantity.type)
+
+      switch (product.quantity.type) {
+        case 'multiply':
+        case 'set-of':
+          quantityToAdd = Studio.studioView.getBlocksCount(Studio.state.view.blocks);
+          break;
+        case 'single':
+          quantityToAdd = 1
+          break;
+        default: 
+          quantityToAdd = 1
+      }
+
+      let addedToCart = {
+        ok: true
+      }
+
+      if (Studio.orderInfo && Studio.orderInfo.status === 'draft') {
+        const { id, quantity, product } = Studio.orderInfo;
+
+        console.log(id);
+
+        addedToCart = await fetch(location.origin + '/cart/add.js', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            items: [
+              {
+                id: currVariant.id,
+                quantity: quantityToAdd,
+                properties: {
+                  'order_id': id,
+                }
+              }
+            ]
+          })
+        })
+
+        console.log(addedToCart)
+      }
+
+      if (addedToCart.ok) {
+        fetch(`product-builder/orders/checkout/${orderId}?id=${Studio.customer.shopify_id}`)
+          .then(res => {
+            if (res.ok) {
+              const link = document.createElement('a');
+
+              link.href = location.origin + '/cart';
+              link.click();
+            }
+          });
+      }
+    }
+  })
+}
+
 const domReader = new DOMParser();
 
 function ActiveActionsController() {
@@ -838,6 +916,8 @@ class ProductBuilder extends HTMLElement {
 
     this.addEventListener('image:check', this.checkImages.bind(this));
 
+    await this.getCart();
+
     this.dispatchEvent(new CustomEvent('studio:inited'));
     this.inited = true;
   }
@@ -872,12 +952,22 @@ class ProductBuilder extends HTMLElement {
     }).then(res => res.json());
   }
 
+  async getCart() {
+    const cart = await fetch(location.origin + '/cart.js').then(res => res.json());
+
+    this.cart = cart;
+
+    return cart;
+  }
+
   setOrderPath() {
     const nextURL = location.origin + location.pathname + `?order-id=${this.orderId}`;
     const nextTitle = document.title;
     const nextState = { additionalInformation: 'Product builder with order history' };
 
     window.history.replaceState(nextState, nextTitle, nextURL);
+
+    productParams = new URLSearchParams(location.search);
   }
 
   defaultBuilderPath() {
@@ -900,6 +990,9 @@ class ProductBuilder extends HTMLElement {
     if (!id || !customerId) {
       return;
     }
+
+    this.orderInfo = await fetch(`product-builder/orders/info/${id}?id=${customerId}`)
+      .then(res => res.json());
 
     return fetch(`product-builder/orders/state/${id}?id=${customerId}`).then(res => {
       return res.json();
@@ -2342,13 +2435,13 @@ class TextTool extends Tool {
     const { value } = this.text;
     const maxSize = this.maxSize !== Infinity
       ? this.maxSize
-      : isLine ? 35 : 300;
-
+      : isLine ? 20 : 300;
 
     if (value.length > maxSize && isLine) {
       this.text.value = value.substring(0, maxSize);
 
-      
+      console.log('here');
+
       this.text.focus();
       this.text.setSelectionRange(this.text.value.length, this.text.value.length);
     } else if (!isLine && value.length > maxSize) {
@@ -3241,7 +3334,6 @@ class Tools extends HTMLElement {
         Studio.utils.change({
           productId: this.pages.products.selected.dataset.id,
           product: null,
-          panel: globalState.panel,
           view: globalState.view
         }, 'product change');
       }
@@ -4087,6 +4179,7 @@ class EditableText extends HTMLElement {
 
           selection.removeAllRanges();
           selection.addRange(range);
+
         } else if (textArr.length > 300) {
           mutation.target.textContent = textContent.substring(0, 300);
           range.setStartAfter(element.lastChild);
@@ -4665,9 +4758,11 @@ class ProductElement extends HTMLElement {
     const textarea = document.createElement('editable-text');
 
     if (line) {
-      textarea.toggleAttribute('line');
+      if (!textarea.hasAttribute('line')) {
+        textarea.toggleAttribute('line');
+      }
 
-      if (maxSize) {
+      if (maxSize && !textarea.hasAttribute('max-size')) {
         textarea.setAttribute('max-size', maxSize);
       }
     }
@@ -5817,6 +5912,30 @@ class StudioView extends HTMLElement {
 
       this.setBlocksValue(prevState.blocks, currState.blocks);
 
+      if (Studio.orderInfo && Studio.orderInfo.status === 'active'
+        && prevCounts !== currCounts
+        && prevCounts !== 0) {
+        const currVariant = Studio.cart.items.find(item => {
+          if (typeof currState.product.shopify_id === 'number') {
+            return item.product_id === currState.product.shopify_id
+              && item.properties.order_id == Studio.orderId;
+          }
+
+          return currState.product.shopify_id.includes(item.product_id)
+            && item.properties.order_id == Studio.orderId;
+        });
+
+        const newQuantity = currVariant.quantity + (currCounts - prevCounts);
+
+        console.log(currVariant);
+
+        this.setCurrentCartQuantity(currVariant.key, newQuantity)
+          .then(_ => {
+            Studio.getCart();
+            console.log(_)
+          })
+      }
+
       this.setProductElements(null, currState.blocks);
     }
     
@@ -6808,6 +6927,8 @@ class StudioView extends HTMLElement {
     let type;
     let childList;
 
+    const childOptions = {};
+
     switch (product.type.id) {
       case 'photobook':
         type = 'photobook-page';
@@ -6817,6 +6938,7 @@ class StudioView extends HTMLElement {
         if (product.handle.includes('polaroid')) {
           type = 'polaroid';
           childList = ['editable-picture', 'text'];
+          childOptions.isLine = true;
         } else {
           type = 'prints'
           childList = ['editable-picture'];
@@ -6879,7 +7001,7 @@ class StudioView extends HTMLElement {
       }, {});
 
     const childrenJSON = childList
-      .map(child => this.getChildsJSON(child));
+      .map(child => this.getChildsJSON(child, childOptions));
 
     return {
       id: uniqueID.block(),
@@ -6898,6 +7020,8 @@ class StudioView extends HTMLElement {
     const id = uniqueID.childBlock();
 
     const { isLine = false } = options;
+
+    console.log(isLine);
 
     switch (type) {
       case 'editable-picture':
@@ -7190,6 +7314,12 @@ class StudioView extends HTMLElement {
   }
 
   addBlock() {
+    const currCount = this.getBlocksCount(Studio.state.view.blocks);
+
+    if (currCount >= Studio.state.product.quantity.maximum) {
+      return;
+    }
+
     const newBlock = this.getBlocksJSON();
 
     Studio.utils.change({
@@ -7198,6 +7328,19 @@ class StudioView extends HTMLElement {
         blocks: [ ...Studio.state.view.blocks, newBlock ]
       }
     }, 'block add');
+  }
+
+  async setCurrentCartQuantity(key, quantity) {
+    return fetch(location.origin + '/cart/change.js', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        'id': key,
+        'quantity': quantity
+      })
+    }).then(res => res.json());
   }
 }
 customElements.define('studio-view', StudioView);
