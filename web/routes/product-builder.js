@@ -12,10 +12,14 @@ const PROXY_PATH = `${process.cwd()}/frontend/product-builder/src`;
 
 const productBuilder = express.Router();
 
-productBuilder.get('/', (req, res) => {
+productBuilder.get('/', async (req, res) => {
+  const host = process.env.HOST;
+
   res.setHeader('Content-Type', 'application/liquid');
 
-  res.sendFile(join(PROXY_PATH, 'builder.liquid')); 
+  const pagePath = join(PROXY_PATH, 'builder.liquid');
+
+  res.sendFile(pagePath); 
 });
 
 productBuilder.get('/product', async (req, res) => {
@@ -78,14 +82,14 @@ productBuilder.get('/cart/checkProduct', async (req, res) => {
 productBuilder.get('/cart', (req, res) => {
   res.setHeader('Content-Type', 'application/liquid');
 
-  res.sendFile(join(process.cwd(), 'frontend', 'product-builder/src', 'card.liquid'));
+  res.sendFile(join(process.cwd(), 'frontend', 'product-builder/src', 'cart.liquid'));
 });
  
 productBuilder.use('/orders', orders);
  
 productBuilder.get('/uploads/list', getCustomerUploads);
 
-productBuilder.post('/uploads/remove', express.json(), removeImage) 
+productBuilder.post('/uploads/remove', express.json(), removeImage);
 
 productBuilder.get('/uploads/*', sharpImage); 
  

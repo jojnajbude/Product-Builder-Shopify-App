@@ -89,7 +89,8 @@ customElements.define('confirm-modal', ConfirmModal);
 const confirmModal = document.querySelector('confirm-modal');
 
 const draftsList = document.querySelector('[data-drafts-list]');
-const customerId = draftsList.dataset.draftsList;
+const customerId = draftsList.dataset.draftsList || Cookies.get('product-builder-anonim-id');
+const shop = draftsList.dataset.shop;
 
 const deleteIcon = `
   <svg width="19" height="20" viewBox="0 0 19 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -113,7 +114,7 @@ const onImageLoad = async (picture, src) => {
 
 const orderItem = (draft) => {
   return new Promise(async (res, rej) => {
-    const { id, product, updatedAt } = draft;
+    const { orderID: id, product, updatedAt } = draft;
   
     const li = document.createElement('li');
     li.classList.add('order', 'is-loading');
@@ -122,7 +123,10 @@ const orderItem = (draft) => {
     picture.width = 100;
     picture.height = 100;
     picture.classList.add('order__image');
-    await onImageLoad(picture, product.imageUrl);
+
+    if (product.imageUrl) {
+      await onImageLoad(picture, product.imageUrl);
+    }
 
     const title = document.createElement('div');
     title.classList.add('order__title');
@@ -161,7 +165,7 @@ const orderItem = (draft) => {
       confirmModal.getConfirm({
         text: 'Are you sure you want to delete?',
         callback: () => {
-          const deleteLink = `orders/delete/${draft.id}?id=${customerId}`;
+          const deleteLink = `orders/delete/${id}?id=${customerId}&shop=${shop}`;
           deleteBtn.classList.add('is-loading');
           deleteBtn.toggleAttribute('disabled');
 
@@ -216,20 +220,18 @@ const setOrders = (orders) => {
   });
 }
 
-console.log(customerId);
-
 const ordersLink = location.origin + '/apps/product-builder/orders/list/' + customerId;
-
-console.log(ordersLink);
 
 const initOrders = () => {
   fetch(ordersLink)
     .then(res => res.json())
-    .then(res => {
-      if (!res.error) {
-        setOrders(res);
+    .then(orders => {
+      if (Array.isArray(orders) && orders.every(order => !order.error)) {
+        setOrders(orders);
       }
     });
 }
 
-initOrders();
+if (customerId) {
+  initOrders();
+}

@@ -19,10 +19,10 @@ import { encryptPassword, decryptPassword } from "./utils/password_hashing.js";
 
 import { google } from "googleapis";
 import Customer from "./models/Customer.js";
-import { youtube } from "googleapis/build/src/apis/youtube/index.js";
 
-import orders from './routes/order.js';
 import productBuilder from "./routes/product-builder.js";
+
+// import { engine } from 'express-handlebars';
 
 dotenv.config();
 
@@ -60,12 +60,20 @@ const PORT = parseInt(process.env.BACKEND_PORT || process.env.PORT || '', 10);
 const STATIC_PATH =
   process.env.NODE_ENV === "production"
     ? `${process.cwd()}/frontend/dist`
-    : `${process.cwd()}/frontend/`; 
+    : `${process.cwd()}/frontend/`;
 
 const app = express();
 
-app.use(cors());
+// app.engine('handlebars', engine({
+//   compilerOptions: {
+ 
+//   }
+// }));
+// app.set('view engine', 'handlebars');
+// app.set('views', './frontend/product-builder/src');
 
+app.use(cors()); 
+  
 // Set up Shopify authentication and webhook handling
 app.get(shopify.config.auth.path, shopify.auth.begin());
 app.get(
@@ -90,12 +98,12 @@ app.get(
   async (req, res, next) => {
     const webhookToCreate = new shopify.api.rest.Webhook({
       session: res.locals.shopify.session
-    });
+    }); 
 
     webhookToCreate.address = "https://product-builder.dev-test.pro/api/customers/create";
     webhookToCreate.topic = "customers/create";
     webhookToCreate.format = "json";
-    await webhookToCreate.save({
+    await webhookToCreate.save({ 
       update: true,
     });
 
@@ -119,7 +127,7 @@ app.post(
   // @ts-ignore
   shopify.processWebhooks({ webhookHandlers: GDPRWebhookHandlers })
 );
-
+ 
 // If you are adding routes outside of the /api path, remember to
 // also add a proxy rule for them in web/frontend/vite.config.js
 
@@ -138,6 +146,18 @@ app.post('/api/customers/create', express.json(), async (req, res) => {
 
   res.sendStatus(200);
 });
+
+app.get('/api/customers/all', async(req, res) => {
+  const customers = await Customer.find({});
+
+  res.send(customers); 
+})
+
+app.get('/api/customers/deleteAll', async(req, res) => {
+  await Customer.deleteMany();
+
+  res.sendStatus(200); 
+})
 
 app.post('/api/customers/delete', express.json(), async (req, res) => {
   const { email, id } = req.body;
@@ -231,6 +251,15 @@ app.use('/api/handle-register', express.json(), async (req, res) => {
     return;
   }
 
+  const isExist = await Customer.findOne({
+    email,
+  });
+
+  if (isExist) {
+    res.sendStatus(400);
+    return;
+  } 
+ 
   const newCustomer = new Customer({
     authCode: null,
     email: email,
@@ -246,8 +275,6 @@ app.use('/api/handle-register', express.json(), async (req, res) => {
 
 app.use('/api/recover', express.json(), async (req, res) => {
   const { email } = req.body;
-
-  console.log(email);
 
   if (!email) {
     res.sendStatus(400);
@@ -313,8 +340,6 @@ app.use('/api/googleOAth', async (req, res) => {
         personLastName = person.names[0].familyName;
       };
 
-      console.log(person);
-
       const newCustomer = new Customer({
         authCode: id,
         email: personEmail?.value,
@@ -366,7 +391,7 @@ app.use('/api/googleOAth', async (req, res) => {
 app.use('/api/instagram/oauth', express.json(), async (req, res) => {
   const { code, state } = req.query;
 
-  console.log(state, req.query)
+  const { shop, customerId } = JSON.parse(state);
 
   if (code) {
     const { client_id, client_secret } = metaKeys.instagram;
@@ -387,12 +412,10 @@ app.use('/api/instagram/oauth', express.json(), async (req, res) => {
       body: formdata
     }).then(res => res.json());
 
-    console.log('here', response);
-
     const { user_id, access_token } = response;
 
     if (access_token) {
-      res.redirect(`https://hladkevych-dev.myshopify.com/apps/product-builder?access_token=${access_token}&user_id=${user_id}`);
+      res.redirect(`${shop}/apps/product-builder?access_token=${access_token}&user_id=${user_id}`);
     }
 
     return;
@@ -406,14 +429,13 @@ app.use('/api/instagram/oauth', express.json(), async (req, res) => {
 });
 
 app.use('/api/instagram/access_token', express.json(), async (req, res) => {
-  console.log(req.body);
   res.send(req.body);
 });
 
 app.post('/api/facebookOAth', express.json(), async (req, res) => {
   const { authResponse, redirect, shop: shopName, action } = req.body;
 
-  const shop = await Shop.findOne({ name: shopName }); 
+  const shop = await Shop.findOne({ name: shopName });
 
   if (!shop) {
     res.send({
@@ -460,7 +482,8 @@ app.post('/api/facebookOAth', express.json(), async (req, res) => {
 
       const isExists = await Customer.findOne({ email: user.email });
 
-      const isFacebookLinked = isExists?.socials.some(social => social.name === 'facebook');
+      
+      const isFacebookLinked = isExists ? isExists.socials.some(social => social.name === 'facebook') : false;
 
       if (customers.length === 0 && !isExists && action === 'register') {
         const newCustomer = new Customer({
@@ -579,10 +602,10 @@ app.get('/api/products', async (req, res) => {
     return;
   }
 
-  const products = await ProductModel.find({ shop: shop?._id});
+  const products = await ProductModel.find({ shop: shop?._id}); 
 
   res.status(200).send(products);
-}); 
+});
 
 app.post('/api/products', async (req, res) => {
   const client = new shopify.api.clients.Graphql({

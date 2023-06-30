@@ -2,6 +2,7 @@ import { join } from 'path';
 import fs from 'fs';
 
 import makeCode from '../utils/makeCode.js';
+import Project from '../models/Projects.js';
 
 const cdnPath = join(process.cwd(), 'frontend', 'product-builder', 'src', 'uploads');
 
@@ -16,7 +17,7 @@ export const getCustomer = (path) => {
 
   const draftPath = join(path, 'orders');
 
-  if (!path.includes('anonims') && !fs.existsSync(draftPath)) {
+  if (!fs.existsSync(draftPath)) {
     fs.mkdirSync(join(path, 'orders'));
   }
 
@@ -32,15 +33,16 @@ export const getOrderPath = (req, res, next) => {
         message: 'Id or anonimId has not provided'
       }
     });
+    return;
   }
 
   if (!shop) {
-
     res.send({
       error: {
         message: 'Shop has not provided'
       }
     })
+    return;
   }
 
   const isLoggedCustomer = fs.existsSync(join(cdnPath, shop, customerId));
@@ -54,7 +56,8 @@ export const getOrderPath = (req, res, next) => {
       error: {
         message: "User's id doesn't exists"
       }
-    })
+    });
+    return;
   }
 
   const createdAt = Date.now();
@@ -65,21 +68,20 @@ export const getOrderPath = (req, res, next) => {
     ? join(cdnPath, shop, customerId, 'orders', orderId)
     : join(cdnPath, shop, 'anonims', customerId, 'orders', orderId);
 
-  req.ordersPath = ordersPath;
-  req.orderId = orderId;
-  req.createdAt
-
   req.order = {
     path: ordersPath,
     id: orderId,
-    createdAt
+    createdAt,
+    isLoggedCustomer
   }
 
   next();
 }
 
 export const createOrder = async (req, res) => {
-  const { path: ordersPath, id: orderId, createdAt } = req.order;
+  const { path: ordersPath, id: orderId, createdAt, isLoggedCustomer } = req.order;
+
+  const { id: customerID, shop } = req.query;
 
   const { status } = req.query;
 
@@ -90,7 +92,8 @@ export const createOrder = async (req, res) => {
       error: {
         message: 'Order is exists'
       }
-    }) 
+    });
+    return;
   }
 
   fs.mkdirSync(ordersPath);
@@ -101,63 +104,76 @@ export const createOrder = async (req, res) => {
 
   const quantity = state.view.blocks.reduce((sum, block) => sum + block.count, 0);
 
-  const info = {
-    id: orderId,
+  const project = new Project({
+    orderID: orderId,
     status: status ? status : 'draft',
     createdAt: createdAt,
     updatedAt: createdAt,
-    quantity
-  }
+    logged: isLoggedCustomer,
+    quantity,
+    shop,
+    customerID
+  });
 
   const { product } = state;
-
+ 
   if (product) {
     const { imageUrl, handle, type, title, status, shopify_id } = product;
 
-    info.product = { imageUrl, handle, type, title, status, shopify_id };
+    project.set('product', { imageUrl, handle, type, title, status, shopify_id });
   }
+  await project.save();
 
-  fs.writeFileSync(join(ordersPath, 'info.json'), JSON.stringify(info));
-
-  res.send(info);
+  res.send(project);
 };
 
 export const updateOrder = async (req, res) => {
-  const { path: ordersPath } = req.order;
+  const { path: ordersPath, id } = req.order;
 
   const statePath = join(ordersPath, 'state.json');
-  const infoPath = join(ordersPath, 'info.json');
 
   const state = req.body;
 
-  const info = JSON.parse(fs.readFileSync(infoPath));
+  const project = await Project.findOne({
+    orderID: id
+  });
 
   const { product } = state;
 
   if (product) {
     const { imageUrl, handle, type, title, status, shopify_id, price } = product;
 
-    info.product = { imageUrl, handle, type, title, status, shopify_id, price };
+    project.set('product', { imageUrl, handle, type, title, status, shopify_id, price });
   }
 
-  info.quantity = state.view.blocks.reduce((sum, block) => sum + block.count, 0);
+  project.set('quantity', state.view.blocks.reduce((sum, block) => sum + block.count, 0));
 
-  info.updatedAt = Date.now();
+  project.set('updatedAt', Date.now());
+
+  await project.save();
 
   fs.writeFileSync(statePath, JSON.stringify(state));
-  fs.writeFileSync(infoPath, JSON.stringify(info));
 
   res.sendStatus(200); 
 };
  
-export const getOrderInfo = (req, res) => {
-  const { path: ordersPath } = req.order;
+export const getOrderInfo = async (req, res) => {
+  const { id } = req.order;
 
-  const info = fs.readFileSync(join(ordersPath, 'info.json'));
+  const project = await Project.findOne({
+    orderID: id
+  });
+
+  if (!project) {
+    res.send({
+      error: "User doesn't have access to this draft"
+    });
+    return;
+  }
 
   res.setHeader('Content-Type', 'application/json');
 
-  res.status(200).send(JSON.parse(info));
+  res.status(200).send(project);
 };
 
 export const getOrderState = async (req, res) => {
@@ -179,31 +195,33 @@ export const getOrderState = async (req, res) => {
   res.send(state);
 }
 
-export const deleteOrder = (req, res) => {
-  const orderPath = req.ordersPath;
+export const deleteOrder = async (req, res) => {
+  const { id, path } = req.order;
 
   const { inactive } = req.query;
 
-  const isExist = fs.existsSync(orderPath);
+  const isExist = fs.existsSync(path);
+
+  console.log(path);
 
   if (!isExist) {
     res.send({
       error: {
         message: "Order's id is incorrect, can't to delete order"
       }
-    })
+    });
+    return;
   }
 
+
   if (inactive) {
-    const infoPath = join(orderPath, 'info.json');
+    const project = await Project.findOne({
+      orderID: id
+    });
 
-    const info = JSON.parse(fs.readFileSync(infoPath));
+    project.set('status', 'draft');
 
-    if (info) {
-      info.status = 'draft';
-    }
-
-    fs.writeFileSync(infoPath, JSON.stringify(info));
+    await project.save();
 
     res.send({
       correct: 'Set status of order to draft'
@@ -211,7 +229,10 @@ export const deleteOrder = (req, res) => {
     return;
   }
 
-  fs.rmSync(orderPath, { recursive: true });
+  fs.rmSync(path, { recursive: true });
+  await Project.deleteOne({
+    orderID: id
+  });
 
   res.send({
     correct: 'Deleted'

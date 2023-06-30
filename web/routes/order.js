@@ -5,7 +5,8 @@ import fs from 'fs';
 import { createOrder, deleteOrder, getCustomer, getOrderInfo, getOrderPath, getOrderState, updateOrder } from '../controllers/order.js';
 
 import { join } from 'path';
-import { shopifyApp } from '@shopify/shopify-app-express';
+import cron from 'node-cron';
+import Project from '../models/Projects.js';
 
 const imageStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -51,6 +52,79 @@ const imageUpload = multer({
   limits: {
     fileSize: 1048576 * 40
   } 
+});
+let i = 0;
+
+cron.schedule('*/2 * * * * *', async (now) => {
+  const anonimsProjects = await Project.find({
+    logged: false
+  }).limit(50);
+
+  const toDelete = anonimsProjects.filter(project => {
+    const timeDiff = (now - project.updatedAt) / 1000;
+    return timeDiff >= 60;
+  });
+
+  const deleted = await Promise.all(toDelete.map(project => {
+    return new Promise(res => {
+      Project.deleteOne({
+        orderID: project.orderID
+      }).then(_ => res(project));
+    })
+  }));
+
+  deleted.map(project => {
+    const { orderID: id, shop, customerID, logged } = project;
+
+    const path = logged
+      ? join(cdnPath, shop, customerID, 'orders', id)
+      : join(cdnPath, shop, 'anonims', customerID, 'orders', id);
+
+    if (fs.existsSync(path)) {
+      fs.rmSync(path, { recursive: true });
+    }
+  });
+});
+
+cron.schedule('*/1 * * * *', () => {
+  const shops = fs.readdirSync(cdnPath, { withFileTypes: true})
+    .filter(shop => shop.isDirectory())
+    .map(shop => shop.name);
+
+  shops.forEach(shop => {
+    const anonimsPath = join(cdnPath, shop, 'anonims');
+    
+    if (!fs.existsSync(anonimsPath)) {
+      return;
+    }
+
+    const anonims = fs.readdirSync(anonimsPath, { withFileTypes: true })
+      .filter(user => user.isDirectory())
+      .map(user => user.name);
+
+    anonims.forEach(anonim => {
+      const anonimPath = join(cdnPath, shop, 'anonims', anonim);
+
+      if (!fs.existsSync(anonimPath)) {
+        return;
+      }
+
+      const ordersPath = join(anonimPath, 'orders');
+
+      if (!fs.existsSync(ordersPath)) {
+        fs.rmSync(anonimPath, { recursive: true });
+      }
+
+      const projects = fs.readdirSync(join(anonimPath, 'orders'), { withFileTypes: true })
+        .filter(project => project.isDirectory() && project.name.startsWith('draft'));
+
+        
+      if (!projects.length) {
+        console.log('anonim has been deleted:', anonim);
+        fs.rmSync(anonimPath, { recursive: true });
+      }
+    })
+  })
 })
 
 const cdnPath = join(process.cwd(), 'frontend', 'product-builder', 'src', 'uploads');
@@ -61,22 +135,56 @@ orders.post('/create', json(), getOrderPath, createOrder);
 
 orders.post('/update/:orderId', json(), getOrderPath, updateOrder);
 
-orders.get('/checkout/:orderId', getOrderPath, (req, res) => {
+orders.get('/checkout/:orderId', getOrderPath, async (req, res) => {
   const { path: ordersPath, id } = req.order;
 
-  const infoPath = join(ordersPath, 'info.json');
+  const project = await Project.findOne({
+    orderID: id
+  });
 
-  const info = JSON.parse(fs.readFileSync(infoPath)); 
+  if (!project) {
+    res.send({
+      error: 'No project'
+    });
+    return;
+  }
 
-  info.status = 'active';
-
-  fs.writeFileSync(infoPath, JSON.stringify(info));
+  project.set('status', 'active');
 
   res.sendStatus(200);
+});
+
+orders.post('/cart/check', json(), (req, res) => {
+  const { id: customerId, shop } = req.query;
+  const { projects } = req.body;
+
+  const userPath = customerId.split('-').length > 1
+    ? join(cdnPath, shop, 'anonims', customerId, 'orders')
+    : join(cdnPath, shop, customerId, 'orders');
+
+  const isUserExist = fs.existsSync(userPath);
+
+  if (!isUserExist) {
+    res.send({
+      error: "User doesn't exists"
+    });
+    return;
+  }
+
+  const projectExists = projects.reduce((result, project) => {
+    const isExist = fs.existsSync(join(userPath, project));
+
+    return {
+      ...result,
+      [project]: isExist
+    }
+  }, {});
+
+  res.send(projectExists);
 })
 
-orders.get('/list/:customerId', (req, res) => {
-  const { customerId } = req.params;
+orders.get('/list/:customerId', async (req, res) => {
+  const { customerId } = req.params; 
 
   const { shop, status } = req.query;
 
@@ -108,24 +216,14 @@ orders.get('/list/:customerId', (req, res) => {
     ? join(cdnPath, shop, customerId, 'orders')
     : join(cdnPath, shop, 'anonims', customerId, 'orders');
 
-  const orders = fs.readdirSync(ordersPath, { withFileTypes: true })
-    .filter(dir => dir.name.startsWith('draft'))
-    .map(dir => {
-      const infoPath = join(ordersPath, dir.name, 'info.json');
-      const isExistInfo = fs.existsSync(infoPath)
-
-      if (isExistInfo) {
-        return fs.readFileSync(infoPath);
-      }
-
-      return false;
-    }).filter(buff => buff)
-    .map(buff => JSON.parse(buff))
-    .filter(order => status ? order.status === 'active' : true);
+  const projects = await Project.find({
+    shop,
+    customerID: customerId
+  });
 
   res.setHeader('Content-Type', 'application/json');
 
-  res.send(orders);
+  res.send(projects);
 });
 
 orders.get('/info/:orderId', getOrderPath, getOrderInfo);

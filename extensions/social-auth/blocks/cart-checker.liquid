@@ -1,0 +1,14 @@
+<script>
+  window.cartChecker = {
+    customerID: '{{ customer.id }}',
+    shop: '{{ shop.permanent_domain }}'
+  }
+</script>
+
+{% schema %}
+  {
+    "name": "Cart checker",
+    "target": "body",
+    "javascript": "cart-checker.js"
+  }
+{% endschema %}

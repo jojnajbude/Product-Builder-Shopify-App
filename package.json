@@ -10,7 +10,11 @@
     "dev-tunnel": "npm run dev -- --tunnel-url https://product-builder.dev-test.pro:3005",
     "info": "shopify app info",
     "generate": "shopify app generate",
-    "deploy": "shopify app deploy"
+    "deploy": "shopify app deploy",
+    "do-build-stage": "docker build -t product-builder --no-cache --build-arg SHOPIFY_API_KEY=9908c334f0597cb8d26d0e1ddb1cab26 .",
+    "do-tag": "docker tag product-builder registry.digitalocean.com/product-builder/product-builder",
+    "do-push": "docker push registry.digitalocean.com/product-builder/product-builder",
+    "do-stage": "npm run do-build-stage && npm run do-tag && npm run do-push"
   },
   "dependencies": {
     "@googleapis/docs": "^2.0.1",

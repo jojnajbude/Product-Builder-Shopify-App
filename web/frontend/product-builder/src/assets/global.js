@@ -1,5 +1,9 @@
 'use strict';
 
+const cookiesTime = {
+  anonimUser: 1 / 24
+}
+
 const backButton = document.querySelector('[data-back-button]');
 if (backButton) {
   backButton.addEventListener('click', () => {
@@ -40,14 +44,10 @@ if (checkoutButton) {
           quantityToAdd = 1
       }
 
-      let addedToCart = {
-        ok: true
-      }
+      let addedToCart = {}
 
       if (Studio.orderInfo && Studio.orderInfo.status === 'draft') {
-        const { id, quantity, product } = Studio.orderInfo;
-
-        console.log(id);
+        const { orderID, quantity, product } = Studio.orderInfo;
 
         addedToCart = await fetch(location.origin + '/cart/add.js', {
           method: 'POST',
@@ -60,18 +60,18 @@ if (checkoutButton) {
                 id: currVariant.id,
                 quantity: quantityToAdd,
                 properties: {
-                  'order_id': id,
+                  'order_id': orderID,
                 }
               }
             ]
           })
-        })
-
-        console.log(addedToCart)
+        }).then(res => res.json());
       }
 
-      if (addedToCart.ok) {
-        fetch(`product-builder/orders/checkout/${orderId}?id=${Studio.customer.shopify_id}`)
+      console.log(addedToCart);
+
+      if (!addedToCart.status) {
+        fetch(`product-builder/orders/checkout/${orderId}?id=${Studio.customer ? Studio.customer.shopify_id : Studio.anonimCustomerId}`)
           .then(res => {
             if (res.ok) {
               const link = document.createElement('a');
@@ -79,7 +79,12 @@ if (checkoutButton) {
               link.href = location.origin + '/cart';
               link.click();
             }
-          });
+          })
+      } else {
+        Studio.errorToast.error({
+          text: addedToCart.description,
+          type: addedToCart.message
+        })
       }
     }
   })
@@ -351,7 +356,7 @@ const layouts = {
   }
 }
 
-const ImageLimits = {
+window.ImageLimits = {
   size: 10 * 1048576,
   resolution: {
     width: 200,
@@ -671,7 +676,7 @@ class ProductBuilder extends HTMLElement {
         if (someImages) {
           this.orderCreating = true;
           this.createOrder().then(order => {
-            this.orderId = order.id;
+            this.orderId = order.orderID;
 
             this.setOrderPath();
             this.orderCreating = false;
@@ -832,10 +837,16 @@ class ProductBuilder extends HTMLElement {
 
       const url = new URL(location.pathname, location.origin);
       for (const key in newQuery) {
-        url.searchParams.append(key, newQuery[key]);
+        if (newQuery[key]) {
+          url.searchParams.append(key, newQuery[key]);
+        }
       }
 
-      location.href = url.href;
+      const link = document.createElement('a');
+
+      link.href = url.href;
+
+      link.click();
   }
 
   setState(state) {
@@ -868,7 +879,7 @@ class ProductBuilder extends HTMLElement {
     const customer = await this.getCustomer();
 
     if (!customer) {
-      this.anonimCustomerId = localStorage.getItem('product-builder-anonim-id');
+      this.anonimCustomerId = Cookies.get('product-builder-anonim-id');
     }
 
     this.setState({
@@ -888,28 +899,26 @@ class ProductBuilder extends HTMLElement {
       this.panel.tools.uploadedImages(this.uploaded);
     }
 
-    const anonimOrderId = localStorage.getItem('product-builder-anonim-order-state');
-
-    if (!this.anonimCustomerId) {
-      if (productParams.get('order-id')) {
-        this.orderId = productParams.get('order-id');
-
-        const state = await this.getOrderState(this.orderId);
-  
-        if (!state.error) {
-          Studio.utils.change(state);
-        } else {
-          this.orderId = await this.createOrder();
-
-          this.setOrderPath();
-        }
+    if (productParams.get('order-id')) {
+      if (!this.customer && !this.anonimCustomerId) {
+        this.defaultBuilderPath();
       }
-    } else if (anonimOrderId) {
-      const state = JSON.parse(anonimOrderId);
 
-      this.addEventListener('studio:inited', () => {
+      this.orderId = productParams.get('order-id');
+
+      const state = await this.getOrderState(this.orderId);
+
+      if (!state) {
+        return;
+      }
+
+      if (state && !state.error) {
         Studio.utils.change(state);
-      })
+      } else {
+        this.orderId = await this.createOrder();
+
+        this.setOrderPath();
+      }
     }
 
     window.oauthInstagram = JSON.parse(localStorage.getItem('oauthInstagram'));
@@ -949,7 +958,11 @@ class ProductBuilder extends HTMLElement {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(Studio.state)
-    }).then(res => res.json());
+    }).then(res => res.json()).then(data => {
+      console.log(data);
+
+      return data;
+    });
   }
 
   async getCart() {
@@ -986,16 +999,47 @@ class ProductBuilder extends HTMLElement {
     const customerId = Studio.customer
       ? Studio.customer.shopify_id
       : Studio.anonimCustomerId;
-
-    if (!id || !customerId) {
+    
+    if (!customerId && id) {
+      console.log('no user')
+      return;
+    } else if (!customerId || !id) {
       return;
     }
 
+    console.log(customerId);
+    
     this.orderInfo = await fetch(`product-builder/orders/info/${id}?id=${customerId}`)
-      .then(res => res.json());
+      .then(res => res.json())
+      .then(data => {
+        if (!data.error) {
+          return data;
+        }
+
+        console.log(data.error);
+
+        Studio.errorToast.error( {
+          text: data.error,
+          type: "User's access"
+        });
+        return;
+      });
+
+    if (!this.orderInfo) {
+      return;
+    }
 
     return fetch(`product-builder/orders/state/${id}?id=${customerId}`).then(res => {
       return res.json();
+    }).then(data => {
+      if (data.error) {
+        Studio.errorToast.error({
+          text: data.error,
+          type: "Directory mismatch"
+        })
+      }
+
+      return data;
     });
   }
 
@@ -1031,17 +1075,29 @@ class ProductBuilder extends HTMLElement {
 
     return customerId
       ? fetch(`product-builder/customer?id=${customerId}`)
-        .then(res => res.json())
-      : null
+        .then(res => res.json()).then(data => {
+          if (data.error) {
+            return null;
+          } 
+        
+          return data;
+        })
+      : null;
   }
 
   async getUploadedList() {
-    return fetch(`product-builder/uploads/list${this.customer ? '' : `?anonimId=${this.anonimCustomerId}`}`)
+    if (!this.anonimCustomerId && !this.customer) {
+      return [];
+    }
+
+    return fetch(`product-builder/uploads/list${this.customer ? `?customerId=${this.customer.shopify_id}` : `?anonimId=${this.anonimCustomerId}`}`)
       .then(res => res.json())
-      .then(data => Array.isArray(data) ? data.map(imageURL => ({
-        original: baseURL + '/' + imageURL,
-        thumbnail: imageURL + `?resize=[${devicePixelRatio * 125},${devicePixelRatio * 125}]&thumbnail=true`
-      })) : []);
+      .then(data => {
+        return Array.isArray(data) ? data.map(imageURL => ({
+          original: baseURL + '/' + imageURL,
+          thumbnail: imageURL + `?resize=[${devicePixelRatio * 125},${devicePixelRatio * 125}]&thumbnail=true`
+        })) : []
+      });
   }
 
   checkImages() {
@@ -1080,6 +1136,14 @@ const utils = {
       if (!utils.history.allowSave) {
         return;
       }
+
+      console.log('here');
+
+      if (Studio.anonimCustomerId) {
+        Cookies.set('product-builder-anonim-id', Studio.anonimCustomerId, {
+          expires: cookiesTime.anonimUser
+        });
+      }
   
       const historyString = localStorage.getItem('product-builder-history');
     
@@ -1108,11 +1172,9 @@ const utils = {
   
       localStorage.setItem('product-builder-history', JSON.stringify(history));
 
-      if (Studio.customer && !Studio.anonimCustomerId && Studio.orderId && Studio.inited && history.length > 1) {
+      if (((Studio.customer && !Studio.anonimCustomerId) || (!Studio.customer && Studio.anonimCustomerId)) && Studio.orderId && Studio.inited && history.length > 1) {
         Studio.updateOrder(Studio.orderId);
-      } else if (Studio.anonimCustomerId && Studio.inited) {
-        localStorage.setItem('product-builder-anonim-order-state', JSON.stringify(Studio.state));
-      } 
+      }
     },
     allowSave: true,
     position: 1,
@@ -1215,6 +1277,12 @@ class ErrorToast extends HTMLElement {
     this.errorContainer = this.querySelector(ErrorToast.selectors.errorsContainer);
 
     this.addEventListener('error:show', this.showErrors.bind(this));
+  }
+
+  error(detail) {
+    this.dispatchEvent(new CustomEvent('error:show', {
+      detail
+    }));
   }
 
   showErrors({ detail: { text, type }}) {
@@ -1618,7 +1686,10 @@ class ProductInfo extends HTMLElement {
       return;
     }
 
-    this.elements.image.src = product.imageUrl + '&height=100';
+    if (product.imageUrl) {
+      this.elements.image.src = product.imageUrl + '&height=100';
+    }
+
     this.elements.title.textContent = product.title;
 
     const sizeOptions = product.options.find(option => option.name === 'Size');
@@ -1649,8 +1720,6 @@ class ProductInfo extends HTMLElement {
     }
 
     const { type, settings, shopify_id, handle, quantity } = product;
-
-    console.log(Studio.state.view);
 
     const newBlocks = Studio.state.view.blocks.map(block => {
         const newChildren = block.childBlocks.map(child => {
@@ -2439,8 +2508,6 @@ class TextTool extends Tool {
 
     if (value.length > maxSize && isLine) {
       this.text.value = value.substring(0, maxSize);
-
-      console.log('here');
 
       this.text.focus();
       this.text.setSelectionRange(this.text.value.length, this.text.value.length);
@@ -3329,8 +3396,6 @@ class Tools extends HTMLElement {
 
         productParams = new URLSearchParams(location.search);
 
-        console.log('PRODUCT CHANGED');
-
         Studio.utils.change({
           productId: this.pages.products.selected.dataset.id,
           product: null,
@@ -3388,7 +3453,9 @@ class Tools extends HTMLElement {
 
   initImagePage() {
     this.errorToast.addEventListener('error:show', (event) => {
-      event.detail.imageWrapper.remove();
+      if (event.detail.imageWrapper) {
+        event.detail.imageWrapper.remove();
+      }
     })
 
     const imagesWrapper = this.querySelector(Tools.selectors.pages.images.imagesWrapper);
@@ -3574,7 +3641,10 @@ class Tools extends HTMLElement {
 
             if (!Studio.anonimCustomerId) {
               Studio.anonimCustomerId = uniqueID.anonim();
-              localStorage.setItem('product-builder-anonim-id', Studio.anonimCustomerId);
+
+              Cookies.set('product-builder-anonim-id', Studio.anonimCustomerId, {
+                expires: cookiesTime.anonimUser
+              });
             }
 
             const fetchURL = baseURL + `/product-builder/orders/uploads${Studio.customer ? `?customerId=${Studio.customer.shopify_id}` : `?anonimId=${Studio.anonimCustomerId}`}&shop=${shop}`;
@@ -3582,6 +3652,12 @@ class Tools extends HTMLElement {
             const response = await fetch(fetchURL, {
               method: 'POST',
               body: formData
+            }).then(res => {
+              if (res.error) {
+                console.log(error);
+              }
+
+              return res;
             });
   
             const imageName = await response.text();
@@ -5927,12 +6003,9 @@ class StudioView extends HTMLElement {
 
         const newQuantity = currVariant.quantity + (currCounts - prevCounts);
 
-        console.log(currVariant);
-
         this.setCurrentCartQuantity(currVariant.key, newQuantity)
           .then(_ => {
             Studio.getCart();
-            console.log(_)
           })
       }
 
@@ -6662,7 +6735,7 @@ class StudioView extends HTMLElement {
     this.elements.container.append(block);
   }
 
-  createPrint(block, productHandle) {
+  createPrint(block) {
     const { id, type, settings } = block;
 
     const studioBlock = this.createStudioBlock('product-prints');
@@ -6671,11 +6744,9 @@ class StudioView extends HTMLElement {
     
     this.blockClickedListener(print);
 
-    const printType = Prints.printTypes.find(ftype => productHandle.includes(ftype));
+    const { width, height } = Studio.product.resolution;
 
-    if (printType) {
-      print.setAttribute('print-type', printType);
-    }
+    print.setAttribute('print-type', `${width}-${height}`);
 
     print.setAttribute('block', id);
     print.setAttribute('block-type', type);
@@ -6935,7 +7006,7 @@ class StudioView extends HTMLElement {
         childList = [];
         break;
       case 'prints':
-        if (product.handle.includes('polaroid')) {
+        if (product.handle.includes('polaroid') || product.handle.includes('retro')) {
           type = 'polaroid';
           childList = ['editable-picture', 'text'];
           childOptions.isLine = true;
@@ -6957,7 +7028,7 @@ class StudioView extends HTMLElement {
         childList = ['editable-picture'];
         break;
       case 'boxes':
-        if (product.handle.includes('polaroid')) {
+        if (product.handle.includes('polaroid') || product.handle.includes('retro')) {
           type = 'polaroid';
           childList = ['editable-picture', 'text'];
         } else {
@@ -7020,8 +7091,6 @@ class StudioView extends HTMLElement {
     const id = uniqueID.childBlock();
 
     const { isLine = false } = options;
-
-    console.log(isLine);
 
     switch (type) {
       case 'editable-picture':
@@ -7601,7 +7670,8 @@ class ImageChooser extends HTMLElement {
   async loginInst() {
     const instToRedirect = {
       id: productParams.get('id'),
-      size: productParams.get('size')
+      size: productParams.get('size'),
+      'order-id': productParams.get('order-id')
     }
 
     localStorage.setItem('instToRedirect', JSON.stringify(instToRedirect));
@@ -7611,7 +7681,7 @@ class ImageChooser extends HTMLElement {
       customerId: window.customerId
     });
 
-    const url = `https://api.instagram.com/oauth/authorize?client_id=${223768276958680}&redirect_uri=https://product-builder.dev-test.pro/api/instagram/oauth&scope=user_profile,user_media&response_type=code&state=${state}`;
+    const url = `https://api.instagram.com/oauth/authorize?client_id=${223768276958680}&redirect_uri=${baseURL}/api/instagram/oauth&scope=user_profile,user_media&response_type=code&state=${state}`;
 
     window.location = url;
   }

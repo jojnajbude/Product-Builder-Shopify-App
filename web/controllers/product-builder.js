@@ -34,7 +34,7 @@ export const removeImage = (req, res) => {
 };
 
 export const getCustomerUploads = (req, res) => {
-  const { logged_in_customer_id: customerId, anonimId, shop } = req.query;
+  const { customerId, anonimId, shop } = req.query;
 
   const path = customerId
     ? join(PROXY_PATH, 'uploads', shop, customerId, 'uploads')
