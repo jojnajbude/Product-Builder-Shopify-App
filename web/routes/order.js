@@ -7,6 +7,9 @@ import { createOrder, deleteOrder, getCustomer, getOrderInfo, getOrderPath, getO
 import { join } from 'path';
 import cron from 'node-cron';
 import Project from '../models/Projects.js';
+import shopifyOrders from './shopify-order.js';
+import Order from '../models/Order.js';
+import shopify from '../shopify.js';
 
 const imageStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -55,9 +58,10 @@ const imageUpload = multer({
 });
 let i = 0;
 
-cron.schedule('*/2 * * * * *', async (now) => {
+cron.schedule('* */30 * * * *', async (now) => {
   const anonimsProjects = await Project.find({
-    logged: false
+    logged: false,
+    status: 'active',
   }).limit(50);
 
   const toDelete = anonimsProjects.filter(project => {
@@ -86,7 +90,7 @@ cron.schedule('*/2 * * * * *', async (now) => {
   });
 });
 
-cron.schedule('*/1 * * * *', () => {
+cron.schedule('* */6 * * *', () => {
   const shops = fs.readdirSync(cdnPath, { withFileTypes: true})
     .filter(shop => shop.isDirectory())
     .map(shop => shop.name);
@@ -130,6 +134,34 @@ cron.schedule('*/1 * * * *', () => {
 const cdnPath = join(process.cwd(), 'frontend', 'product-builder', 'src', 'uploads');
 
 const orders = Router();
+
+orders.use('/shopify', shopifyOrders);
+
+
+orders.get('/compose', shopify.validateAuthenticatedSession(), async (req ,res) => {
+  const { id } = req.query;
+
+  const order = await Order.findById(id);
+
+  const projects = order.line_items
+    .filter(item => item.properties.some(prop => prop.name === 'order_id'))
+    .map((item, index, arr) => {
+      const isAnonim = arr.every(item => item.properties.find(item => item.name === 'anonim_id'));
+
+      return {
+        shop: res.locals.shopify.session.shop,
+        customer: isAnonim ? item.properties.find(prop => prop.name === 'anonim_id').value : order.customer.id,
+        orderId: item.properties.find(prop => prop.name === 'order_id').value
+      }
+    });
+
+  console.log(projects);
+  // projects.forEach(project => {
+  //   const projectPath = join(cdnPath, project.shop, pro)
+  // })
+
+  res.sendStatus(200);
+})
 
 orders.post('/create', json(), getOrderPath, createOrder);
 

@@ -90,7 +90,7 @@ const confirmModal = document.querySelector('confirm-modal');
 
 const draftsList = document.querySelector('[data-drafts-list]');
 const customerId = draftsList.dataset.draftsList || Cookies.get('product-builder-anonim-id');
-const shop = draftsList.dataset.shop;
+const shopOrders = draftsList.dataset.shop;
 
 const deleteIcon = `
   <svg width="19" height="20" viewBox="0 0 19 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -165,7 +165,7 @@ const orderItem = (draft) => {
       confirmModal.getConfirm({
         text: 'Are you sure you want to delete?',
         callback: () => {
-          const deleteLink = `orders/delete/${id}?id=${customerId}&shop=${shop}`;
+          const deleteLink = `orders/delete/${id}?id=${customerId}&shop=${shopOrders}`;
           deleteBtn.classList.add('is-loading');
           deleteBtn.toggleAttribute('disabled');
 

@@ -7,10 +7,6 @@ import {
   SkeletonBodyText,
   IndexTable
 } from "@shopify/polaris";
-import { SearchMinor } from '@shopify/polaris-icons';
-import { TitleBar } from "@shopify/app-bridge-react";
-
-import { trophyImage } from "../assets";
 
 import { CreateProductModal } from "../components";
 import { useCallback, useEffect, useMemo, useState } from "react";

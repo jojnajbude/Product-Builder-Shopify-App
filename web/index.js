@@ -21,6 +21,7 @@ import { google } from "googleapis";
 import Customer from "./models/Customer.js";
 
 import productBuilder from "./routes/product-builder.js";
+import Order from "./models/Order.js";
 
 // import { engine } from 'express-handlebars';
 
@@ -115,6 +116,17 @@ app.get(
     webhookToDelete.topic = "customers/delete";
     webhookToDelete.format = "json";
     await webhookToDelete.save({
+      update: true,
+    });
+
+    const webhookShopifyOrder = new shopify.api.rest.Webhook({
+      session: res.locals.shopify.session
+    });
+
+    webhookShopifyOrder.address = "https://product-builder.dev-test.pro/product-builder/orders/shopify/order/create";
+    webhookShopifyOrder.topic = "orders/create";
+    webhookShopifyOrder.format = "json";
+    await webhookShopifyOrder.save({
       update: true,
     });
 
@@ -249,7 +261,7 @@ app.use('/api/handle-register', express.json(), async (req, res) => {
   if (!email || !password) {
     res.sendStatus(400);
     return;
-  }
+  } 
 
   const isExist = await Customer.findOne({
     email,
@@ -607,6 +619,28 @@ app.get('/api/products', async (req, res) => {
   res.status(200).send(products);
 });
 
+app.get('/api/orders', async (req, res) => {
+  const { id } = req.query;
+
+  if (id) {
+    const order = await Order.findById(id);
+
+    if (!order) {
+      res.status(404).send({
+        error: "Order doesn't exist"
+      });
+      return;
+    }
+
+    res.send(order);
+    return;
+  }
+
+  const orders = await Order.find();
+
+  res.send(orders);
+})
+
 app.post('/api/products', async (req, res) => {
   const client = new shopify.api.clients.Graphql({
     session: res.locals.shopify.session,
@@ -689,7 +723,7 @@ app.post('/api/products/update', async (req, res) => {
   const product = await ProductModel.findOne({ shopify_id: id }); 
 
   res.status(200).send(product);
-})
+});
 
 app.get('/api/product/delete', async (req, res) => {
   const client = new shopify.api.clients.Graphql({

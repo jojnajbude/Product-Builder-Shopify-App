@@ -49,6 +49,14 @@ if (checkoutButton) {
       if (Studio.orderInfo && Studio.orderInfo.status === 'draft') {
         const { orderID, quantity, product } = Studio.orderInfo;
 
+        const props = {
+          'order_id': orderID,
+        }
+
+        if (Studio.anonimCustomerId && !Studio.customer) {
+          props['anonim_id'] = Studio.anonimCustomerId
+        }
+
         addedToCart = await fetch(location.origin + '/cart/add.js', {
           method: 'POST',
           headers: {
@@ -59,9 +67,7 @@ if (checkoutButton) {
               {
                 id: currVariant.id,
                 quantity: quantityToAdd,
-                properties: {
-                  'order_id': orderID,
-                }
+                properties: props
               }
             ]
           })
@@ -221,7 +227,8 @@ const layouts = {
         </defs>
       </svg>
       `,
-    types: ['photobook']
+    types: ['photobook'],
+    blocks: ['editable-picture']
   },
   wholeFrameless: {
     id: 'wholeFrameless',
@@ -244,7 +251,8 @@ const layouts = {
         </defs>
       </svg>
       `,
-    types: ['photobook']
+    types: ['photobook'],
+    blocks: ['editable-picture']
   },
   rightImageWithText: {
     id: 'rightImageWithText',
@@ -271,7 +279,8 @@ const layouts = {
         </defs>
       </svg>
       `,
-    types: ['photobook']
+    types: ['photobook'],
+    blocks: ['text', 'editable-picture']
   },
   leftImageWithText: {
     id: 'leftImageWithText',
@@ -298,7 +307,8 @@ const layouts = {
         </defs>
       </svg>
       `,
-    types: ['photobook']
+    types: ['photobook'],
+    blocks: ['editable-picture', 'text']
   },
   bigWithThreeSquare: {
     id: 'bigWithThreeSquare',
@@ -325,7 +335,8 @@ const layouts = {
         </defs>
       </svg>
     `,
-    types: ['photobook']
+    types: ['photobook'],
+    blocks: ['editable-picture','editable-picture','editable-picture','editable-picture']
   },
   twoRectangleImagesWithText: {
     id: 'twoRectangleImagesWithText',
@@ -352,7 +363,8 @@ const layouts = {
         </defs>
       </svg>
     `,
-    types: ['photobook']
+    types: ['photobook'],
+    blocks: ['editable-picture', 'text', 'editable-picture', 'text']
   }
 }
 
@@ -1111,7 +1123,7 @@ customElements.define('product-builder', ProductBuilder);
 
 const utils = {
   change: (state, initiator) => {
-    // console.log(initiator, state);
+    console.log(initiator);
 
     const changeEvent = new CustomEvent('studio:change', {
       detail: {
@@ -1136,8 +1148,6 @@ const utils = {
       if (!utils.history.allowSave) {
         return;
       }
-
-      console.log('here');
 
       if (Studio.anonimCustomerId) {
         Cookies.set('product-builder-anonim-id', Studio.anonimCustomerId, {
@@ -5011,7 +5021,7 @@ class PhotobookPage extends HTMLElement {
     const callback = this[this.layout.id + 'Layout'];
 
     if (callback) {
-      callback.apply(this, this.editablePicturesJSON);
+      callback.apply(this);
     }
   }
 
@@ -5133,7 +5143,6 @@ class PhotobookPage extends HTMLElement {
     const bigImage = this.getEditable(editableQuery());
 
     this.append(bigImage);
-
   }
 
   bigWithThreeSquareLayout() {
@@ -5986,7 +5995,7 @@ class StudioView extends HTMLElement {
 
       this.toggleSelected(prevState.blocks, currState.blocks);
 
-      this.setBlocksValue(prevState.blocks, currState.blocks);
+      const newBlocks = this.setBlocksValue(prevState.blocks, currState.blocks);
 
       if (Studio.orderInfo && Studio.orderInfo.status === 'active'
         && prevCounts !== currCounts
@@ -6009,7 +6018,11 @@ class StudioView extends HTMLElement {
           })
       }
 
-      this.setProductElements(null, currState.blocks);
+      if (newBlocks) {
+        this.setProductElements(null, newBlocks);
+      } else {
+        this.setProductElements(null, currState.blocks);
+      }
     }
     
     if (currState.product && prevState.blockCount !== currState.blockCount) {
@@ -6437,7 +6450,10 @@ class StudioView extends HTMLElement {
           element.setValue(block.settings, block);
         }
 
-        children = initiateNewChildren(element, selectedChildrenIds, block.childBlocks);
+        if (block.settings.layout && !compareObjects(prevSettings, block.settings)) {
+          children = layouts[block.settings.layout.layout].blocks
+            .map((child, idx) => this.getChildsJSON(child, undefined, block.childBlocks));
+        }
 
         return {
           ...block,
@@ -6448,9 +6464,12 @@ class StudioView extends HTMLElement {
     const prevChildren = prevBlocks.map(block => block.childBlocks);
     const currChildren = newBlocks.map(block => block.childBlocks);
 
+    let returnedBlocks;
+
     if (!compareObjects(prevChildren, currChildren)) {
-      this.setChildsValue(prevChildren, currChildren, newBlocks);
+      returnedBlocks = this.setChildsValue(prevChildren, currChildren, newBlocks);
     } else {
+      returnedBlocks = newBlocks;
       Studio.utils.change({
         view: {
           ...JSON.parse(this.getAttribute('state')),
@@ -6486,6 +6505,8 @@ class StudioView extends HTMLElement {
         Studio.utils.history.save();
       }, 10);
     }
+
+    return returnedBlocks;
   }
 
   setChildsValue(prevChildren, currChildren, currBlocks) {
@@ -6523,8 +6544,19 @@ class StudioView extends HTMLElement {
             }
           })
 
-        return block;
-      })
+        return block
+      });
+
+    console.log(newBlocks);
+
+    Studio.utils.change({
+      view: {
+        ...JSON.parse(this.getAttribute('state')),
+        blocks: newBlocks
+      }
+    }, 'set block value - from set child value');
+
+    return newBlocks;
   }
 
   setSelectedBlock(block, activeChild, isBulk) {
@@ -6720,19 +6752,24 @@ class StudioView extends HTMLElement {
     this.elements.container.appendChild(block);
   }
 
-  createPhotobookPage(layout) {
-    const block = this.createStudioBlock('photobook-page');
+  createPhotobookPage(block) {
+    const studioBlock = this.createStudioBlock('photobook-page');
+    const { id, type, settings } = block;
 
     const page = document.createElement('photobook-page');
     page.classList.add('photobook-page', 'product-builder__element');
-    page.setAttribute('photobook-page', layout);
+    page.setAttribute('photobook-page', block.settings.layout.layout);
 
+    page.setAttribute('block', id);
+    page.setAttribute('block-type', type);
     
     this.blockClickedListener(page);
 
-    block.append(page);
+    page.setValue(settings, block);
 
-    this.elements.container.append(block);
+    studioBlock.append(page);
+
+    this.elements.container.append(studioBlock);
   }
 
   createPrint(block) {
@@ -7003,7 +7040,7 @@ class StudioView extends HTMLElement {
     switch (product.type.id) {
       case 'photobook':
         type = 'photobook-page';
-        childList = [];
+        childList = layouts.whole.blocks;
         break;
       case 'prints':
         if (product.handle.includes('polaroid') || product.handle.includes('retro')) {
@@ -7110,6 +7147,15 @@ class StudioView extends HTMLElement {
           tools: EditableText.ToolList,
           settings: EditableText.defaultValue
         }
+      case 'line':
+        return {
+          type,
+          id,
+          isLine: true,
+          selected: false,
+          tools: EditableText.ToolList,
+          settings: EditableText.defaultValue
+        }
       default:
         return {
           type: 'default',
@@ -7135,8 +7181,9 @@ class StudioView extends HTMLElement {
     const waitToClear = [];
 
     const createBlock = (block) => {
+
       switch(block.type) {
-        case 'photobook':
+        case 'photobook-page':
           this.createPhotobookPage(block);
           break;
         case 'prints':
