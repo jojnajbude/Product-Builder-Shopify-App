@@ -1,0 +1,35 @@
+body {
+  margin: 0;
+  background-color: #EFEFEF;
+  padding: 25px;
+}
+
+body > .studio-view {
+  border-radius: 30px;
+  background-color: #fff;
+  min-height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.studio-view > .studio-view__container {
+  position: absolute;
+  inset: 25px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  justify-items: center;
+  flex-wrap: wrap;
+  overflow-y: auto;
+}
+
+.product-element, .product-element * {
+  cursor: default;
+}
+
+.studio-view__container > .product-element:only-of-type {
+  align-self: center;
+  justify-self: center;
+}

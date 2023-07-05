@@ -23,7 +23,7 @@ import Customer from "./models/Customer.js";
 import productBuilder from "./routes/product-builder.js";
 import Order from "./models/Order.js";
 
-// import { engine } from 'express-handlebars';
+import { create } from 'express-handlebars';
 
 dotenv.config();
 
@@ -65,13 +65,35 @@ const STATIC_PATH =
 
 const app = express();
 
-// app.engine('handlebars', engine({
-//   compilerOptions: {
- 
-//   }
-// }));
-// app.set('view engine', 'handlebars');
-// app.set('views', './frontend/product-builder/src');
+const hbs = create({
+  helpers: {
+    switch(value, options) {
+      this.switch_value = value; 
+      return options.fn(this);
+    },
+    case(value, options) {
+      if (value == this.switch_value) {
+        return options.fn(this);
+      }
+    },
+    assign(name, value, options) {
+      if (!options.data.root) {
+        options.data.root = {};
+      }
+      options.data.root[name] = value;
+    },
+    contains(needle, haystack, options){
+      return (haystack.indexOf(needle) !== -1) ? options.fn(this) : options.inverse(this);
+    },
+    includes(needle, haystack, options) {
+      return (haystack.includes(needle)) ? options.fn(this) : options.inverse(this);
+    }
+  }
+});
+
+app.engine('handlebars', hbs.engine);
+app.set('view engine', 'handlebars');
+app.set('views', './frontend/product-builder/src');
 
 app.use(cors()); 
   
@@ -598,19 +620,28 @@ app.get('/api/shopify/products', async (req, res) => {
 });
 
 app.get('/api/products', async (req, res) => {
+  const idToString = (idNumber) => `gid://shopify/Product/${idNumber}`;
+
   const { id } = req.query;
 
   const shop = await Shop.findOne({ name: res.locals.shopify.session.shop });
 
   if (id) {
-    const product = await ProductModel.findOne({ shopify_id: id, shop: shop?._id });
+    const shopify_id = typeof +id === 'number' ? idToString(id) : id;
+
+    const product = await ProductModel.findOne({
+      shopify_id,
+      shop: shop?._id
+    });
 
     if (product) {
       res.status(200).send(product);
       return;
     }
 
-    res.sendStatus(400);
+    res.status(400).send({
+      error: 'Invalid id => ' + id
+    });
     return;
   }
 
@@ -623,7 +654,9 @@ app.get('/api/orders', async (req, res) => {
   const { id } = req.query;
 
   if (id) {
-    const order = await Order.findById(id);
+    const order = await Order.findOne({
+      shopify_id: id
+    });
 
     if (!order) {
       res.status(404).send({
@@ -636,7 +669,7 @@ app.get('/api/orders', async (req, res) => {
     return;
   }
 
-  const orders = await Order.find();
+  const orders = await Order.find().sort({ order_number: 'desc' });
 
   res.send(orders);
 })

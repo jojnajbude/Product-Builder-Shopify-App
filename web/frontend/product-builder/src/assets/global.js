@@ -1,7 +1,7 @@
 'use strict';
 
 const cookiesTime = {
-  anonimUser: 1 / 24
+  anonimUser: 10
 }
 
 const backButton = document.querySelector('[data-back-button]');
@@ -73,8 +73,6 @@ if (checkoutButton) {
           })
         }).then(res => res.json());
       }
-
-      console.log(addedToCart);
 
       if (!addedToCart.status) {
         fetch(`product-builder/orders/checkout/${orderId}?id=${Studio.customer ? Studio.customer.shopify_id : Studio.anonimCustomerId}`)
@@ -1019,8 +1017,6 @@ class ProductBuilder extends HTMLElement {
       return;
     }
 
-    console.log(customerId);
-    
     this.orderInfo = await fetch(`product-builder/orders/info/${id}?id=${customerId}`)
       .then(res => res.json())
       .then(data => {
@@ -1123,7 +1119,7 @@ customElements.define('product-builder', ProductBuilder);
 
 const utils = {
   change: (state, initiator) => {
-    console.log(initiator);
+    // console.log(initiator);
 
     const changeEvent = new CustomEvent('studio:change', {
       detail: {
@@ -3551,7 +3547,7 @@ class Tools extends HTMLElement {
 
       if (event.target !== toDeleteBtn && !toDeleteBtn.contains(event.target)) {
         Studio.utils.change({
-          imagesToDownload: image.src
+          imagesToDownload: image.src.split('?').shift()
         }, 'set images to downloads');
       }
     });
@@ -6547,8 +6543,6 @@ class StudioView extends HTMLElement {
         return block
       });
 
-    console.log(newBlocks);
-
     Studio.utils.change({
       view: {
         ...JSON.parse(this.getAttribute('state')),
@@ -7129,6 +7123,12 @@ class StudioView extends HTMLElement {
 
     const { isLine = false } = options;
 
+    const resolution = !Studio.product.settings.hasLayout
+      ? getResolution(Studio.product.resolution.width, Studio.product.resolution.height)
+      : {};
+
+    console.log(resolution);
+
     switch (type) {
       case 'editable-picture':
         return {
@@ -7136,7 +7136,8 @@ class StudioView extends HTMLElement {
           id,
           selected: false,
           tools: EditablePicture.ToolsList,
-          settings: EditablePicture.defaultValue
+          settings: EditablePicture.defaultValue,
+          resolution
         }
       case 'text':
         return {

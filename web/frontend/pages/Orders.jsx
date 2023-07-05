@@ -1,21 +1,13 @@
 import { Badge, Button, Icon, IndexTable, Layout, LegacyCard, Page, SkeletonBodyText, SkeletonPage, SkeletonThumbnail, useIndexResourceState } from "@shopify/polaris";
 import { useAppQuery, useAuthenticatedFetch } from "../hooks";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
   UploadMajor
 } from '@shopify/polaris-icons';
 import { authenticatedFetch } from "@shopify/app-bridge-utils";
-
-const formatter = (price, currency) => {
-  const formatter = new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: currency || 'USD',
-  });
-
-  return formatter.format(Number(price));
-};
+import moneyFormat from "../assets/moneyFormat.js";
 
 Number.prototype.formatItems = function() {
   if (this === 0) {
@@ -29,10 +21,12 @@ Number.prototype.formatItems = function() {
   return this + ' items';
 }
 
-export default function Product() {
+export default function Orders() {
   const navigator = useNavigate();
 
-  const fetch = useAuthenticatedFetch();
+  const ref = useRef({
+    refetchTimer: null
+  });
 
   const {
     data: orders,
@@ -74,7 +68,7 @@ export default function Product() {
         </IndexTable.Cell>
 
         <IndexTable.Cell>
-          { formatter(parseInt(order.current_subtotal_price), order.currency || 'USD') }
+          { moneyFormat(parseInt(order.current_subtotal_price), order.currency || 'USD') }
         </IndexTable.Cell>
 
         <IndexTable.Cell>
@@ -86,18 +80,22 @@ export default function Product() {
     ))
   });
 
-  const downloadProject = useCallback(async () => {
-    const file = await fetch(`/product-builder/orders/compose?id=${selectedResources[0]}`);
-  }, [orders, selectedResources]);
-
   const resourceName = useMemo(() => ({
     singular: 'order',
     plural: 'orders'
   }), []);
 
   useEffect(() => {
-    console.log(orders);
-  }, [orders]);
+    console.log(ref.current.refetchTimer);
+    ref.current.refetchTimer = setInterval(() => {
+      console.log('refetched');
+      refetch();
+    }, 10000);
+
+    return () => {
+      clearInterval(ref.current.refetchTimer);
+    }
+  }, []);
 
   if (isLoading) {
     const SkeletonRow = (i) => (
@@ -157,7 +155,7 @@ export default function Product() {
 
   return (
     <Page
-      title="App name"
+      title="Orders List"
     >
       <Layout>
         <Layout.Section>
@@ -178,12 +176,6 @@ export default function Product() {
                 allResourcesSelected ? 'All' : selectedResources.length
               }
               onSelectionChange={handleSelectionChange}
-              promotedBulkActions={[
-                {
-                  content: 'Download',
-                  onAction: downloadProject
-                }
-              ]}
             >
               {rowMarkup}
             </IndexTable>

@@ -1,10 +1,17 @@
 import { join } from 'path';
 import fs from 'fs';
+import JSZip from 'jszip';
+
+import Order from '../models/Order.js';
 
 import makeCode from '../utils/makeCode.js';
 import Project from '../models/Projects.js';
 
-const cdnPath = join(process.cwd(), 'frontend', 'product-builder', 'src', 'uploads');
+const zip  = new JSZip();
+
+const frontPath = join(process.cwd(), 'frontend', 'product-builder', 'src');
+
+const cdnPath = join(frontPath, 'uploads');
 
 export const getCustomer = (path) => {
   const uploads = join(path, 'uploads');
@@ -238,3 +245,222 @@ export const deleteOrder = async (req, res) => {
     correct: 'Deleted'
   });
 };
+
+export const getImageFromUrl = async (url) => {
+  if (!url) {
+    return new Promise(rej => rej());
+  }
+
+  return fetch(url).then(res => res.arrayBuffer());
+}
+
+export const composeProject = async (req ,res) => {
+  const { order_id, project_id } = req.query;
+
+  const [ order, project ] = await Promise.all([
+    Order.findOne({
+      shopify_id: order_id
+    }),
+    Project.findOne({
+      orderID: project_id
+    })
+  ]);
+
+  const lineItem = order.line_items
+    .filter(item => item.properties.some(prop => prop.name === 'order_id'))
+    .map((item, _, arr) => {
+      const isAnonim = arr.every(item => item.properties.find(item => item.name === 'anonim_id'));
+
+      // console.log(item);
+
+      return {
+        shop: project.shop,
+        customer: {
+          id: isAnonim ? item.properties.find(prop => prop.name === 'anonim_id').value : order.customer.id,
+          name: order.customer.first_name,
+          lastName: order.customer.last_name,
+          email: order.customer.email
+        },
+        product: {
+          name: item.name,
+          title: item.title
+        },
+        orderId: item.properties.find(prop => prop.name === 'order_id').value
+      }
+    }).find(item => item.orderId === project_id);
+
+  const { customer } = lineItem;
+
+  const projectPath = customer.id.split('-').length === 2
+    ? join(cdnPath, lineItem.shop, 'anonims', customer.id, 'orders', lineItem.orderId)
+    : join(cdnPath, lineItem.shop, customer.id, 'orders', lineItem.orderId);
+  
+  const composeName = `${project.product.title.split('/').join('-')} - ${
+    customer.name && customer.lastName
+      ? `${customer.name} ${customer.lastName}(${customer.email})`
+      : `${customer.email || customer.id}`
+  }`;
+
+  const composePath = join(projectPath, composeName);
+  const zipPath = join(projectPath, composeName + '.zip');
+
+  const zipName = composePath.split('/').pop();
+
+  if (fs.existsSync(zipPath)) {
+    res.sendFile(zipPath);
+    return;
+  }
+
+  if (fs.existsSync(composePath)) {
+    const zipName = composePath.split('/').pop();
+
+    const projectZip = zip.folder(zipName);
+
+    const projectComposeContent = fs.readdirSync(composePath, { withFileTypes: true })
+      .filter(file => !file.isDirectory())
+      .map(file => ({
+        name: file.name,
+        data: fs.readFileSync(join(composePath, file.name))
+      }));
+
+    projectComposeContent.forEach(file => {
+      projectZip.file(file.name, file.data, { binary: true });
+    });
+
+    const zipFolder = await zip.generateAsync({ type: 'blob' });
+
+    const zibBuffer = Buffer.from(await zipFolder.arrayBuffer());
+
+    fs.writeFileSync(zipPath, zibBuffer);
+
+    res.send({
+      name: zipName,
+      data: zibBuffer
+    });
+    return;
+  }
+
+  if (!fs.existsSync(composePath)) {
+    fs.mkdirSync(composePath);
+  }
+
+  const state = JSON.parse(fs.readFileSync(join(projectPath, 'state.json')));
+
+  const blocks = state.view.blocks
+    .filter(block => block.childBlocks.some(child => child.imageUrl))
+    .map(block => ({
+      id: block.id,
+      images: block.childBlocks
+        .filter(child => child.imageUrl)
+        .map(child => ({
+          url: child.imageUrl,
+          settings: child.settings,
+          resolution: child.resolution
+        }))
+        .map(image => {
+          const { crop, rotate, backgroundColor } = image.settings;
+
+          const { width, height } = image.resolution;
+
+          const resize = width && height
+            ? [width, height]
+            : null;
+
+          const editedUrl = image.url + `?${
+              resize
+                ? `resize=${JSON.stringify(resize)}&`
+                : ''
+            }crop=${crop.value}&rotate=${rotate.value}&background=${backgroundColor.value}`
+
+          return { 
+            original: image.url,
+            edited: editedUrl
+          }
+        })
+    }));
+
+  const blocksReady = blocks.map(async (block, idx) => new Promise(async (res, rej) => {
+    const images = block.images.map(image => new Promise(async res => {
+      const [original, edited] = await Promise.all([
+        getImageFromUrl(image.original),
+        getImageFromUrl(image.edited)
+      ])
+
+      res({
+        original,
+        edited
+      });
+    }));
+
+    const imagesBuffers = await Promise.all(images);
+
+    imagesBuffers.forEach(image => {
+      const originalPath = join(composePath, `${block.id} - image-${idx + 1} - original.jpg`);
+      const editedPath = join(composePath, `${block.id} - image-${idx + 1} - edited.jpg`);
+
+      fs.writeFileSync(originalPath, Buffer.from(image.original));
+      fs.writeFileSync(editedPath, Buffer.from(image.edited));
+    });
+
+    res();
+  }));
+
+  await Promise.all(blocksReady);
+
+  const projectZip = zip.folder(zipName);
+
+  const projectComposeContent = fs.readdirSync(composePath, { withFileTypes: true })
+    .filter(file => !file.isDirectory())
+    .map(file => ({
+      name: file.name,
+      data: fs.readFileSync(join(composePath, file.name))
+    }));
+
+  projectComposeContent.forEach(file => {
+    projectZip.file(file.name, file.data, { binary: true });
+  });
+
+  const zipFolder = await zip.generateAsync({ type: 'blob' });
+
+  const zipBuffer = Buffer.from(await zipFolder.arrayBuffer());
+
+  fs.writeFileSync(zipPath, zipBuffer);
+
+  res.send(zipBuffer);
+};
+
+export const viewProject = async (req, res) => {
+  const { project: projectId } = req.query;
+
+  const project = await Project.findOne({
+    orderID: projectId
+  });
+
+  if (!project) {
+    res.sendStatus(404);
+    return;
+  }
+
+  const { shop, customerID } = project;
+
+  const isLoggedCustomer = fs.existsSync(join(cdnPath, shop, customerID));
+
+  const projectPath = isLoggedCustomer
+    ? join(cdnPath, shop, customerID, 'orders', projectId)
+    : join(cdnPath, shop, 'anonims', customerID, 'orders', projectId);
+
+  if (!fs.existsSync(projectPath)) {
+    res.sendStatus(400);
+    return;
+  }
+
+  const state = JSON.parse(fs.readFileSync(join(projectPath, 'state.json')));
+
+  const blocks = state.view.blocks;
+
+  res.render('project-view', { 
+    state: JSON.stringify(state),
+    blocks,
+    product: state.product
+  });
+}
