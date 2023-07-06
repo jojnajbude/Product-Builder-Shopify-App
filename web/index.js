@@ -25,6 +25,8 @@ import Order from "./models/Order.js";
 
 import { create } from 'express-handlebars';
 
+import mongoose from "./database/index.js";
+
 dotenv.config();
 
 const googleKeys = {
@@ -87,8 +89,12 @@ const hbs = create({
     },
     includes(needle, haystack, options) {
       return (haystack.includes(needle)) ? options.fn(this) : options.inverse(this);
+    },
+    imageCrop(value) {
+      return 1 + (Math.round((value / 50) * 100) / 100);
     }
-  }
+  },
+  partialsDir: './frontend/product-builder/src/partials'
 });
 
 app.engine('handlebars', hbs.engine);
@@ -626,8 +632,14 @@ app.get('/api/products', async (req, res) => {
 
   const shop = await Shop.findOne({ name: res.locals.shopify.session.shop });
 
+  const prods = await ProductModel.find({
+    shop: shop?._id
+  })
+
   if (id) {
-    const shopify_id = typeof +id === 'number' ? idToString(id) : id;
+    const shopify_id = typeof id === 'string' && parseInt(id).toString().length === id.length
+      ? idToString(id)
+      : id;
 
     const product = await ProductModel.findOne({
       shopify_id,
@@ -665,13 +677,49 @@ app.get('/api/orders', async (req, res) => {
       return;
     }
 
-    res.send(order);
+    const hashedOrder = { 
+      ...order.toObject(),
+      line_items: order.line_items.map(item => {
+        const orderProp = item.properties.find(prop => prop.name === 'order_id');
+        const orderId = orderProp.value;
+
+        
+        const hashedProjectId = encryptPassword(orderId, process.env.PASSWORD_SECRET);
+        
+        return {
+          ...item,
+          hashedProjectId
+        }
+      })
+    }; 
+
+    res.send(hashedOrder);
     return;
   }
 
   const orders = await Order.find().sort({ order_number: 'desc' });
 
-  res.send(orders);
+  const hashedOrders = orders.map(order => {
+    const newLineItems = order.line_items.map(item => {
+      const orderProp = item.properties.find(prop => prop.name === 'order_id');
+      const orderId = orderProp.value;
+
+      const hashedProjectId = encryptPassword(orderId, process.env.PASSWORD_SECRET);
+
+      return {
+        ...item,
+        hashedProjectId
+      }
+    });
+
+
+    return {
+      ...order.toObject(),
+      line_items: newLineItems
+    }
+  })
+
+  res.send(hashedOrders);
 })
 
 app.post('/api/products', async (req, res) => {

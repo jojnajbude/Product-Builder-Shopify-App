@@ -5688,9 +5688,6 @@ class Tiles extends ProductElement {
     if (block) {
       this.editablePictures = block.childBlocks
         .filter(child => child.type === 'editable-picture');
-    
-      this.editableText = block.childBlocks
-        .filter(child => child.type === 'text');
     }
   }
 }
@@ -5718,7 +5715,6 @@ class ViewControls extends HTMLElement {
       studio: document.querySelector('studio-view'),
       studioPlayground: document.querySelector('[data-playground]'),
       studioContainer: document.querySelector('[data-studio-view-container]'),
-      anchor: document.querySelector('[data-view-anchor]')
     }
 
     this.studioPositionX = 0;
@@ -5936,7 +5932,7 @@ class StudioView extends HTMLElement {
     viewControls: 'view-controls',
     blockControls: 'product-controls',
     blockControlsById: (id) => `product-controls[block-controls="${id}"]`,
-    addBlock: '[data-add-block'
+    addBlock: '[data-add-block]'
   };
 
   static get observedAttributes() {
@@ -6913,6 +6909,8 @@ class StudioView extends HTMLElement {
     tile.setAttribute('block', id);
     tile.setAttribute('block-type', type);
 
+    // console.log(block);
+
     tile.setValue(settings, block);
     
     this.elements.container.append(studioBlock);
@@ -7123,11 +7121,9 @@ class StudioView extends HTMLElement {
 
     const { isLine = false } = options;
 
-    const resolution = !Studio.product.settings.hasLayout
+    const resolution = !Studio.product.settings.hasLayout && !Studio.product.type.id !== 'tiles'
       ? getResolution(Studio.product.resolution.width, Studio.product.resolution.height)
       : {};
-
-    console.log(resolution);
 
     switch (type) {
       case 'editable-picture':
@@ -7258,11 +7254,13 @@ class StudioView extends HTMLElement {
       return elem.getAttribute('block') === block.id;
     }));
 
+    
     newBlocks = newBlocks.filter(block => !elemsToRemove.includes(block.id));
-
+    
     if (blocksToCreate !== 0) {
       toUpdate = true;
     }
+    // console.log(newBlocks, toUpdate);
 
     if (!toUpdate) {
       return;
@@ -7270,10 +7268,14 @@ class StudioView extends HTMLElement {
 
     blocksToCreate.forEach(block => createBlock(block));
 
-    const { offsetHeight, offsetWidth } = this.querySelector(StudioView.selectors.block);
-    const { offsetWidth: controlsWidth } = this.querySelector(StudioView.selectors.blockControls);
+    const block = this.querySelector(StudioView.selectors.block);
 
-    this.addBlockBtn.setSize(offsetWidth > controlsWidth ? offsetWidth : controlsWidth, offsetHeight);
+    if (block) {
+      const { offsetHeight, offsetWidth } = block;
+      const { offsetWidth: controlsWidth } = this.querySelector(StudioView.selectors.blockControls);
+
+      this.addBlockBtn.setSize(offsetWidth > controlsWidth ? offsetWidth : controlsWidth, offsetHeight);
+    }
 
       Studio.utils.change({ view: {
         ...JSON.parse(this.getAttribute('state')),

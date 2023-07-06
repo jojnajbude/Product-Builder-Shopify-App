@@ -33,3 +33,12 @@ body > .studio-view {
   align-self: center;
   justify-self: center;
 }
+
+.product-element.Black,
+.product-element.Red,
+.product-element.Orange,
+.product-element.Blue,
+.product-element.Indigo,
+.product-element.Purple {
+  color: #fff;
+}

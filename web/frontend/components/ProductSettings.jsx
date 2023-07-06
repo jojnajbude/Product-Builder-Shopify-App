@@ -16,7 +16,7 @@ export function ProductSettings({
   settings,
   setSettings
 }) {
-  const [selectedLayouts, setSelectedLayouts] = useState(product ? product.settings.selectedLayouts : []);
+  // const [selectedLayouts, setSelectedLayouts] = useState(product ? product.settings.selectedLayouts : []);
 
 
   // const LayoutCard = useCallback((layout) => (

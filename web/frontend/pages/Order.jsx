@@ -18,6 +18,8 @@ export default function Order() {
     refetch
   } = useAppQuery({ url: `api/orders?id=${id}` });
 
+  console.log(order);
+
   if (isLoading) {
     return (
       <SkeletonPage>

@@ -13,8 +13,11 @@ export default function lineItem({ item, shopifyOrderID, customer }) {
     properties,
     product_id,
     price,
-    quantity
+    quantity,
+    hashedProjectId
   } = item;
+
+  console.log(hashedProjectId);
 
   const {
     data: product,
@@ -132,7 +135,16 @@ export default function lineItem({ item, shopifyOrderID, customer }) {
               <Button
                 size='slim'
                 plain
-                url={location.origin + `/product-builder/orders/view?project=${order_id}`}
+                url={location.origin + `/product-builder/orders/generatePDF?project=${hashedProjectId}`}
+                target="_blank"
+              >
+                PDF
+              </Button>
+
+              <Button
+                size='slim'
+                plain
+                url={location.origin + `/product-builder/orders/view?project=${hashedProjectId}`}
                 target="_blank"
               >
                 Preview

@@ -2,7 +2,7 @@ import { Router, json } from 'express';
 import multer from "multer";
 import fs from 'fs';
 
-import childProcess from 'node:child_process';
+import wkhtmltopdf from 'wkhtmltopdf';
 
 import { composeProject, createOrder, deleteOrder, getCustomer, getImageFromUrl, getOrderInfo, getOrderPath, getOrderState, updateOrder, viewProject } from '../controllers/order.js';
 
@@ -10,6 +10,8 @@ import { join } from 'path';
 import cron from 'node-cron';
 import Project from '../models/Projects.js';
 import shopifyOrders from './shopify-order.js';
+import { decryptPassword } from '../utils/password_hashing.js';
+import Order from '../models/Order.js';
 
 const imageStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -140,6 +142,35 @@ orders.get('/view', viewProject);
 
 orders.get('/compose', composeProject);
 
+orders.get('/generatePDF', async (req, res) => {
+  const { project: hashedProject } = req.query;
+
+  const projectId = decryptPassword(hashedProject, process.env.PASSWORD_SECRET);
+
+
+  const project = await Project.findOne({
+    orderID: projectId
+  });
+
+  const {
+    shop,
+    customerID,
+    logged
+  } = project;
+
+  const pdfPath = logged
+    ? join(cdnPath, shop, customerID, 'orders', projectId)
+    : join(cdnPath, shop, 'anonims', customerID, 'orders', projectId)
+
+  const url = `${process.env.HOST}/product-builder/orders/view?project=${hashedProject}`;
+
+  const html = await fetch(url).then(res => res.text());
+
+  const pdf = wkhtmltopdf(html, {
+    pageSize: 'A4'
+  }).pipe(res);
+});
+ 
 orders.post('/create', json(), getOrderPath, createOrder);
 
 orders.post('/update/:orderId', json(), getOrderPath, updateOrder);

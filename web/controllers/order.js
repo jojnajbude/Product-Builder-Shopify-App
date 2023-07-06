@@ -2,10 +2,13 @@ import { join } from 'path';
 import fs from 'fs';
 import JSZip from 'jszip';
 
+import CryptoJS from 'crypto-js';
+
 import Order from '../models/Order.js';
 
 import makeCode from '../utils/makeCode.js';
 import Project from '../models/Projects.js';
+import { decryptPassword } from '../utils/password_hashing.js';
 
 const zip  = new JSZip();
 
@@ -311,6 +314,10 @@ export const composeProject = async (req ,res) => {
     return;
   }
 
+  project.set('status', 'composing');
+
+  await project.save();
+
   if (fs.existsSync(composePath)) {
     const zipName = composePath.split('/').pop();
 
@@ -337,6 +344,10 @@ export const composeProject = async (req ,res) => {
       name: zipName,
       data: zibBuffer
     });
+
+    project.set('status', 'complete');
+    project.save();
+
     return;
   }
 
@@ -427,10 +438,17 @@ export const composeProject = async (req ,res) => {
   fs.writeFileSync(zipPath, zipBuffer);
 
   res.send(zipBuffer);
+
+  project.set('status', 'complete');
+  project.save();
 };
 
 export const viewProject = async (req, res) => {
-  const { project: projectId } = req.query;
+  const { project: projectHash } = req.query;
+
+  const projectId = decryptPassword(projectHash, process.env.PASSWORD_SECRET);
+
+  console.log(projectId, projectHash);
 
   const project = await Project.findOne({
     orderID: projectId
@@ -456,11 +474,18 @@ export const viewProject = async (req, res) => {
 
   const state = JSON.parse(fs.readFileSync(join(projectPath, 'state.json')));
 
+  const [ mainCss, viewCss ] = await Promise.all([
+    fetch(`${process.env.HOST}/product-builder/assets/main.css`).then(res => res.text()),
+    fetch(`${process.env.HOST}/product-builder/assets/project-view.css`).then(res => res.text()),
+  ])
+
   const blocks = state.view.blocks;
 
   res.render('project-view', { 
     state: JSON.stringify(state),
     blocks,
-    product: state.product
+    product: state.product,
+    mainCss,
+    viewCss
   });
 }

@@ -221,6 +221,8 @@ export default function Product() {
   useEffect(() => {
     if (product && types) {
       setSelectedStatus(product.status);
+
+      console.log(product);
       setProductQuantity(product.quantity.type);
 
       if (product.quantity.type === 'multiply') {
