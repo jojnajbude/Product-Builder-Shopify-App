@@ -129,8 +129,7 @@
                   </svg>  
                 </div>
                 
-                <div class="option-selector__options" data-options>
-                </div>
+                <div class="option-selector__options" data-options></div>
               </product-option-selector>
             </div>
           </div>
@@ -394,5 +393,43 @@
   
       <div class="error-toast__errors" data-errors></div>
     </error-toast>
+
+    <related-products class="related-products" state="close">
+      <div class="related-products__header">
+        <button class="button related-products__exit-btn" data-exit>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4.5 4.5L14.0806 14.0806" stroke="#FF0079" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4.5 14.0801L14.0806 4.49943" stroke="#FF0079" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+
+          <span>Exit</span>
+        </button>
+
+        <span class="related-products__title">
+          Choose your options
+        </span>
+      </div>
+
+      <div class="related-products__content">
+        <img
+          src=""
+          alt=""
+          class="related-products__main-image"
+          width="383"
+          height="262"
+          loading="lazy"
+          data-related-product-image
+        >
+
+        <div class="related-products__items" data-related-products-list></div>
+      </div>
+
+      <button
+        class="related-products__checkout-btn button button--primary"
+        data-checkout
+      >
+        Continue to Checkout
+      </button>
+    </related-products>
   </body>
 </html>

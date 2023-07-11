@@ -1,89 +1,14 @@
   <style>
-    {{!-- {{{ mainCss }}}
-    {{{ viewCss }}} --}}
+    {{{ mainCss }}}
+    {{{ viewCss }}}
 
     .studio-view__container {
       position: relative;
     }
   </style>
 
-  {{!-- <div
-    block="{{ blocks.0.id }}"
-    block-type="polaroid"
-    background-color="{{ blocks.0settings.backgroundColor.value }}"
-    is-white="false"
-    print-type="polaroid"
-    class="prints product-element prints__polaroid polaroid is-selected {{ block.settings.backgroundColor.label}}" 
-    style="background-color: {{ blocks.0.settings.backgroundColor.value }};"
-  >
-
-    {{#each blocks.0.childBlocks as | child |}}
-      {{#switch child.type}}
-        {{#case 'editable-picture'}}
-          {{assign 'image' child}}
-        {{/case}}
-
-        {{#case 'text'}}
-          {{assign 'text' child}}
-        {{/case}}
-      {{/switch}}
-    {{/each}}
-
-    <div
-      class="product-element__picture editable-picture {{#unless @root.image.imageUrl }}is-empty{{/unless}}"
-      child-block="childBlock-0"
-      crop="0"
-      rotate="0"
-      background-color="rgb(0,255,133)"
-      editable-picture=""
-    >
-      <div class="editable-picture__empty-state" data-empty-state="">
-        <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M1.10156 3.98131C1.10156 3.00356 1.89418 2.21094 2.87193 2.21094H13.9367C14.9145 2.21094 15.7071 3.00356 15.7071 3.98131V12.3906C15.7071 13.3683 14.9145 14.1609 13.9367 14.1609H2.87193C1.89418 14.1609 1.10156 13.3683 1.10156 12.3906V3.98131Z" stroke="#FF0079" stroke-width="1.77037" stroke-linejoin="round"></path>
-          <path d="M4.08594 14.1618L10.9214 6.7567C11.5568 6.06839 12.6184 5.99415 13.3434 6.58732L15.704 8.51875" stroke="#FF0079" stroke-width="1.77037" stroke-linecap="round" stroke-linejoin="round"></path>
-          <path d="M1.10156 6.85938L6.2467 12.0045" stroke="#FF0079" stroke-width="1.77037"></path>
-          <path d="M8.73299 8.85104C8.73299 8.18715 7.54405 6.85938 6.07743 6.85938C4.61081 6.85938 3.42188 8.18715 3.42188 8.85104" stroke="#FF0079" stroke-width="1.77037" stroke-linecap="round" stroke-linejoin="round"></path>
-        </svg>
-      </div>
-
-      {{#if @root.image.imageUrl }}
-        <img
-          class="editable-picture__image"
-          draggable="false"
-          crossorigin=""
-          src="{{ @root.image.imageUrl }}?resize=[921,897]&amp;container=[210,210]&amp;rotate={{@root.image.settings.rotate.value}}&crop={{ imageCrop @root.image.settings.crop.value }}&background={{ block.settings.backgroundColor.value }}"
-          style="opacity: 1;"
-        >
-      {{/if}}            
-
-    </div>
-    
-    <div
-      line=""
-      max-size="20"
-      child-block="childBlock-1"
-      text-align="{{ @root.text.settings.text.align }}"
-      is-bold="{{ @root.text.settings.text.fontStyle.bold }}"
-      is-italic="{{ @root.text.settings.text.fontStyle.italic }}"
-      is-underline="{{ @root.text.settings.text.fontStyle.underline }}"
-      font="{{ @root.text.settings.text.font }}"
-      class="product-element__text textarea-container"
-      editable-text=""
-    >
-      <span
-        class="textarea line"
-      >
-        {{#if @root.text.settings.text.text }}
-          {{ @root.text.settings.text.text }}
-        {{else}}
-          Add text here
-        {{/if}}
-      </span>
-    </div>
-  </div> --}}
-
-<div class="studio-view">
-  <div class="studio-view__container">
+{{#unless pdf }}<div class="studio-view">{{/unless}}
+  <div class="studio-view__container {{#if pdf }}pdf{{/if}}">
 
   {{#each blocks as | block | }}
     {{#switch block.type}}
@@ -393,4 +318,4 @@
     {{/switch}}
   {{/each}} 
   </div>
-</div>
+{{#unless pdf }}</div>{{/unless}}

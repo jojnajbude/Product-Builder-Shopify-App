@@ -114,7 +114,9 @@ const onImageLoad = async (picture, src) => {
 
 const orderItem = (draft) => {
   return new Promise(async (res, rej) => {
-    const { orderID: id, product, updatedAt } = draft;
+    const { projectId: id, product, updatedAt } = draft;
+
+    console.log(draft);
   
     const li = document.createElement('li');
     li.classList.add('order', 'is-loading');
@@ -157,7 +159,7 @@ const orderItem = (draft) => {
     const editBtn = document.createElement('a');
     editBtn.textContent = 'Edit';
     editBtn.classList.add('button', 'button--primary');
-    editBtn.href = location.origin + `/apps/product-builder?order-id=${id}`;
+    editBtn.href = location.origin + `/apps/product-builder?project-id=${id}`;
 
     const deleteBtn = document.createElement('button');
 

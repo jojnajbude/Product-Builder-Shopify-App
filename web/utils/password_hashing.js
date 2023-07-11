@@ -1,11 +1,23 @@
 import CryptoJS from "crypto-js"
 
 export const encryptPassword = (password, secret) => {
-  return CryptoJS.AES.encrypt(password, secret, { }).toString().replace('+','xMl3Jk').replace('/','Por21Ld').replace('=','Ml32');
+  const code = CryptoJS.AES
+    .encrypt(password, secret)
+    .toString()
+    .replace(/\+/g,'p1L2u3S')
+    .replace(/\//g,'s1L2a3S4h')
+    .replace(/=/g,'e1Q2u3A4l');
+
+  return code;
 }
 
 export const decryptPassword = (hash, secret) => {
-  const bytes = CryptoJS.AES.decrypt(hash.replace('xMl3Jk', '+' ).replace('Por21Ld', '/').replace('Ml32', '='), secret);
+  const code = hash
+    .replace(/p1L2u3S/g, '+' )
+    .replace(/s1L2a3S4h/g, '/')
+    .replace(/e1Q2u3A4l/g, '=');
+
+  const bytes = CryptoJS.AES.decrypt(code, secret);
 
   return bytes.toString(CryptoJS.enc.Utf8);
 }

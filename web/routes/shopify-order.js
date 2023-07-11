@@ -29,12 +29,12 @@ shopifyOrders.post('/order/create', json(), async (req, res) => {
   } = shopifyOrder;
 
   const projects = line_items
-    .filter(item => item.properties.some(prop => prop.name === 'order_id'))
+    .filter(item => item.properties.some(prop => prop.name === 'project_id'))
     .map(item => ({
       id: item.id,
       quantity: item.quantity,
       title: item.title,
-      order_id: item.properties.find(prop => prop.name === 'order_id').value
+      project_id: item.properties.find(prop => prop.name === 'project_id').value
     }));
 
   if (!projects.length) {

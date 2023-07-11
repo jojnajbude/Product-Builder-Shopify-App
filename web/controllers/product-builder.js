@@ -2,6 +2,7 @@ import fs from 'fs';
 import { join } from 'path';
 
 import sharp from 'sharp';
+import { deleteFile, downloadFile, existsFile, readDirectory } from '../utils/cdnApi.js';
 
 const PROXY_PATH = `${process.cwd()}/frontend/product-builder/src`;
 
@@ -13,42 +14,52 @@ export const getUploadPath = (params) => {
   const { shop, customerId, anonimId, fileName } = params;
 
   if (anonimId) {
-    return join('product-builder/uploads', shop, 'anonims', anonimId, 'uploads', fileName);
+    return join('product-builder', shop, 'anonims', anonimId, 'uploads', fileName);
   }
 
-  return join('product-builder/uploads', shop, customerId, 'uploads', fileName);
+  return join('product-builder', shop, customerId, 'uploads', fileName);
 }
 
-export const removeImage = (req, res) => {
+export const removeImage = async (req, res) => {
   const { imageURL } = req.body;
 
   const urlPath = new URL(imageURL).pathname;
 
-  const filePath = join(PROXY_PATH, urlPath.split('/product-builder/').pop());
+  const filePath = join('shops', urlPath.split('/product-builder/').pop());
 
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
+  const response = await deleteFile(filePath);
+
+  if (response.HttpCode === 200) {
+    res.sendStatus(200);
+    return;
   }
 
-  res.sendStatus(200);
+  res.sendStatus(400);
 };
 
-export const getCustomerUploads = (req, res) => {
+export const getCustomerUploads = async (req, res) => {
   const { customerId, anonimId, shop } = req.query;
 
   const path = customerId
-    ? join(PROXY_PATH, 'uploads', shop, customerId, 'uploads')
-    : join(PROXY_PATH, 'uploads', shop, 'anonims', anonimId, 'uploads');
+    ? join('shops', shop, customerId, 'uploads')
+    : join('shops', shop, 'anonims', anonimId, 'uploads');
 
-  if (customerId && !anonimId && fs.existsSync(path) ) {
-    const uploads = fs.readdirSync(path, { withFileTypes: true })
-      .map(file => getUploadPath({ shop, customerId, fileName: file.name }));
+  if (!(await existsFile(path))) {
+    res.send({
+      error: 'directrory not exists'
+    });
+    return;
+  }
+
+  if (customerId && !anonimId) {
+    const uploads = (await readDirectory(path))
+      .map(file => getUploadPath({ shop, customerId, fileName: file.ObjectName }));
 
     res.send(uploads);
     return;
-  } else if (!customerId && anonimId && fs.existsSync(path)) {
-    const uploads = fs.readdirSync(path, { withFileTypes: true })
-      .map(file => getUploadPath({ shop, anonimId, fileName: file.name }));
+  } else if (!customerId && anonimId) {
+    const uploads = (await readDirectory(path))
+      .map(file => getUploadPath({ shop, anonimId, fileName: file.ObjectName }));
 
     res.send(uploads);
     return;
@@ -64,9 +75,9 @@ export const sharpImage = async (req, res) => {
 
   const startFrom = pathArr.indexOf('product-builder') + 1;
 
-  const path = join(process.cwd(), 'frontend/product-builder/src', ...pathArr.slice(startFrom));
+  const path = join('shops', ...pathArr.slice(startFrom));
 
-  const options = ['rotate', 'flip', 'flop', 'crop', 'resize', 'filter', 'thumbnail', 'format', 'container', 'background'];
+  const options = ['rotate', 'flip', 'flop', 'crop', 'resize', 'filter', 'thumbnail', 'format', 'container', 'background', 'type'];
 
   const config = Object.keys(req.query)
     .reduce((obj, key) => {
@@ -94,6 +105,11 @@ export const sharpImage = async (req, res) => {
           return obj;
         }
 
+        if (key === 'type') {
+          obj[key] = req.query[key];
+          return obj;
+        }
+
         try { 
           obj[key] = JSON.parse(req.query[key]);
         } catch {
@@ -108,12 +124,19 @@ export const sharpImage = async (req, res) => {
       return obj;
     }, {})
  
-  if (!fs.existsSync(path)) {
+  if (!(await existsFile(path))) {
     res.sendStatus(400);
     return;
   }
- 
-  let file = sharp(path);
+
+  const picture = await downloadFile(path);
+
+  if (!(picture instanceof Buffer)) {
+    res.sendStatus(400);
+    return;
+  }
+
+  let file = sharp(picture);
 
   const metadata = await file.metadata();
 
@@ -128,7 +151,8 @@ export const sharpImage = async (req, res) => {
     thumbnail,
     format = 'jpeg',
     container,
-    background = { r: 255, g: 255, b: 255, alpha: 1 }
+    background = { r: 255, g: 255, b: 255, alpha: 1 },
+    type = 'print'
   } = config;
 
   if (thumbnail && typeof thumbnail !== 'boolean') { 
@@ -152,6 +176,8 @@ export const sharpImage = async (req, res) => {
       width: resizeWidth,
       height: resizeHeight,
     });
+
+    res.setHeader('Content-Type', 'image/webp'); 
 
     const readyFile = await file
     .withMetadata()
@@ -196,6 +222,18 @@ export const sharpImage = async (req, res) => {
   }
 
   const readyFile = await file.toBuffer();
+
+  if (type === 'polaroid') {
+    file = await createPolaroid(readyFile, null, {
+      background
+    });
+
+    res.setHeader('Content-Type', 'image/jpeg'); 
+
+    res.send(file);
+    return;
+  }
+
  
   res.send(readyFile);
 }
@@ -319,6 +357,40 @@ const cropImage = async (file, crop, background) => {
     });
   }
 
-  return file
+  return file;
+}
+
+const createPolaroid = async (img, text, {
+  background
+}) => {
+  let polaroid = sharp({
+    create: {
+      width: 600,
+      height: 800,
+      channels: 4,
+      background
+    }
+  });
+
+  let picture = await sharp(img)
+    .resize({
+      width: 500,
+      height: 500
+    })
+    .jpeg()
+    .toBuffer();
+
+  polaroid = polaroid
+    .composite([
+      {
+        input: picture,
+        top: 50,
+        left: 50
+      }
+    ]);
+
+  polaroid = await polaroid.jpeg().toBuffer();
+
+  return polaroid;
 }
   

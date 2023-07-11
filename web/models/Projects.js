@@ -2,7 +2,7 @@ import { Schema } from "mongoose";
 import mongoose from "./../database/index.js";
 
 const ProjectSchema = new mongoose.Schema({
-  orderID: String,
+  projectId: String,
   status: String,
   createdAt: Number,
   updatedAt: Number,

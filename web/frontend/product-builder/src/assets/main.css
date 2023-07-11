@@ -21,6 +21,11 @@ body {
   height: 100vh;
 }
 
+.text {
+  font-weight: 400;
+  color: var(--text-color);
+}
+
 img[src=""], img:not([src]) {
   opacity: 0 !important;
 }
@@ -1134,6 +1139,10 @@ product-option-selector {
   cursor: pointer;
 }
 
+.option-selector:has(.option-selector__options:empty) {
+  display: none;
+}
+
 .option-selector__options {
   position: absolute;
   top: 100%;
@@ -2188,4 +2197,120 @@ product-tile {
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+/* Related products */
+related-products {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  z-index: 100;
+  width: 880px;
+  opacity: 1;
+  transition: opacity .3s;
+}
+
+related-products[state="open"] {
+  display: flex;
+}
+
+.related-products {
+  flex-direction: column;
+  gap: 30px;
+  justify-content: center;
+  padding: 30px;
+  background-color: #fff;
+  box-shadow: 0px 0px 40px 0px rgba(0, 0, 0, 0.4);
+  border-radius: 30px;
+}
+
+.related-products__header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.related-products__exit-btn {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  translate: 0 -50%;
+}
+
+.related-products__exit-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.related-products__content {
+  display: flex;
+  /* gap: 30px; */
+  justify-content: space-between;
+  align-items: center;
+}
+
+.related-products__main-image {
+  object-fit: contain;
+  border-radius: 20px;
+  flex: 0 0 calc(50% - 15px);
+}
+
+.related-products__items {
+  flex: 0 0 calc(50% - 15px);
+  display: flex;
+  gap: 10px;
+  flex-direction: column;
+}
+
+.related-products__checkout-btn {
+  width: 355px;
+  margin: 0 auto;
+}
+
+/* Related Product */
+.related-product {
+  display: flex;
+  cursor: pointer;
+  gap: 20px;
+  padding: 20px;
+  position: relative;
+  background-color: var(--action-background);
+  border-radius: 20px;
+  align-items: center;
+}
+
+.related-product::before {
+  content: '';
+  display: block;
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(90deg, #FF0079 0%, #FF8714 100%);
+  border-radius: 22px;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity .3s;
+}
+
+.related-product.is-selected::before {
+  opacity: 1;
+}
+
+.related-product__content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.related-product__title {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.related-product__add-btn {
+  justify-content: center;
 }

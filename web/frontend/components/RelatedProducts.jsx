@@ -34,7 +34,7 @@ export function RelatedProduct({ relatedProducts, setRelatedProducts }) {
       source={SearchMajor}
       color='subdued'
     />
-  ));
+  ), []);
 
   const getProducts = useCallback(async () => {
     if (browseInput === '') {
@@ -56,6 +56,14 @@ export function RelatedProduct({ relatedProducts, setRelatedProducts }) {
       getProducts(browseInput);
     }, 500);
   }, [browseInput]);
+
+  useEffect(() => {
+    if (!browseProducts) {
+      setSelected([]);
+    } else {
+      setSelected(relatedProducts.map(product => product.id))
+    }
+  }, [browseProducts]);
 
   return (
     <>
@@ -152,6 +160,7 @@ export function RelatedProduct({ relatedProducts, setRelatedProducts }) {
               ]
             );
             setProducts([]);
+            setSelected([]);
           }
         }}
       >

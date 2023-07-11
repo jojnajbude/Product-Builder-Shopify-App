@@ -312,7 +312,7 @@ const orderItemTemplate = (order, idx) => {
   const container = document.createElement('div');
   container.classList.add('cart-item', 'cart-grid');
   container.id = `CartItem-${index}`
-  container.setAttribute('order-id', id);
+  container.setAttribute('project-id', id);
 
   const itemInfo = document.createElement('div');
   itemInfo.classList.add('cart-item__info')

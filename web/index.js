@@ -148,7 +148,7 @@ app.get(
     });
 
     const webhookShopifyOrder = new shopify.api.rest.Webhook({
-      session: res.locals.shopify.session
+      session: res.locals.shopify.session 
     });
 
     webhookShopifyOrder.address = "https://product-builder.dev-test.pro/product-builder/orders/shopify/order/create";
@@ -692,16 +692,16 @@ app.get('/api/orders', async (req, res) => {
         }
       })
     }; 
-
-    res.send(hashedOrder);
-    return;
+ 
+    res.send(hashedOrder); 
+    return; 
   }
 
   const orders = await Order.find().sort({ order_number: 'desc' });
 
   const hashedOrders = orders.map(order => {
     const newLineItems = order.line_items.map(item => {
-      const orderProp = item.properties.find(prop => prop.name === 'order_id');
+      const orderProp = item.properties.find(prop => prop.name === 'project_id');
       const orderId = orderProp.value;
 
       const hashedProjectId = encryptPassword(orderId, process.env.PASSWORD_SECRET);
@@ -711,7 +711,7 @@ app.get('/api/orders', async (req, res) => {
         hashedProjectId
       }
     });
-
+ 
 
     return {
       ...order.toObject(),
@@ -720,7 +720,7 @@ app.get('/api/orders', async (req, res) => {
   })
 
   res.send(hashedOrders);
-})
+}) 
 
 app.post('/api/products', async (req, res) => {
   const client = new shopify.api.clients.Graphql({
@@ -788,6 +788,8 @@ app.post('/api/products/update', async (req, res) => {
     res.sendStatus(400);
     return;
   }
+
+  console.log(state.relatedProducts);
 
   await ProductModel.findOneAndUpdate({ shopify_id: id }, {
     type: {

@@ -4,6 +4,15 @@ const cookiesTime = {
   anonimUser: 10
 }
 
+function moneyFormat(price, currency) {
+  const formatter = new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: currency || 'USD',
+  });
+
+  return formatter.format(Number(price));
+};
+
 const backButton = document.querySelector('[data-back-button]');
 if (backButton) {
   backButton.addEventListener('click', () => {
@@ -14,9 +23,15 @@ if (backButton) {
 const checkoutButton = document.querySelector('[data-checkout-button]');
 if (checkoutButton) {
   checkoutButton.addEventListener('click', async () => {
-    const orderId = productParams.get('order-id');
+    const projectId = productParams.get('project-id');
 
-    if (orderId) {
+    const relatedProduct = await Studio.relatedProducts.getRelatedProducts();
+
+    if (relatedProduct.rejected) {
+      return;
+    }
+
+    if (projectId) {
       const shopifyProduct = await fetch(location.origin + `/products/${Studio.product.handle}.js`)
         .then(res => res.json());
 
@@ -47,10 +62,10 @@ if (checkoutButton) {
       let addedToCart = {}
 
       if (Studio.orderInfo && Studio.orderInfo.status === 'draft') {
-        const { orderID, quantity, product } = Studio.orderInfo;
+        const { projectId: project_id, quantity, product } = Studio.orderInfo;
 
         const props = {
-          'order_id': orderID,
+          'project_id': project_id,
         }
 
         if (Studio.anonimCustomerId && !Studio.customer) {
@@ -68,14 +83,15 @@ if (checkoutButton) {
                 id: currVariant.id,
                 quantity: quantityToAdd,
                 properties: props
-              }
+              },
+              ...relatedProduct
             ]
           })
         }).then(res => res.json());
       }
 
       if (!addedToCart.status) {
-        fetch(`product-builder/orders/checkout/${orderId}?id=${Studio.customer ? Studio.customer.shopify_id : Studio.anonimCustomerId}`)
+        fetch(`product-builder/orders/checkout/${projectId}?id=${Studio.customer ? Studio.customer.shopify_id : Studio.anonimCustomerId}`)
           .then(res => {
             if (res.ok) {
               const link = document.createElement('a');
@@ -104,8 +120,8 @@ function ActiveActionsController() {
       const toClose = item.target !== event.target
         && !item.target.contains(event.target)
         && item.opener !== event.target
-        && !item.opener.contains(event.target);
-  
+        && (item.opener ? !item.opener.contains(event.target) : true);
+
       if (toClose) {
         item.callback();
         item.closed = true;
@@ -127,6 +143,7 @@ function ActiveActionsController() {
 
   return addToActiveAction
 }
+const subscribeToActionController = ActiveActionsController();
 
 const defaultDPI = 300;
 
@@ -141,7 +158,6 @@ function getResolution(width, height) {
   }
 }
 
-const subscribeToActionController = ActiveActionsController();
 
 (function() {
   window.blockCounter = 0;
@@ -421,7 +437,8 @@ class ProductBuilder extends HTMLElement {
   static selectors = {
     panel: '[customization-panel]',
     studioView: '[studio-view]',
-    errorToast: 'error-toast'
+    errorToast: 'error-toast',
+    relatedProducts: 'related-products'
   };
 
   static get observedAttributes() {
@@ -449,6 +466,7 @@ class ProductBuilder extends HTMLElement {
     }
 
     this.errorToast = document.querySelector(ProductBuilder.selectors.errorToast);
+    this.relatedProducts = document.querySelector(ProductBuilder.selectors.relatedProducts)
 
     this.init();
   }
@@ -465,7 +483,7 @@ class ProductBuilder extends HTMLElement {
       return;
     }
 
-    if (!productParams.get('id') && !productParams.get('order-id') && !currState.product) {
+    if (!productParams.get('id') && !productParams.get('project-id') && !currState.product) {
       this.panel.tools.focusOnTab('products');
     }
 
@@ -484,6 +502,8 @@ class ProductBuilder extends HTMLElement {
       this.product = currState.product;
 
       this.draft.product = currState.product;
+
+      this.relatedProducts.init();
 
       this.panel.setState({ product: currState.product });
     }
@@ -680,13 +700,13 @@ class ProductBuilder extends HTMLElement {
     if (this.product && !compareObjects(prevState.view.blocks, currState.view.blocks)) {
       const { blocks } =  currState.view;
 
-      if (!this.orderId && !productParams.get('order-id') && !this.orderCreating) {
+      if (!this.projectId && !productParams.get('project-id') && !this.orderCreating) {
         const someImages = blocks.some(block => block.childBlocks.some(child => child.imageUrl));
 
         if (someImages) {
           this.orderCreating = true;
           this.createOrder().then(order => {
-            this.orderId = order.orderID;
+            this.projectId = order.projectId;
 
             this.setOrderPath();
             this.orderCreating = false;
@@ -909,14 +929,14 @@ class ProductBuilder extends HTMLElement {
       this.panel.tools.uploadedImages(this.uploaded);
     }
 
-    if (productParams.get('order-id')) {
+    if (productParams.get('project-id')) {
       if (!this.customer && !this.anonimCustomerId) {
         this.defaultBuilderPath();
       }
 
-      this.orderId = productParams.get('order-id');
+      this.projectId = productParams.get('project-id');
 
-      const state = await this.getOrderState(this.orderId);
+      const state = await this.getOrderState(this.projectId);
 
       if (!state) {
         return;
@@ -925,7 +945,7 @@ class ProductBuilder extends HTMLElement {
       if (state && !state.error) {
         Studio.utils.change(state);
       } else {
-        this.orderId = await this.createOrder();
+        this.projectId = await this.createOrder();
 
         this.setOrderPath();
       }
@@ -984,7 +1004,7 @@ class ProductBuilder extends HTMLElement {
   }
 
   setOrderPath() {
-    const nextURL = location.origin + location.pathname + `?order-id=${this.orderId}`;
+    const nextURL = location.origin + location.pathname + `?project-id=${this.projectId}`;
     const nextTitle = document.title;
     const nextState = { additionalInformation: 'Product builder with order history' };
 
@@ -998,7 +1018,7 @@ class ProductBuilder extends HTMLElement {
     const nextTitle = document.title;
     const nextState = { additionalInformation: 'Product builder with order history' };
 
-    this.orderId = null;
+    this.projectId = null;
 
     window.history.pushState(nextState, nextTitle, nextURL);
 
@@ -1101,6 +1121,8 @@ class ProductBuilder extends HTMLElement {
     return fetch(`product-builder/uploads/list${this.customer ? `?customerId=${this.customer.shopify_id}` : `?anonimId=${this.anonimCustomerId}`}`)
       .then(res => res.json())
       .then(data => {
+        console.log(data);
+
         return Array.isArray(data) ? data.map(imageURL => ({
           original: baseURL + '/' + imageURL,
           thumbnail: imageURL + `?resize=[${devicePixelRatio * 125},${devicePixelRatio * 125}]&thumbnail=true`
@@ -1178,8 +1200,8 @@ const utils = {
   
       localStorage.setItem('product-builder-history', JSON.stringify(history));
 
-      if (((Studio.customer && !Studio.anonimCustomerId) || (!Studio.customer && Studio.anonimCustomerId)) && Studio.orderId && Studio.inited && history.length > 1) {
-        Studio.updateOrder(Studio.orderId);
+      if (((Studio.customer && !Studio.anonimCustomerId) || (!Studio.customer && Studio.anonimCustomerId)) && Studio.projectId && Studio.inited && history.length > 1) {
+        Studio.updateOrder(Studio.projectId);
       }
     },
     allowSave: true,
@@ -3586,7 +3608,7 @@ class Tools extends HTMLElement {
 
     if (typeof imageFile === 'object') {
       const setImage = (imageName) => {
-        image.src = baseURL + '/product-builder/uploads/' + imageName;
+        image.src = baseURL + '/product-builder/' + imageName;
   
         image.onload = () => {
           imageWrapper.classList.remove('is-loading');
@@ -5995,11 +6017,11 @@ class StudioView extends HTMLElement {
         const currVariant = Studio.cart.items.find(item => {
           if (typeof currState.product.shopify_id === 'number') {
             return item.product_id === currState.product.shopify_id
-              && item.properties.order_id == Studio.orderId;
+              && item.properties.project_id == Studio.projectId;
           }
 
           return currState.product.shopify_id.includes(item.product_id)
-            && item.properties.order_id == Studio.orderId;
+            && item.properties.project_id == Studio.projectId;
         });
 
         const newQuantity = currVariant.quantity + (currCounts - prevCounts);
@@ -7721,7 +7743,7 @@ class ImageChooser extends HTMLElement {
     const instToRedirect = {
       id: productParams.get('id'),
       size: productParams.get('size'),
-      'order-id': productParams.get('order-id')
+      'project-id': productParams.get('project-id')
     }
 
     localStorage.setItem('instToRedirect', JSON.stringify(instToRedirect));
@@ -7857,3 +7879,248 @@ class ImageChooser extends HTMLElement {
       }
   }
 }
+
+class RelatedProducts extends HTMLElement {
+  static selectors = {
+    exitBtn: '[data-exit]',
+    productImage: '[data-related-product-image]',
+    productsList: '[data-related-products-list]',
+    checkoutBtn: '[data-checkout]',
+    relatedProduct: '[data-related-product]'
+  }
+
+  static get  observedAttributes() {
+    return ['state']
+  }
+
+  constructor() {
+    super();
+
+    this.elements = {
+      exitBtn: this.querySelector(RelatedProducts.selectors.exitBtn),
+      productImage: this.querySelector(RelatedProducts.selectors.productImage),
+      productsList: this.querySelector(RelatedProducts.selectors.productsList),
+      checkoutButton: this.querySelector(RelatedProducts.selectors.checkoutBtn)
+    };
+
+    if (this.getAttribute('state') === 'open') {
+      subscribeToActionController({
+        target: this,
+        opener: null,
+        callback: () => {
+          this.close()
+        }
+      })
+    }
+
+    this.elements.exitBtn.addEventListener('click', this.close.bind(this));
+
+  }
+
+  open(toSubscribe = true) {
+    this.setAttribute('state', 'open');
+
+    this.style.opacity = 0;
+
+    setTimeout(() => {
+      this.style.opacity = 1;
+      this.relatedProductsElems.forEach(elem => elem.setButtonWidth());
+    }, 10);
+
+    setTimeout(() => {
+      this.style.opacity = null;
+    }, 300);
+
+    if (toSubscribe) {
+      subscribeToActionController({
+        target: this,
+        opener: checkoutButton,
+        callback: callback || (() => {
+          this.close()
+        })
+      })
+    }
+  }
+
+  close() {
+    this.style.opacity = 0;
+
+    setTimeout(() => {
+      this.setAttribute('state', 'close');
+    }, 300);
+  }
+
+  setImage(imageUrl) {
+    if (typeof imageUrl !== 'string') {
+      return;
+    }
+
+    this.elements.productImage.src = imageUrl;
+  }
+
+  async init() {
+    const { product } = Studio.state;
+
+    if (this.relatedProductsElems) {
+      this.relatedProductsElems.forEach(elem => elem.remove());
+    }
+
+    this.setImage(product.imageUrl);
+
+    this.relatedProducts = product.relatedProducts;
+
+    this.initRelatedProducts();
+  }
+
+  initRelatedProducts() {
+    this.relatedProductsElems = this.relatedProducts
+      .map(product => this.productTemplate(product));
+  }
+
+  productTemplate(product) {
+    const { handle, id, image, options, priceRangeV2, title } = product;
+
+    const added = 'Added!';
+
+    const container = document.createElement('div');
+    container.classList.add('related-products__product', 'related-product');
+    container.setAttribute('data-product-id', id);
+    container.toggleAttribute('data-related-product');
+
+    if (options.length === 1) {
+      container.setAttribute('data-variant', options[0]);
+    }
+
+    const titleElem = document.createElement('div');
+    titleElem.classList.add('related-product__title');
+    titleElem.textContent = title;
+
+    const description = document.createElement('div');
+    description.classList.add('text', 'related-product__description');
+    description.textContent = `Before leaving, would you like to find this creation in your account to edit and order later?`;
+
+    const contentWrapper = document.createElement('div');
+    contentWrapper.classList.add('related-product__content');
+    contentWrapper.append(titleElem, description);
+
+    const addButton = document.createElement('button');
+    const buttonText = document.createElement('span');
+
+    const price = moneyFormat(priceRangeV2.minVariantPrice.amount, 'USD');
+
+    addButton.classList.add('button', 'button--primary-action', 'related-product__add-btn');
+    addButton.append(buttonText);
+
+    container.append(contentWrapper, addButton);
+    
+    const select = () => {
+      container.classList.add('is-selected');
+    };
+
+    const unselect = () => {
+      container.classList.remove('is-selected');
+    }
+
+    const toggle = () => {
+      container.classList.toggle('is-selected');
+
+      if (container.classList.contains('is-selected')) {
+        buttonText.textContent = added;
+      } else {
+        buttonText.textContent = price;
+      }
+    }
+
+    const setButtonWidth = () => {
+      buttonText.textContent = added;
+      const addedLength = buttonText.scrollWidth;
+
+      buttonText.textContent = price;
+      const priceLength = buttonText.scrollWidth;
+
+      buttonText.style.width = `${Math.max(addedLength, priceLength)}px`;
+
+      if (container.classList.contains('is-selected')) {
+        buttonText.textContent = added;
+      }
+    }
+
+    const initVariants = async () => {
+      const url = baseURL + `/product-builder/shopify/product/${id.split('/').pop()}/variants?shop=${window.shop}`;
+
+      const product = await fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          if (data.error) {
+            return data;
+          }
+
+          const variants = data.variants.edges
+            .map(variant => variant.node)
+
+          return {
+            ...data,
+            variants
+          }
+        });
+
+      const { variants } = product;
+
+      const currentVariantId = variants[0].id;
+
+      container.setAttribute(
+        'data-variant', 
+        String(currentVariantId).startsWith('gid://') 
+          ? currentVariantId.split('/').pop()
+          : currentVariantId
+        )
+    }
+
+    addButton.addEventListener('click', toggle);
+
+    this.elements.productsList.append(container);
+    setButtonWidth();
+
+    initVariants();
+
+    return {
+      container,
+      select,
+      unselect,
+      toggle,
+      setButtonWidth,
+      remove: container.remove.bind(container)
+    };
+  }
+
+  getRelatedProducts() {
+    return new Promise((resolve, reject) => {
+      this.open(false);
+
+      subscribeToActionController({
+        target: this,
+        opener: checkoutButton,
+        callback: () => {
+          reject({ rejected: true });
+          this.close();
+        }
+      })
+
+      this.elements.checkoutButton.addEventListener('click', () => {
+        const relatedProducts = [...document.querySelectorAll(RelatedProducts.selectors.relatedProduct)]
+          .filter(elem => elem.classList.contains('is-selected'))
+          .map(elem => ({
+            id: elem.getAttribute('data-variant'),
+            quantity: 1,
+            properties: {
+              'related-project': Studio.projectId || ''
+            }
+          }))
+
+        resolve(relatedProducts);
+        this.close();
+      });
+    })
+  }
+}
+customElements.define('related-products', RelatedProducts);

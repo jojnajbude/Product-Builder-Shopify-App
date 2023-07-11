@@ -152,6 +152,8 @@ export default function Product() {
       return;
     }
 
+    console.log(relatedProducts);
+
     const response = await fetch(`api/products/update?id=${product.shopify_id}`, {
       method: 'POST',
       headers: {
@@ -161,7 +163,7 @@ export default function Product() {
         type: selectedType,
         status: selectedStatus,
         settings: settings,
-        relatedProducts: relatedProducts,
+        relatedProducts,
         quantity,
         resolution
       })
@@ -186,7 +188,7 @@ export default function Product() {
       setIsLoadingButtons(current => current.filter(button => button !== saveButtonId));
     }
 
-  }, [selectedType, selectedStatus, product, settings, relatedProducts, productQuantity, minimQuantity, maximumQuantity, resolution]);
+  }, [relatedProducts, selectedType, selectedStatus, product, settings, productQuantity, minimQuantity, maximumQuantity, resolution]);
 
   const discardChanges = useCallback(() => {
     setSelectedStatus(initialState.status);
@@ -216,7 +218,7 @@ export default function Product() {
     discardAction.setOptions({
       onAction: discardChanges
     });
-  }, [product, settings, isLoadingButtons, selectedStatus, selectedType, minimQuantity, productQuantity, maximumQuantity, hasMaximum, resolution]);
+  }, [product, settings, isLoadingButtons, selectedStatus, selectedType, minimQuantity, productQuantity, maximumQuantity, hasMaximum, resolution, relatedProducts]);
 
   useEffect(() => {
     if (product && types) {
@@ -436,8 +438,6 @@ export default function Product() {
               setSettings={setSettings}
               settings={settings}
             />
-
-            
 
             <RelatedProduct
               relatedProducts={relatedProducts}

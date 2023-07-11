@@ -8,33 +8,30 @@ import Order from '../models/Order.js';
 
 import makeCode from '../utils/makeCode.js';
 import Project from '../models/Projects.js';
-import { decryptPassword } from '../utils/password_hashing.js';
+import { decryptPassword, encryptPassword } from '../utils/password_hashing.js';
+import { createDir, deleteFile, downloadFile, existsFile, uploadFile } from '../utils/cdnApi.js';
 
 const zip  = new JSZip();
 
 const frontPath = join(process.cwd(), 'frontend', 'product-builder', 'src');
 
-const cdnPath = join(frontPath, 'uploads');
+const cdnPath = 'shops';
 
-export const getCustomer = (path) => {
+export const getCustomer = async (path) => {
   const uploads = join(path, 'uploads');
 
-  if (!fs.existsSync(path) && !fs.existsSync(uploads)) {
-    fs.mkdirSync(path);
+  const draftPath = join(path, 'projects');
 
-    fs.mkdirSync(uploads);
-  } 
+  if (!(await existsFile(draftPath))) {
+    const response = await createDir(join(path, 'projects'));
 
-  const draftPath = join(path, 'orders');
-
-  if (!fs.existsSync(draftPath)) {
-    fs.mkdirSync(join(path, 'orders'));
+    console.log('response', response);
   }
 
   return uploads;
 }
 
-export const getOrderPath = (req, res, next) => {
+export const getProjectPath = async (req, res, next) => {
   const { id: customerId, shop } = req.query;
 
   if (!customerId) {
@@ -55,11 +52,11 @@ export const getOrderPath = (req, res, next) => {
     return;
   }
 
-  const isLoggedCustomer = fs.existsSync(join(cdnPath, shop, customerId));
+  const isLoggedCustomer = await existsFile(join(cdnPath, shop, customerId));
 
   const isAnoninCustomer = isLoggedCustomer
     ? false
-    : fs.existsSync(join(cdnPath, shop, 'anonims', customerId));
+    : await existsFile(join(cdnPath, shop, 'anonims', customerId));
 
   if (!isLoggedCustomer && !isAnoninCustomer) {
     res.send({
@@ -72,15 +69,15 @@ export const getOrderPath = (req, res, next) => {
 
   const createdAt = Date.now();
 
-  const orderId = req.params.orderId ? req.params.orderId : `draft-${createdAt}-${makeCode(5)}`;
+  const projectId = req.params.orderId ? req.params.orderId : `draft-${createdAt}-${makeCode(5)}`;
 
-  const ordersPath = isLoggedCustomer
-    ? join(cdnPath, shop, customerId, 'orders', orderId)
-    : join(cdnPath, shop, 'anonims', customerId, 'orders', orderId);
+  const projectPath = isLoggedCustomer
+    ? join(cdnPath, shop, customerId, 'projects', projectId)
+    : join(cdnPath, shop, 'anonims', customerId, 'projects', projectId);
 
-  req.order = {
-    path: ordersPath,
-    id: orderId,
+  req.project = {
+    path: projectPath,
+    id: projectId,
     createdAt,
     isLoggedCustomer
   }
@@ -88,34 +85,34 @@ export const getOrderPath = (req, res, next) => {
   next();
 }
 
-export const createOrder = async (req, res) => {
-  const { path: ordersPath, id: orderId, createdAt, isLoggedCustomer } = req.order;
+export const createProject = async (req, res) => {
+  const { path: projectPath, id: projectId, createdAt, isLoggedCustomer } = req.project;
 
   const { id: customerID, shop } = req.query;
 
   const { status } = req.query;
 
-  const isExist = fs.existsSync(ordersPath);
+  const isExist = await existsFile(projectPath);
 
   if (isExist) {
     res.send({
       error: {
-        message: 'Order is exists'
+        message: 'Project is exists'
       }
     });
     return;
   }
 
-  fs.mkdirSync(ordersPath);
+  await createDir(projectPath);
 
   const state = req.body;
 
-  fs.writeFileSync(join(ordersPath, 'state.json'), JSON.stringify(state));
+  await uploadFile(projectPath, 'state.json', Buffer.from(JSON.stringify(state)));
 
   const quantity = state.view.blocks.reduce((sum, block) => sum + block.count, 0);
 
   const project = new Project({
-    orderID: orderId,
+    projectId: projectId,
     status: status ? status : 'draft',
     createdAt: createdAt,
     updatedAt: createdAt,
@@ -132,20 +129,19 @@ export const createOrder = async (req, res) => {
 
     project.set('product', { imageUrl, handle, type, title, status, shopify_id });
   }
+
   await project.save();
 
   res.send(project);
 };
 
-export const updateOrder = async (req, res) => {
-  const { path: ordersPath, id } = req.order;
-
-  const statePath = join(ordersPath, 'state.json');
+export const updateProject = async (req, res) => {
+  const { path: projectPath, id } = req.project;
 
   const state = req.body;
 
   const project = await Project.findOne({
-    orderID: id
+    projectId: id
   });
 
   const { product } = state;
@@ -162,21 +158,21 @@ export const updateOrder = async (req, res) => {
 
   await project.save();
 
-  fs.writeFileSync(statePath, JSON.stringify(state));
+  await uploadFile(projectPath, 'state.json', Buffer.from(JSON.stringify(state)));
 
   res.sendStatus(200); 
 };
  
-export const getOrderInfo = async (req, res) => {
-  const { id } = req.order;
+export const getProjectInfo = async (req, res) => {
+  const { id } = req.project;
 
   const project = await Project.findOne({
-    orderID: id
+    projectId: id
   });
 
   if (!project) {
     res.send({
-      error: "User doesn't have access to this draft"
+      error: "User doesn't have access to this project"
     });
     return;
   }
@@ -186,38 +182,36 @@ export const getOrderInfo = async (req, res) => {
   res.status(200).send(project);
 };
 
-export const getOrderState = async (req, res) => {
-  const { path: ordersPath, id: orderId, createdAt } = req.order;
+export const getProjectState = async (req, res) => {
+  const { path: projectPath, id: projectId, createdAt } = req.project;
 
-  const isExist = fs.existsSync(join(ordersPath, 'state.json'));
+  const isExist = await existsFile(join(projectPath, 'state.json'));
 
   if (!isExist) {
     res.send({
       error: {
-        message: 'No such order in directory'
+        message: 'No such project in directory'
       }
     });
     return;
   }
 
-  const state = fs.readFileSync(join(ordersPath, 'state.json'));
+  const state = await downloadFile(projectPath, 'state.json');
 
   res.send(state);
 }
 
-export const deleteOrder = async (req, res) => {
-  const { id, path } = req.order;
+export const deleteProject = async (req, res) => {
+  const { id, path } = req.project;
 
   const { inactive } = req.query;
 
-  const isExist = fs.existsSync(path);
-
-  console.log(path);
+  const isExist = await existsFile(path);
 
   if (!isExist) {
     res.send({
       error: {
-        message: "Order's id is incorrect, can't to delete order"
+        message: "Project's id is incorrect, can't to delete project"
       }
     });
     return;
@@ -226,7 +220,7 @@ export const deleteOrder = async (req, res) => {
 
   if (inactive) {
     const project = await Project.findOne({
-      orderID: id
+      projectId: id
     });
 
     project.set('status', 'draft');
@@ -234,14 +228,15 @@ export const deleteOrder = async (req, res) => {
     await project.save();
 
     res.send({
-      correct: 'Set status of order to draft'
+      correct: 'Set status of project to draft'
     });
     return;
   }
 
-  fs.rmSync(path, { recursive: true });
+  await deleteFile(path);
+
   await Project.deleteOne({
-    orderID: id
+    projectId: id
   });
 
   res.send({
@@ -273,8 +268,6 @@ export const composeProject = async (req ,res) => {
     .filter(item => item.properties.some(prop => prop.name === 'order_id'))
     .map((item, _, arr) => {
       const isAnonim = arr.every(item => item.properties.find(item => item.name === 'anonim_id'));
-
-      // console.log(item);
 
       return {
         shop: project.shop,
@@ -318,8 +311,26 @@ export const composeProject = async (req ,res) => {
 
   await project.save();
 
+  const pdfURL = `${process.env.HOST}/product-builder/orders/generatePDF?project=${
+    encryptPassword(project.orderID, process.env.PASSWORD_SECRET)
+  }`;
+
   if (fs.existsSync(composePath)) {
     const zipName = composePath.split('/').pop();
+
+    const pdf = await fetch(pdfURL)
+      .then(response => {
+        if (!response.ok) {
+          return response;
+        }
+
+        return response.blob()
+      })
+
+    if (!pdf.ok && !(pdf instanceof Blob)) {
+      res.sendStatus(400);
+      return;
+    }
 
     const projectZip = zip.folder(zipName);
 
@@ -333,6 +344,8 @@ export const composeProject = async (req ,res) => {
     projectComposeContent.forEach(file => {
       projectZip.file(file.name, file.data, { binary: true });
     });
+
+    projectZip.file('project.pdf', Buffer.from(await pdf.arrayBuffer()));
 
     const zipFolder = await zip.generateAsync({ type: 'blob' });
 
@@ -348,6 +361,20 @@ export const composeProject = async (req ,res) => {
     project.set('status', 'complete');
     project.save();
 
+    return;
+  }
+
+  const pdf = await fetch(pdfURL)
+    .then(response => {
+      if (!response.ok) {
+        return response;
+      }
+
+      return response.blob()
+    })
+
+  if (!pdf.ok && !(pdf instanceof Blob)) {
+    res.sendStatus(400);
     return;
   }
 
@@ -405,9 +432,9 @@ export const composeProject = async (req ,res) => {
 
     const imagesBuffers = await Promise.all(images);
 
-    imagesBuffers.forEach(image => {
-      const originalPath = join(composePath, `${block.id} - image-${idx + 1} - original.jpg`);
-      const editedPath = join(composePath, `${block.id} - image-${idx + 1} - edited.jpg`);
+    imagesBuffers.forEach((image, imageIdx) => {
+      const originalPath = join(composePath, `${idx + 1}-image-${imageIdx + 1}-original.jpg`);
+      const editedPath = join(composePath, `${idx + 1}-image-${imageIdx + 1}-edited.jpg`);
 
       fs.writeFileSync(originalPath, Buffer.from(image.original));
       fs.writeFileSync(editedPath, Buffer.from(image.edited));
@@ -431,6 +458,9 @@ export const composeProject = async (req ,res) => {
     projectZip.file(file.name, file.data, { binary: true });
   });
 
+
+  projectZip.file('project.pdf', Buffer.from(await pdf.arrayBuffer()));
+
   const zipFolder = await zip.generateAsync({ type: 'blob' });
 
   const zipBuffer = Buffer.from(await zipFolder.arrayBuffer());
@@ -444,14 +474,12 @@ export const composeProject = async (req ,res) => {
 };
 
 export const viewProject = async (req, res) => {
-  const { project: projectHash } = req.query;
+  const { project: projectHash, pdf = false } = req.query;
 
   const projectId = decryptPassword(projectHash, process.env.PASSWORD_SECRET);
 
-  console.log(projectId, projectHash);
-
   const project = await Project.findOne({
-    orderID: projectId
+    projectId: projectId
   });
 
   if (!project) {
@@ -461,18 +489,18 @@ export const viewProject = async (req, res) => {
 
   const { shop, customerID } = project;
 
-  const isLoggedCustomer = fs.existsSync(join(cdnPath, shop, customerID));
+  const isLoggedCustomer = await existsFile(join(cdnPath, shop, customerID));
 
   const projectPath = isLoggedCustomer
     ? join(cdnPath, shop, customerID, 'orders', projectId)
     : join(cdnPath, shop, 'anonims', customerID, 'orders', projectId);
 
-  if (!fs.existsSync(projectPath)) {
+  if (!(await existsFile(projectPath))) {
     res.sendStatus(400);
     return;
   }
 
-  const state = JSON.parse(fs.readFileSync(join(projectPath, 'state.json')));
+  const state = JSON.parse(await downloadFile(join(projectPath, 'state.json')));
 
   const [ mainCss, viewCss ] = await Promise.all([
     fetch(`${process.env.HOST}/product-builder/assets/main.css`).then(res => res.text()),
@@ -486,6 +514,7 @@ export const viewProject = async (req, res) => {
     blocks,
     product: state.product,
     mainCss,
-    viewCss
+    viewCss,
+    pdf: true
   });
 }

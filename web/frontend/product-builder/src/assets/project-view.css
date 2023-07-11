@@ -22,17 +22,50 @@ body > .studio-view {
   gap: 20px;
   justify-items: center;
   flex-wrap: wrap;
-  overflow-y: auto;
+  overflow: visible
+}
+
+.studio-view__container.pdf {
+  position: relative;
+  inset: 0;
 }
 
 .product-element, .product-element * {
   cursor: default;
 }
 
-.studio-view__container > .product-element:only-of-type {
-  align-self: center;
-  justify-self: center;
+.studio-view__container.pdf:has(.product-element:only-of-type) {
+  /* justify-content: center;
+  align-items: center; */
+
+  display: grid;
+  grid-template-columns: 1000px 1000px;
 }
+
+.studio-view__container.pdf:has(.prints__polaroid) {
+  gap: 50px 20px;
+}
+
+.studio-view__container.pdf:has(.magnet) {
+  justify-content: space-evenly;
+  gap: 10px;
+}
+
+.studio-view__container.pdf > .magnet {
+  /* width: 50%; */
+
+}
+
+.pdf .magnet {
+  overflow: hidden;
+}
+
+/* .studio-view__container.pdf .prints__polaroid:nth-child(16n),
+.studio-view__container.pdf .prints__polaroid:nth-child(16n - 1),
+.studio-view__container.pdf .prints__polaroid:nth-child(16n - 2),
+.studio-view__container.pdf .prints__polaroid:nth-child(16n - 3) {
+  margin-bottom: 125px;
+} */
 
 .product-element.Black,
 .product-element.Red,

@@ -17,8 +17,6 @@ export default function lineItem({ item, shopifyOrderID, customer }) {
     hashedProjectId
   } = item;
 
-  console.log(hashedProjectId);
-
   const {
     data: product,
     isLoading
@@ -49,6 +47,14 @@ export default function lineItem({ item, shopifyOrderID, customer }) {
       setDownloadPercent((loaded * 100 / toLoad).toFixed(1));
     };
 
+    toComposeXHR.onerror = () => {
+      console.log('error');
+    }
+
+    toComposeXHR.onabort = () => {
+      console.log('abort')
+    }
+
     toComposeXHR.onloadstart = () => {
       setcomsposeStatus('downloading');
     }
@@ -56,17 +62,24 @@ export default function lineItem({ item, shopifyOrderID, customer }) {
     toComposeXHR.responseType = 'blob';
 
     toComposeXHR.onloadend = function(e) {
-      setcomsposeStatus('load')
+      if (this.status !== 200) {
+        setDownloadPercent(0);
+        setcomsposeStatus('inactive');
+        return;
+      }
+
+      setcomsposeStatus('start')
       const a = document.createElement('a');
 
       const downloadURL = URL.createObjectURL(this.response);
   
-      a.href = downloadURL;
+      a.href = downloadURL; 
       a.download = name;
   
       a.click();
 
-      setcomsposeStatus('inactive');
+      setcomsposeStatus('inactive'); 
+      setDownloadPercent(0);
     }
 
     toComposeXHR.send();
