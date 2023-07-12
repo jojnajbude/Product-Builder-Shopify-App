@@ -173,8 +173,8 @@ export const sharpImage = async (req, res) => {
     const [resizeWidth, resizeHeight] = resize;
 
     file = file.resize({
-      width: resizeWidth,
-      height: resizeHeight,
+      width: parseInt(resizeWidth.toFixed(0)),
+      height: parseInt(resizeHeight.toFixed(0)),
     });
 
     res.setHeader('Content-Type', 'image/webp'); 

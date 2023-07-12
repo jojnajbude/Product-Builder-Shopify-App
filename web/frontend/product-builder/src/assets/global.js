@@ -107,7 +107,7 @@ if (checkoutButton) {
         })
       }
     }
-  })
+  });
 }
 
 const domReader = new DOMParser();
@@ -3847,7 +3847,8 @@ customElements.define('customization-tools', Tools);
 class Panel extends HTMLElement {
   static selectors = {
     productInfo: '[data-product]',
-    tools: '[data-customization-tools]'
+    tools: '[data-customization-tools]',
+    mobileTrigger: '[data-mobile-trigger]'
   };
 
   static get observedAttributes() {
@@ -3859,6 +3860,38 @@ class Panel extends HTMLElement {
 
     this.productInfo = this.querySelector(Panel.selectors.productInfo);
     this.tools = this.querySelector(Panel.selectors.tools);
+
+    this.mobileTrigger = this.querySelector(Panel.selectors.mobileTrigger);
+
+    this.style.translate = `0px 0px`;
+
+    this.event = {
+      mobileMouseDown: this.mobileMouseDown.bind(this),
+      mouseMove: this.mouseMove.bind(this),
+      mobileMouseUp: this.mobileMouseUp.bind(this),
+      windowMouseUp: (() => {
+        window.removeEventListener('mousemove', this.event.mouseMove);
+
+        this.style.transition = null;
+      }).bind(this),
+      mobileTouchStart: this.mobileTouchStart.bind(this),
+      touchMove: this.touchMove.bind(this),
+      mobileTouchEnd: this.mobileTouchEnd.bind(this),
+      windowTouchUp: (() => {
+        window.removeEventListener('touchmove', this.event.touchMove)
+      }).bind(this),
+      prevClientY: null,
+      prevTranslateY: 0
+    };
+
+    this.mobileTrigger.addEventListener('mousedown', this.event.mobileMouseDown);
+    this.mobileTrigger.addEventListener('mouseup', this.event.mobileMouseUp);
+    window.addEventListener('mouseup', this.event.windowMouseUp);
+    
+    this.mobileTrigger.addEventListener('touchstart', this.event.mobileTouchStart);
+    this.mobileTrigger.addEventListener('touchend', this.event.mobileTouchEnd);
+    window.addEventListener('touchend', this.event.windowTouchUp);
+
 
     this.setAttribute('state', JSON.stringify(globalState.panel));
 
@@ -3914,6 +3947,78 @@ class Panel extends HTMLElement {
     }
 
     this.setAttribute('state', JSON.stringify(newState));
+  }
+
+  mobileMouseDown(event) {
+    this.style.transition = 'translate 0s';
+
+    this.event.prevClientY = event.clientY;
+
+    window.addEventListener('mousemove', this.event.mouseMove);
+  }
+
+  mobileTouchStart(event) {
+    this.style.transition = 'translate 0s';
+
+    this.event.prevClientY = event.touches[0].clientY;
+
+    window.addEventListener('touchmove', this.event.touchMove);
+  }
+
+  mouseMove(event) {
+    const currY = event.clientY;
+
+    const diff = currY - this.event.prevClientY;
+
+    this.event.prevTranslateY = ((this.event.prevTranslateY * -1) - diff) * -1;
+
+    if (this.event.prevTranslateY * -1 > (this.offsetHeight - this.offsetHeight * 0.1)) {
+      this.style.translate = `0px -${this.offsetWidth}`;
+      this.event.prevClientY = currY;
+      return;
+    } else if (this.event.prevTranslateY * -1 < 0) {
+      this.style.translate = '0px 0px';
+      this.event.prevClientY = currY;
+      return;
+    }
+
+    this.style.translate = `0px ${this.event.prevTranslateY}px`;
+
+    this.event.prevClientY = currY;
+  }
+
+  touchMove(event) {
+    const currY = event.touches[0].clientY;
+
+    const diff = currY - this.event.prevClientY;
+
+    this.event.prevTranslateY = ((this.event.prevTranslateY * -1) - diff) * -1;
+
+    if (this.event.prevTranslateY * -1 > (this.offsetHeight - this.offsetHeight * 0.1)) {
+      this.style.translate = `0px -${this.offsetWidth}`;
+      this.event.prevClientY = currY;
+      return;
+    } else if (this.event.prevTranslateY * -1 < 0) {
+      this.style.translate = '0px 0px';
+      this.event.prevClientY = currY;
+      return;
+    }
+
+    this.style.translate = `0px ${this.event.prevTranslateY}px`;
+
+    this.event.prevClientY = currY;
+  }
+
+  mobileMouseUp(event) {
+    window.removeEventListener('mousemove', this.event.mouseMove);
+
+    this.style.transition = null;
+  }
+
+  mobileTouchEnd(event) {
+    window.removeEventListener('touchmove', this.event.touchMove);
+
+    this.style.transition = null;
   }
 
   onStateChange() {
@@ -7986,6 +8091,17 @@ class RelatedProducts extends HTMLElement {
     container.classList.add('related-products__product', 'related-product');
     container.setAttribute('data-product-id', id);
     container.toggleAttribute('data-related-product');
+
+    const check = document.createElement('div');
+    check.classList.add('related-product__check');
+
+    check.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 9.23438L7.24264 13.477L15.7279 4.99173" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    `;
+
+    container.append(check);
 
     if (options.length === 1) {
       container.setAttribute('data-variant', options[0]);

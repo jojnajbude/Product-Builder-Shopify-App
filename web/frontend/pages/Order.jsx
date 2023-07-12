@@ -1,5 +1,5 @@
 import { Layout, LegacyCard, Page, SkeletonPage, Text} from "@shopify/polaris";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAppQuery } from "../hooks";
 
@@ -43,10 +43,10 @@ export default function Order() {
         <Layout.Section>
           <LegacyCard title="Products">  
             {order.line_items
-              .filter(item => item.properties.some(prop => prop.name === 'order_id'))
+              .filter(item => item.properties.some(prop => prop.name === 'project_id'))
               .map(item => (
                 <LineItem
-                  key={item.properties.find(prop => prop.name === 'order_id').value}
+                  key={item.properties.find(prop => prop.name === 'project_id').value}
                   item={item}
                   shopifyOrderID={id}
                   customer={{

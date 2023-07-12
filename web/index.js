@@ -680,7 +680,12 @@ app.get('/api/orders', async (req, res) => {
     const hashedOrder = { 
       ...order.toObject(),
       line_items: order.line_items.map(item => {
-        const orderProp = item.properties.find(prop => prop.name === 'order_id');
+        const orderProp = item.properties.find(prop => prop.name === 'project_id');
+
+        if (!orderProp) {
+          return;
+        }
+
         const orderId = orderProp.value;
 
         
@@ -690,7 +695,7 @@ app.get('/api/orders', async (req, res) => {
           ...item,
           hashedProjectId
         }
-      })
+      }).filter(item => item)
     }; 
  
     res.send(hashedOrder); 
@@ -702,6 +707,11 @@ app.get('/api/orders', async (req, res) => {
   const hashedOrders = orders.map(order => {
     const newLineItems = order.line_items.map(item => {
       const orderProp = item.properties.find(prop => prop.name === 'project_id');
+
+      if (!orderProp) {
+        return;
+      }
+
       const orderId = orderProp.value;
 
       const hashedProjectId = encryptPassword(orderId, process.env.PASSWORD_SECRET);
@@ -710,7 +720,7 @@ app.get('/api/orders', async (req, res) => {
         ...item,
         hashedProjectId
       }
-    });
+    }).filter(item => item);
  
 
     return {

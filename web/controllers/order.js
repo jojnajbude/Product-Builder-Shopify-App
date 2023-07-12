@@ -9,7 +9,7 @@ import Order from '../models/Order.js';
 import makeCode from '../utils/makeCode.js';
 import Project from '../models/Projects.js';
 import { decryptPassword, encryptPassword } from '../utils/password_hashing.js';
-import { createDir, deleteFile, downloadFile, existsFile, uploadFile } from '../utils/cdnApi.js';
+import { createDir, deleteFile, downloadFile, existsFile, readDirectory, uploadFile } from '../utils/cdnApi.js';
 
 const zip  = new JSZip();
 
@@ -250,7 +250,7 @@ export const getImageFromUrl = async (url) => {
   }
 
   return fetch(url).then(res => res.arrayBuffer());
-}
+}; 
 
 export const composeProject = async (req ,res) => {
   const { order_id, project_id } = req.query;
@@ -260,12 +260,30 @@ export const composeProject = async (req ,res) => {
       shopify_id: order_id
     }),
     Project.findOne({
-      orderID: project_id
+      projectId: project_id
     })
   ]);
 
+  if (!project) {
+    res.send({
+      error: {
+        message: 'no project'
+      }
+    });
+    return;
+  }
+
+  if (!order) {
+    res.send({
+      error: {
+        message: 'no order'
+      }
+    });
+    return;
+  }
+
   const lineItem = order.line_items
-    .filter(item => item.properties.some(prop => prop.name === 'order_id'))
+    .filter(item => item.properties.some(prop => prop.name === 'project_id'))
     .map((item, _, arr) => {
       const isAnonim = arr.every(item => item.properties.find(item => item.name === 'anonim_id'));
 
@@ -281,15 +299,15 @@ export const composeProject = async (req ,res) => {
           name: item.name,
           title: item.title
         },
-        orderId: item.properties.find(prop => prop.name === 'order_id').value
+        projectId: item.properties.find(prop => prop.name === 'project_id').value
       }
-    }).find(item => item.orderId === project_id);
+    }).find(item => item.projectId === project_id);
 
   const { customer } = lineItem;
 
   const projectPath = customer.id.split('-').length === 2
-    ? join(cdnPath, lineItem.shop, 'anonims', customer.id, 'orders', lineItem.orderId)
-    : join(cdnPath, lineItem.shop, customer.id, 'orders', lineItem.orderId);
+    ? join(cdnPath, lineItem.shop, 'anonims', customer.id, 'projects', lineItem.projectId)
+    : join(cdnPath, lineItem.shop, customer.id, 'projects', lineItem.projectId);
   
   const composeName = `${project.product.title.split('/').join('-')} - ${
     customer.name && customer.lastName
@@ -302,8 +320,10 @@ export const composeProject = async (req ,res) => {
 
   const zipName = composePath.split('/').pop();
 
-  if (fs.existsSync(zipPath)) {
-    res.sendFile(zipPath);
+  if (await existsFile(zipPath)) {
+    const zip = await downloadFile(zipPath);
+
+    res.send(zip);
     return;
   }
 
@@ -315,48 +335,45 @@ export const composeProject = async (req ,res) => {
     encryptPassword(project.orderID, process.env.PASSWORD_SECRET)
   }`;
 
-  if (fs.existsSync(composePath)) {
-    const zipName = composePath.split('/').pop();
+  if (await existsFile(composePath)) {
+    const zipName = composeName.split('/').pop();
 
-    const pdf = await fetch(pdfURL)
-      .then(response => {
-        if (!response.ok) {
-          return response;
-        }
+    // const pdf = await fetch(pdfURL)
+    //   .then(response => {
+    //     if (!response.ok) {
+    //       return response;
+    //     }
 
-        return response.blob()
-      })
+    //     return response.blob()
+    //   })
 
-    if (!pdf.ok && !(pdf instanceof Blob)) {
-      res.sendStatus(400);
-      return;
-    }
+    // if (!pdf.ok && !(pdf instanceof Blob)) {
+    //   res.sendStatus(400);
+    //   return;
+    // }
 
     const projectZip = zip.folder(zipName);
 
-    const projectComposeContent = fs.readdirSync(composePath, { withFileTypes: true })
-      .filter(file => !file.isDirectory())
-      .map(file => ({
-        name: file.name,
-        data: fs.readFileSync(join(composePath, file.name))
+    const projectComposeContent = (await readDirectory(composePath))
+      .filter(file => !file.IsDirectory)
+      .map(async file => ({
+        name: file.ObjectName,
+        data: await downloadFile(join(composePath, file.ObjectName))
       }));
 
-    projectComposeContent.forEach(file => {
+    (await Promise.all(projectComposeContent)).forEach(file => {
       projectZip.file(file.name, file.data, { binary: true });
     });
 
-    projectZip.file('project.pdf', Buffer.from(await pdf.arrayBuffer()));
+    // projectZip.file('project.pdf', Buffer.from(await pdf.arrayBuffer()));
 
     const zipFolder = await zip.generateAsync({ type: 'blob' });
 
     const zibBuffer = Buffer.from(await zipFolder.arrayBuffer());
 
-    fs.writeFileSync(zipPath, zibBuffer);
+    await uploadFile(projectPath, composeName + '.zip', zibBuffer)
 
-    res.send({
-      name: zipName,
-      data: zibBuffer
-    });
+    res.send(zibBuffer);
 
     project.set('status', 'complete');
     project.save();
@@ -364,25 +381,21 @@ export const composeProject = async (req ,res) => {
     return;
   }
 
-  const pdf = await fetch(pdfURL)
-    .then(response => {
-      if (!response.ok) {
-        return response;
-      }
+  // const pdf = await fetch(pdfURL)
+  //   .then(response => {
+  //     if (!response.ok) {
+  //       return response;
+  //     }
 
-      return response.blob()
-    })
+  //     return response.blob()
+  //   })
 
-  if (!pdf.ok && !(pdf instanceof Blob)) {
-    res.sendStatus(400);
-    return;
-  }
+  // if (!pdf.ok && !(pdf instanceof Blob)) {
+  //   res.sendStatus(400);
+  //   return;
+  // }
 
-  if (!fs.existsSync(composePath)) {
-    fs.mkdirSync(composePath);
-  }
-
-  const state = JSON.parse(fs.readFileSync(join(projectPath, 'state.json')));
+  const state = JSON.parse(await downloadFile(join(projectPath, 'state.json')));
 
   const blocks = state.view.blocks
     .filter(block => block.childBlocks.some(child => child.imageUrl))
@@ -417,7 +430,7 @@ export const composeProject = async (req ,res) => {
         })
     }));
 
-  const blocksReady = blocks.map(async (block, idx) => new Promise(async (res, rej) => {
+  const blocksReady = blocks.map((block, idx) => new Promise(async (res, rej) => {
     const images = block.images.map(image => new Promise(async res => {
       const [original, edited] = await Promise.all([
         getImageFromUrl(image.original),
@@ -432,13 +445,17 @@ export const composeProject = async (req ,res) => {
 
     const imagesBuffers = await Promise.all(images);
 
-    imagesBuffers.forEach((image, imageIdx) => {
-      const originalPath = join(composePath, `${idx + 1}-image-${imageIdx + 1}-original.jpg`);
-      const editedPath = join(composePath, `${idx + 1}-image-${imageIdx + 1}-edited.jpg`);
+    const imagesDownloads = imagesBuffers.map((image, imageIdx) => {
+      const originalName = `block-${idx + 1}-image-${imageIdx + 1}-original.jpg`;
+      const editedName = `block-${idx + 1}-image-${imageIdx + 1}-edited.jpg`;
 
-      fs.writeFileSync(originalPath, Buffer.from(image.original));
-      fs.writeFileSync(editedPath, Buffer.from(image.edited));
+      return Promise.all([
+        uploadFile(composePath, originalName, Buffer.from(image.original)),
+        uploadFile(composePath, editedName, Buffer.from(image.edited))
+      ])
     });
+
+    await Promise.all(imagesDownloads);
 
     res();
   }));
@@ -447,25 +464,25 @@ export const composeProject = async (req ,res) => {
 
   const projectZip = zip.folder(zipName);
 
-  const projectComposeContent = fs.readdirSync(composePath, { withFileTypes: true })
-    .filter(file => !file.isDirectory())
-    .map(file => ({
-      name: file.name,
-      data: fs.readFileSync(join(composePath, file.name))
+  const projectComposeContent = (await readDirectory(composePath))
+    .filter(file => !file.IsDirectory)
+    .map(async file => ({
+      name: file.ObjectName,
+      data: await downloadFile(join(composePath, file.ObjectName))
     }));
 
-  projectComposeContent.forEach(file => {
+  (await Promise.all(projectComposeContent)).forEach(file => {
     projectZip.file(file.name, file.data, { binary: true });
   });
 
 
-  projectZip.file('project.pdf', Buffer.from(await pdf.arrayBuffer()));
+  // projectZip.file('project.pdf', Buffer.from(await pdf.arrayBuffer()));
 
   const zipFolder = await zip.generateAsync({ type: 'blob' });
 
   const zipBuffer = Buffer.from(await zipFolder.arrayBuffer());
 
-  fs.writeFileSync(zipPath, zipBuffer);
+  await uploadFile(projectPath, composeName + '.zip', zipBuffer);
 
   res.send(zipBuffer);
 
@@ -483,7 +500,11 @@ export const viewProject = async (req, res) => {
   });
 
   if (!project) {
-    res.sendStatus(404);
+    res.status(404).send({
+      error: {
+        message: `no valid project - ${projectId}`
+      }
+    });
     return;
   }
 
@@ -492,11 +513,15 @@ export const viewProject = async (req, res) => {
   const isLoggedCustomer = await existsFile(join(cdnPath, shop, customerID));
 
   const projectPath = isLoggedCustomer
-    ? join(cdnPath, shop, customerID, 'orders', projectId)
-    : join(cdnPath, shop, 'anonims', customerID, 'orders', projectId);
+    ? join(cdnPath, shop, customerID, 'projects', projectId)
+    : join(cdnPath, shop, 'anonims', customerID, 'projects', projectId);
 
   if (!(await existsFile(projectPath))) {
-    res.sendStatus(400);
+    res.status(400).send({
+      error: {
+        message: `no valid project path - ${projectId}`
+      }
+    });
     return;
   }
 
@@ -517,4 +542,4 @@ export const viewProject = async (req, res) => {
     viewCss,
     pdf: true
   });
-}
+};

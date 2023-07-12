@@ -22,7 +22,7 @@ export default function lineItem({ item, shopifyOrderID, customer }) {
     isLoading
   } = useAppQuery({ url: `api/products?id=${product_id}` });
 
-  const { order_id, anonim_id } = properties.reduce((props, prop) => ({
+  const { project_id, anonim_id } = properties.reduce((props, prop) => ({
     ...props,
     [prop.name]: prop.value
   }), {});
@@ -34,11 +34,11 @@ export default function lineItem({ item, shopifyOrderID, customer }) {
       customer.first_name && customer.last_name
         ? `${customer.first_name} ${customer.last_name}(${customer.email})`
         : customer.email
-      } - ${order_id.split('-').slice(1).join('-')}.zip`;
+      } - ${project_id.split('-').slice(1).join('-')}.zip`;
     
     const toComposeXHR = new XMLHttpRequest();
 
-    toComposeXHR.open('GET', `${location.origin}/product-builder/orders/compose?order_id=${shopifyOrderID}&project_id=${order_id}`);
+    toComposeXHR.open('GET', `${location.origin}/product-builder/orders/compose?order_id=${shopifyOrderID}&project_id=${project_id}`);
 
     toComposeXHR.onprogress = (event) => {
       const loaded = (event.loaded / 1024 / 1024).toFixed(2);
@@ -122,7 +122,7 @@ export default function lineItem({ item, shopifyOrderID, customer }) {
             </Link>
 
             <Text>
-              Order id: { order_id.split('-').slice(1).join('-') }
+              Order id: { project_id.split('-').slice(1).join('-') }
             </Text>
           </div>
 
@@ -145,14 +145,14 @@ export default function lineItem({ item, shopifyOrderID, customer }) {
             position: 'relative',
             height: '100%'
           }}>
-              <Button
+              {/* <Button
                 size='slim'
                 plain
                 url={location.origin + `/product-builder/orders/generatePDF?project=${hashedProjectId}`}
                 target="_blank"
               >
                 PDF
-              </Button>
+              </Button> */}
 
               <Button
                 size='slim'
