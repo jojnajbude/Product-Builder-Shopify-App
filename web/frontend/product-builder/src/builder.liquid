@@ -34,13 +34,19 @@
 </head>
   <body>
     <header class="header">
-      <button class="button button--primary-action" data-back-button>
+      <button class="button button--primary-action back-button" data-back-button>
         <svg class="button__icon" width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M7.28796 3.75L2.25016 9L7.28796 14.25" stroke="#FF0079" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           <line x1="1" y1="-1" x2="12.2998" y2="-1" transform="matrix(1 0 0 -1 2.45032 8.27344)" stroke="#FF0079" stroke-width="2" stroke-linecap="round"/>
         </svg>
           
         <span>Back</span>
+
+        <svg class="mobile" width="18" height="19" viewBox="0 0 18 19" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M7.28906 4.25L2.25126 9.5L7.28906 14.75" stroke="#FF0079" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="1" y1="-1" x2="12.2998" y2="-1" transform="matrix(1 0 0 -1 2.45312 8.77344)" stroke="#FF0079" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+
       </button>
 
       <a href="/" class="header__logo">
@@ -87,6 +93,13 @@
           <path d="M10.712 14.25L15.7498 9L10.712 3.75" stroke="#FF811A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           <line x1="1" y1="-1" x2="12.2998" y2="-1" transform="matrix(-1 -8.74228e-08 -8.74228e-08 1 15.5497 9.72656)" stroke="#FF811A" stroke-width="2" stroke-linecap="round"/>
         </svg>
+
+        <svg class="mobile" width="24" height="25" viewBox="0 0 24 25" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M1 2.5H3.39566C4.33305 2.5 5.14468 3.15106 5.34803 4.06614L6 7M6 7L7.10424 13.0733C7.62296 15.9263 10.1077 18 13.0075 18H15.7106C18.512 18 20.9406 16.0615 21.5614 13.3297L22.5835 8.83243C22.7969 7.89379 22.0834 7 21.1208 7H6Z" stroke="#FF0079" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="8.5" cy="21.5" r="1" stroke="#FF0079" stroke-width="2"/>
+          <circle cx="20.5" cy="21.5" r="1" stroke="#FF0079" stroke-width="2"/>
+        </svg>
+
       </button>
     </header>
 
@@ -217,13 +230,9 @@
                 </custom-switch>
               </div>
 
-              <div class="page__product-container">
+              <div class="page__product-container" data-product-container>
                 <div class="page__products" data-products-list>
                 </div>
-              </div>
-
-              <div class="button button--primary page__product-button" data-product-button>
-                Open product
               </div>
             </div>
 
@@ -283,43 +292,6 @@
 
               <div class="page__images-container" >
                 <div class="page__images" data-images></div>
-              </div>
-
-              <div class="page__upload">
-                <button
-                  class="button button--primary"
-                  data-upload-image
-                >
-                  <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M13.0142 5.16797L9.30547 1.27213L5.59678 5.16797" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    <line x1="1" y1="-1" x2="8.75" y2="-1" transform="matrix(0 1 1 0 10.0237 1.19531)" stroke="white" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M3.03125 10V12.5C3.03125 15.2614 5.26983 17.5 8.03125 17.5H10.25C13.0114 17.5 15.25 15.2614 15.25 12.5V10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                    
-                  <span>Upload Photos</span>
-                </button>
-
-                <div class="upload__wrapper" data-upload-wrapper>
-                  <div class="upload__variant">
-                    <input
-                      accept=".webp,.jpg,.jpeg,.png"
-                      type="file"
-                      name="images"
-                      id="image-from-pc"
-                      multiple
-                      data-import-from-pc
-                    >
-                    <label for="image-from-pc">
-                      From PC
-                    </label>
-                  </div>
-                  <div class="upload__variant" data-from-instagram>
-                    <span>From Instagram</span>
-                  </div>
-                  <div class="upload__variant" data-from-facebook>
-                    <span>From Facebook</span>
-                  </div>
-                </div>
               </div>
             </div>
 

@@ -110,6 +110,59 @@ if (checkoutButton) {
   });
 }
 
+function globalResize() {
+  window.bodySize = document.body.offsetWidth >= 750 ? 'desktop' : 'mobile';
+
+  let subscribedAdaptiveContent = [];
+
+  const dispathAdaptive = (size, elem) => {
+    const resizeEvent = new CustomEvent('body:resized', {
+      detail: {
+        size
+      }
+    });
+
+    if (elem) {
+      elem.dispatchEvent(resizeEvent);
+      return;
+    }
+
+    subscribedAdaptiveContent.forEach(elem => elem.dispatchEvent(resizeEvent));
+  }
+
+  const windowResize = new ResizeObserver(entries => {
+    entries.forEach(entry => {
+      const width = entry.contentRect.width;
+      
+
+      if (width < 750 && window.bodySize === 'mobile') {
+        return;
+      } else if (width < 750 && window.bodySize !== 'mobile') {
+        window.bodySize = 'mobile';
+        dispathAdaptive(window.bodySize);
+      } else if (width > 750 && window.bodySize !== 'desktop') {
+        window.bodySize = 'desktop';
+        dispathAdaptive(window.bodySize);
+      }
+    });
+  });
+  windowResize.observe(document.body);
+
+  return {
+    subscribe: (elem) => {
+      subscribedAdaptiveContent.push(elem);
+
+      dispathAdaptive(window.bodySize, elem);
+    },
+    unsubscribe: (elem) => {
+      subscribedAdaptiveContent = subscribedAdaptiveContent
+        .filter(item => item !== elem);
+    }
+  }
+}
+
+const adaptiveActions = globalResize();
+
 const domReader = new DOMParser();
 
 function ActiveActionsController() {
@@ -1121,8 +1174,6 @@ class ProductBuilder extends HTMLElement {
     return fetch(`product-builder/uploads/list${this.customer ? `?customerId=${this.customer.shopify_id}` : `?anonimId=${this.anonimCustomerId}`}`)
       .then(res => res.json())
       .then(data => {
-        console.log(data);
-
         return Array.isArray(data) ? data.map(imageURL => ({
           original: baseURL + '/' + imageURL,
           thumbnail: imageURL + `?resize=[${devicePixelRatio * 125},${devicePixelRatio * 125}]&thumbnail=true`
@@ -1622,7 +1673,54 @@ class OptionSelector extends HTMLElement {
 }
 customElements.define('product-option-selector', OptionSelector);
 
-class ProductInfo extends HTMLElement {
+class AdaptiveContent extends HTMLElement {
+  constructor() {
+    super();
+
+    this.addEventListener('body:resized', this.onResize.bind(this));
+  }
+
+  setPoints({ mobile, desktop }) {
+    this.mobilePoint = mobile;
+    this.desktopPoint = desktop;
+
+    adaptiveActions.subscribe(this);
+  }
+
+  onResize(event) {
+    console.log(event.detail.size);
+
+    const { size } = event.detail;
+
+    switch(size) {
+      case 'mobile':
+        this.setPosition(this.mobilePoint);
+        break;
+      case 'desktop':
+        this.setPosition(this.desktopPoint);
+        break;
+    }
+  }
+
+  setPosition(position) {
+    const { position: queue, elem } = position;
+
+    if (document.contains(this)) {
+      this.remove();
+    }
+
+    if (queue === 'after') {
+      elem.after(this);
+    } else if (queue === 'before') {
+      elem.parentElement.insertBefore(this, elem);
+    } else if (queue === 'inside') {
+      elem.append(this);
+    }
+  }
+}
+customElements.define('adaptive-content', AdaptiveContent);
+
+class ProductInfo extends AdaptiveContent {
   static selectors = {
     image: '[data-product-image]',
     title: '[data-product-title]',
@@ -1631,7 +1729,7 @@ class ProductInfo extends HTMLElement {
       wrapper: '[data-product-quantity]',
       current: '[data-product-curr-quantity]',
       request: '[data-product-req-quantity]',
-    }  
+    }
   };
 
   static get observedAttributes() {
@@ -1667,6 +1765,19 @@ class ProductInfo extends HTMLElement {
     }).bind(this));
 
     this.parent = this.parentNode;
+
+    console.log(Studio.panel.tools);
+
+    this.setPoints({
+      mobile: {
+        position: 'after',
+        elem: backButton
+      },
+      desktop: {
+        position: 'before',
+        elem: document.querySelector('customization-tools')
+      }
+    })
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -3227,6 +3338,7 @@ class Tools extends HTMLElement {
       page: '[data-page]',
       products: {
         container: '[data-products-list]',
+        wrapper: '[data-product-container]',
         product: '[data-product]',
         switch: '[data-product-switch-grid]',
         openProduct: '[data-product-button]'
@@ -3236,6 +3348,7 @@ class Tools extends HTMLElement {
         makeMagic: '[data-make-magic]',
         imagesWrapper: '[data-images]',
         image: '[data-image]',
+        imageSource: '[data-image-source]',
         uploadImage: '[data-upload-image]',
         uploadSelector: '[data-upload-wrapper]',
         importFromPC: '[data-import-from-pc]'
@@ -3321,6 +3434,8 @@ class Tools extends HTMLElement {
     if (tabToFocus) {
       tabToFocus.click();
     }
+
+    this.parentElement.openOnTab(40);
   }
 
   initTabs() {
@@ -3359,6 +3474,8 @@ class Tools extends HTMLElement {
     this.moveRunner();
     this.changePage();
 
+    this.parentElement.openOnTab(50);
+
     Studio.dispatchEvent(new CustomEvent('change', {
       detail: {
         tabs: {
@@ -3394,6 +3511,7 @@ class Tools extends HTMLElement {
 
   async initProductPage() {
     const productsContainer = this.querySelector(Tools.selectors.pages.products.container)
+    const productWrapper = this.querySelector(Tools.selectors.pages.products.wrapper);
 
     const gridSwitch = this.querySelector(Tools.selectors.pages.products.switch);
     this.classList.add('product-grid--' + gridSwitch.getValue());
@@ -3417,7 +3535,28 @@ class Tools extends HTMLElement {
         return item;
       });
 
-    const openProductBtn = this.querySelector(Tools.selectors.pages.products.openProduct);
+    const openProductBtn = (() => {
+      const btn = document.createElement('adaptive-content');
+      btn.classList.add('button', 'button--primary', 'page__product-button');
+      btn.toggleAttribute('data-product-button');
+      btn.toggleAttribute('panel-related');
+
+      btn.textContent = 'Open product';
+
+      btn.setPoints({
+        mobile: {
+          position: 'inside',
+          elem: document.body
+        },
+        desktop: {
+          position: 'after',
+          elem: productWrapper
+        }
+      });
+
+      return btn;
+    })();
+
     openProductBtn.addEventListener('click', () => {
       if (this.pages.products.selected) {     
         Studio.defaultBuilderPath();
@@ -3479,6 +3618,39 @@ class Tools extends HTMLElement {
     this.pages.selected.classList.add('is-selected');
   }
 
+  setImageSelected(blocks) {
+    if (!blocks) {
+      return;
+    }
+
+    const editableImages = blocks.reduce((images, block) => {
+      block.childBlocks.forEach(child => {
+        if (child.type === 'editable-picture' && child.imageUrl) {
+          images.push(child.imageUrl);
+        }
+      })
+
+      return images;
+    }, []);
+
+    console.log(editableImages);
+
+    document.querySelectorAll(Tools.selectors.pages.images.image)
+      .forEach(image => {
+        const imageSource = image.querySelector(Tools.selectors.pages.images.imageSource);
+
+        const url = imageSource.src.split('?').shift();
+
+        console.log(url);
+
+        if (editableImages.includes(url)) {
+          image.classList.add('is-selected');
+        } else {
+          image.classList.remove('is-selected');
+        }
+      });
+  }
+
   initImagePage() {
     this.errorToast.addEventListener('error:show', (event) => {
       if (event.detail.imageWrapper) {
@@ -3488,8 +3660,74 @@ class Tools extends HTMLElement {
 
     const imagesWrapper = this.querySelector(Tools.selectors.pages.images.imagesWrapper);
 
-    const uploadButton = this.querySelector(Tools.selectors.pages.images.uploadImage);
-    const uploadSelector = this.querySelector(Tools.selectors.pages.images.uploadSelector);
+    const uploadAdaptiveBtn = (() => {
+      const adaptive = document.createElement('adaptive-content');
+      adaptive.classList.add('page__upload', 'unshow');
+      adaptive.toggleAttribute('panel-related');
+
+      adaptive.setPoints({
+        mobile: {
+          position: 'inside',
+          elem: document.body
+        },
+        desktop: {
+          position: 'after',
+          elem: imagesWrapper.parentElement
+        }
+      });
+
+      const uploadButton = document.createElement('button');
+      uploadButton.classList.add('button', 'button--primary');
+      uploadButton.toggleAttribute('data-upload-image');
+
+      uploadButton.innerHTML = `
+      
+        <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M13.0142 5.16797L9.30547 1.27213L5.59678 5.16797" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="1" y1="-1" x2="8.75" y2="-1" transform="matrix(0 1 1 0 10.0237 1.19531)" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          <path d="M3.03125 10V12.5C3.03125 15.2614 5.26983 17.5 8.03125 17.5H10.25C13.0114 17.5 15.25 15.2614 15.25 12.5V10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+          
+        <span>Upload Photos</span>
+      `;
+
+      const uploadSelector = document.createElement('div');
+      uploadSelector.classList.add('upload__wrapper');
+      uploadSelector.toggleAttribute('data-upload-wrapper');
+
+      uploadSelector.innerHTML = `
+        <div class="upload__variant">
+          <input
+            accept=".webp,.jpg,.jpeg,.png"
+            type="file"
+            name="images"
+            id="image-from-pc"
+            multiple
+            data-import-from-pc
+          >
+          <label for="image-from-pc">
+            From PC
+          </label>
+        </div>
+        <div class="upload__variant" data-from-instagram>
+          <span>From Instagram</span>
+        </div>
+        <div class="upload__variant" data-from-facebook>
+          <span>From Facebook</span>
+        </div>
+      `;
+
+      adaptive.append(uploadButton, uploadSelector);
+
+      return {
+        adaptive,
+        uploadButton,
+        uploadSelector
+      };
+    })();
+
+    const uploadButton = uploadAdaptiveBtn.uploadButton;
+    const uploadSelector = uploadAdaptiveBtn.uploadSelector;
 
     const hideUsedImages = this.querySelector(Tools.selectors.pages.images.imageHide);
     hideUsedImages.addEventListener('change', () => {
@@ -3528,7 +3766,7 @@ class Tools extends HTMLElement {
       imagesWrapper
     }
 
-    const inputFromPC = this.querySelector(Tools.selectors.pages.images.importFromPC);
+    const inputFromPC = document.querySelector(Tools.selectors.pages.images.importFromPC);
     this.inputFromPC = inputFromPC;
 
     inputFromPC.addEventListener('change', (async () => {
@@ -3560,6 +3798,7 @@ class Tools extends HTMLElement {
     const formData = new FormData();
 
     const image = new Image();
+    image.toggleAttribute('data-image-source');
     const imageWrapper = document.createElement('div');
     imageWrapper.classList.add('page__image-wrapper', 'is-loading');
     imageWrapper.toggleAttribute('data-image');
@@ -3848,7 +4087,8 @@ class Panel extends HTMLElement {
   static selectors = {
     productInfo: '[data-product]',
     tools: '[data-customization-tools]',
-    mobileTrigger: '[data-mobile-trigger]'
+    mobileTrigger: '[data-mobile-trigger]',
+    mobileAdaptiveButtons: 'adaptive-content[panel-related]'
   };
 
   static get observedAttributes() {
@@ -3858,7 +4098,7 @@ class Panel extends HTMLElement {
   constructor() {
     super();
 
-    this.productInfo = this.querySelector(Panel.selectors.productInfo);
+    this.productInfo = document.querySelector(Panel.selectors.productInfo);
     this.tools = this.querySelector(Panel.selectors.tools);
 
     this.mobileTrigger = this.querySelector(Panel.selectors.mobileTrigger);
@@ -3878,11 +4118,15 @@ class Panel extends HTMLElement {
       touchMove: this.touchMove.bind(this),
       mobileTouchEnd: this.mobileTouchEnd.bind(this),
       windowTouchUp: (() => {
-        window.removeEventListener('touchmove', this.event.touchMove)
+        window.removeEventListener('touchmove', this.event.touchMove);
+
+        document.body.style.overscrollBehavior = null;
       }).bind(this),
       prevClientY: null,
       prevTranslateY: 0
     };
+
+    this.mobileGradient = this.initMobileGradient();
 
     this.mobileTrigger.addEventListener('mousedown', this.event.mobileMouseDown);
     this.mobileTrigger.addEventListener('mouseup', this.event.mobileMouseUp);
@@ -3923,8 +4167,6 @@ class Panel extends HTMLElement {
 
           return obj;
         }, {});
-
-      this.tools.setToolsState(toSet);
     }
 
       
@@ -3938,6 +4180,8 @@ class Panel extends HTMLElement {
         }
       }, 'panel - blockCount: ' + currState.blockCount)
     }
+
+    this.tools.setImageSelected();
   }
 
   setState(state) {
@@ -3947,6 +4191,55 @@ class Panel extends HTMLElement {
     }
 
     this.setAttribute('state', JSON.stringify(newState));
+  }
+
+  initMobileGradient() {
+    const gradient = document.createElement('div');
+
+    gradient.classList.add('gradient', 'customization-panel__mobile-gradient');
+
+    const show = () => {
+      gradient.style.opacity = null;
+    }
+
+    const unshow = () => {
+      gradient.style.opacity = 0;
+    }
+
+    const remove = () => gradient.remove();
+    const append = () => this.parentElement.append(gradient);
+
+    
+    if (window.bodySize) {
+      append();
+    } else {
+      remove();
+    }
+
+    if ((this.event.prevTranslateY * -1) < 90) {
+      unshow();
+    } else {
+      show();
+    }
+
+    return {
+      gradient,
+      show,
+      unshow,
+      remove,
+      append
+    };
+  }
+
+  openOnTab(percent) {
+    if (window.bodySize === 'mobile' && (this.event.prevTranslateY * -1) < this.offsetHeight / 2) {
+      this.event.prevTranslateY = (this.offsetHeight * (percent / 100)) * -1;
+
+      this.style.translate = `0px ${this.event.prevTranslateY}px`;
+
+      document.querySelectorAll(Panel.selectors.mobileAdaptiveButtons)
+        .forEach(btn => btn.classList.remove('unshow'));
+    }
   }
 
   mobileMouseDown(event) {
@@ -3960,9 +4253,11 @@ class Panel extends HTMLElement {
   mobileTouchStart(event) {
     this.style.transition = 'translate 0s';
 
+    document.body.classList.add('fixed');
+
     this.event.prevClientY = event.touches[0].clientY;
 
-    window.addEventListener('touchmove', this.event.touchMove);
+    window.addEventListener('touchmove', this.event.touchMove); 
   }
 
   mouseMove(event) {
@@ -3972,17 +4267,27 @@ class Panel extends HTMLElement {
 
     this.event.prevTranslateY = ((this.event.prevTranslateY * -1) - diff) * -1;
 
-    if (this.event.prevTranslateY * -1 > (this.offsetHeight - this.offsetHeight * 0.1)) {
-      this.style.translate = `0px -${this.offsetWidth}`;
-      this.event.prevClientY = currY;
-      return;
-    } else if (this.event.prevTranslateY * -1 < 0) {
-      this.style.translate = '0px 0px';
-      this.event.prevClientY = currY;
-      return;
+    if (this.event.prevTranslateY * -1 < this.offsetHeight * 0.23) {
+      document.querySelectorAll(Panel.selectors.mobileAdaptiveButtons)
+        .forEach(btn => btn.classList.add('unshow'));
+    } else {
+      document.querySelectorAll(Panel.selectors.mobileAdaptiveButtons)
+        .forEach(btn => btn.classList.remove('unshow'));
     }
 
-    this.style.translate = `0px ${this.event.prevTranslateY}px`;
+    if (this.event.prevTranslateY * -1 < 90) {
+      this.mobileGradient.unshow();
+    } else {
+      this.mobileGradient.show();
+    }
+
+    if (this.event.prevTranslateY * -1 > (this.offsetHeight - this.offsetHeight * 0.1)) {
+      this.style.translate = `0px -${this.offsetWidth}`;
+    } else if (this.event.prevTranslateY * -1 < 0) {
+      this.style.translate = '0px 0px';
+    } else {
+      this.style.translate = `0px ${this.event.prevTranslateY}px`;
+    }
 
     this.event.prevClientY = currY;
   }
@@ -3994,7 +4299,22 @@ class Panel extends HTMLElement {
 
     this.event.prevTranslateY = ((this.event.prevTranslateY * -1) - diff) * -1;
 
-    if (this.event.prevTranslateY * -1 > (this.offsetHeight - this.offsetHeight * 0.1)) {
+    if (this.event.prevTranslateY * -1 < this.offsetHeight * 0.23) {
+      document.querySelectorAll(Panel.selectors.mobileAdaptiveButtons)
+        .forEach(btn => btn.classList.add('unshow'));
+    } else {
+      document.querySelectorAll(Panel.selectors.mobileAdaptiveButtons)
+        .forEach(btn => btn.classList.remove('unshow'));
+    }
+
+
+    if (this.event.prevTranslateY * -1 < 90) {
+      this.mobileGradient.unshow();
+    } else {
+      this.mobileGradient.show();
+    }
+
+    if (this.event.prevTranslateY * -1 > (this.offsetHeight - 90)) {
       this.style.translate = `0px -${this.offsetWidth}`;
       this.event.prevClientY = currY;
       return;
@@ -4017,6 +4337,8 @@ class Panel extends HTMLElement {
 
   mobileTouchEnd(event) {
     window.removeEventListener('touchmove', this.event.touchMove);
+
+    document.body.classList.remove('fixed');
 
     this.style.transition = null;
   }
@@ -6154,6 +6476,8 @@ class StudioView extends HTMLElement {
         imagesToDownload: null
       }, 'reset images to download')
     }
+
+    Studio.panel.tools.setImageSelected(currState.blocks);
   }
 
   setImages({ blocks, imagesToDownload }) {
@@ -8008,6 +8332,27 @@ class RelatedProducts extends HTMLElement {
       checkoutButton: this.querySelector(RelatedProducts.selectors.checkoutBtn)
     };
 
+    this.gradient = (() => {
+      const gradient = document.createElement('div');
+      gradient.classList.add('related-products__gradient');
+
+      const append = () => document.body.append(gradient);
+      const remove = () => gradient.remove();
+
+      const show = () => gradient.classList.add('show');
+      const unshow = () => gradient.classList.remove('show');
+
+      append();
+
+      return {
+        gradient,
+        append,
+        remove,
+        show,
+        unshow
+      }
+    })();
+
     if (this.getAttribute('state') === 'open') {
       subscribeToActionController({
         target: this,
@@ -8024,6 +8369,8 @@ class RelatedProducts extends HTMLElement {
 
   open(toSubscribe = true) {
     this.setAttribute('state', 'open');
+
+    this.gradient.show();
 
     this.style.opacity = 0;
 
@@ -8049,6 +8396,8 @@ class RelatedProducts extends HTMLElement {
 
   close() {
     this.style.opacity = 0;
+
+    this.gradient.unshow();
 
     setTimeout(() => {
       this.setAttribute('state', 'close');
