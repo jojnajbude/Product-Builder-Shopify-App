@@ -133,7 +133,6 @@ function globalResize() {
   const windowResize = new ResizeObserver(entries => {
     entries.forEach(entry => {
       const width = entry.contentRect.width;
-      
 
       if (width < 750 && window.bodySize === 'mobile') {
         return;
@@ -149,8 +148,12 @@ function globalResize() {
   windowResize.observe(document.body);
 
   return {
-    subscribe: (elem) => {
+    subscribe: (elem, callback) => {
       subscribedAdaptiveContent.push(elem);
+
+      if (callback) {
+        elem.addEventListener('body:resized', callback);
+      }
 
       dispathAdaptive(window.bodySize, elem);
     },
@@ -3633,15 +3636,11 @@ class Tools extends HTMLElement {
       return images;
     }, []);
 
-    console.log(editableImages);
-
     document.querySelectorAll(Tools.selectors.pages.images.image)
       .forEach(image => {
         const imageSource = image.querySelector(Tools.selectors.pages.images.imageSource);
 
         const url = imageSource.src.split('?').shift();
-
-        console.log(url);
 
         if (editableImages.includes(url)) {
           image.classList.add('is-selected');
@@ -4139,6 +4138,8 @@ class Panel extends HTMLElement {
 
     this.setAttribute('state', JSON.stringify(globalState.panel));
 
+    adaptiveActions.subscribe(this, this.onWindowResize.bind(this));
+
     this.tools.init();
   }
 
@@ -4167,6 +4168,8 @@ class Panel extends HTMLElement {
 
           return obj;
         }, {});
+
+      this.tools.setToolsState(toSet);
     }
 
       
@@ -4193,6 +4196,20 @@ class Panel extends HTMLElement {
     this.setAttribute('state', JSON.stringify(newState));
   }
 
+  onWindowResize(event) {
+    const { size } = event.detail;
+
+    if (size !== 'mobile') {
+      this.style.translate = null;
+      this.event.prevTranslateY = 0;
+      this.mobileGradient.remove();
+    } else {
+      this.mobileGradient.append();
+      document.querySelectorAll(Panel.selectors.mobileAdaptiveButtons)
+        .forEach(btn => btn.classList.add('unshow'));
+    }
+  }
+
   initMobileGradient() {
     const gradient = document.createElement('div');
 
@@ -4207,7 +4224,11 @@ class Panel extends HTMLElement {
     }
 
     const remove = () => gradient.remove();
-    const append = () => this.parentElement.append(gradient);
+    const append = () => {
+      if (!document.contains(gradient)) {
+        this.parentElement.append(gradient);
+      }
+    }
 
     
     if (window.bodySize) {
@@ -8531,14 +8552,16 @@ class RelatedProducts extends HTMLElement {
 
       const { variants } = product;
 
-      const currentVariantId = variants[0].id;
+      if (variants) {
+        const currentVariantId = variants[0].id;
 
-      container.setAttribute(
-        'data-variant', 
-        String(currentVariantId).startsWith('gid://') 
-          ? currentVariantId.split('/').pop()
-          : currentVariantId
-        )
+        container.setAttribute(
+          'data-variant', 
+          String(currentVariantId).startsWith('gid://') 
+            ? currentVariantId.split('/').pop()
+            : currentVariantId
+          )
+      }
     }
 
     addButton.addEventListener('click', toggle);
