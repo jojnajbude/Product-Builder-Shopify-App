@@ -326,6 +326,10 @@ adaptive-content[panel-related] {
   background-color: #fff3f3;
 }
 
+.customization-panel__product-quantity > span {
+  text-wrap: nowrap;
+}
+
 .customization-panel__mobile-gradient {
   display: none;
 }

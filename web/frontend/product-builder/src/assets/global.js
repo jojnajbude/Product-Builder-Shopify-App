@@ -272,7 +272,7 @@ function getResolution(width, height) {
   }
 })();
 
-const baseURL = 'https://product-builder.dev-test.pro';
+const baseURL = 'https://getcocun-stage-qa5ol.ondigitalocean.app';
 
 const layouts = {
   whole: {

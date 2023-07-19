@@ -1,6 +1,6 @@
 import { join } from 'path';
 
-const cdnPath = 'https://getcocun-dev.b-cdn.net/shops/';
+const cdnPath = 'https://getcocun-stage.b-cdn.net/shops/';
 
 const joinPath = (...path) => {
   const stringPath = path.map(elem => String(elem));

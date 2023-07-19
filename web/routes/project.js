@@ -2,8 +2,6 @@ import { Router, json, urlencoded } from 'express';
 import multer from "multer";
 import fs from 'fs';
 
-import wkhtmltopdf from 'wkhtmltopdf';
-
 import { composeProject, createProject, deleteProject, getCustomer, getImageFromUrl, getProjectInfo, getProjectPath, getProjectState, updateProject, viewProject } from '../controllers/order.js';
 
 import { join } from 'path';
@@ -13,7 +11,6 @@ import shopifyOrders from './shopify-order.js';
 import { decryptPassword } from '../utils/password_hashing.js';
 import Order from '../models/Order.js';
 
-import puppeteer from 'puppeteer';
 import { deleteFile, downloadFile, existsFile, readDirectory, uploadFile, uploadImage } from '../utils/cdnApi.js';
 
 const imageStorage = multer.memoryStorage();
@@ -115,67 +112,60 @@ projects.get('/view', viewProject);
 
 projects.get('/compose', composeProject);
 
-projects.get('/generatePDF', async (req, res) => {
-  const { project: hashedProject } = req.query;
+// projects.get('/generatePDF', async (req, res) => {
+//   const { project: hashedProject } = req.query;
 
-  const projectId = decryptPassword(hashedProject, process.env.PASSWORD_SECRET);
+//   const projectId = decryptPassword(hashedProject, process.env.PASSWORD_SECRET);
 
-  const project = await Project.findOne({
-    projectId: projectId
-  });
+//   const project = await Project.findOne({
+//     projectId: projectId
+//   });
 
-  if (!project) { 
-    res.sendStatus(404);  
-    return;
-  }  
+//   if (!project) { 
+//     res.sendStatus(404);  
+//     return;
+//   }  
 
-  const {
-    shop,
-    customerID,
-    logged
-  } = project;
+//   const {
+//     shop,
+//     customerID,
+//     logged
+//   } = project;
 
-  const pdfPath = logged
-    ? join(cdnPath, shop, customerID, 'orders', projectId)
-    : join(cdnPath, shop, 'anonims', customerID, 'orders', projectId)
+//   const pdfPath = logged
+//     ? join(cdnPath, shop, customerID, 'orders', projectId)
+//     : join(cdnPath, shop, 'anonims', customerID, 'orders', projectId)
 
-  const url = `${process.env.HOST}/product-builder/orders/view?project=${hashedProject}&pdf=true`;
+//   const url = `${process.env.HOST}/product-builder/orders/view?project=${hashedProject}&pdf=true`;
  
-  const browser = await puppeteer.launch({ headless: 'new' });
-  const page = await browser.newPage();
+//   const browser = await puppeteer.launch({ headless: 'new' });
+//   const page = await browser.newPage();
 
   
-  await page.goto(url, {
-    waitUntil: 'networkidle0'
-  });
+//   await page.goto(url, {
+//     waitUntil: 'networkidle0'
+//   });
   
-  await page.emulateMediaType('print');
+//   await page.emulateMediaType('print');
 
-  const pdf = await page.pdf({
-    path: join(pdfPath, 'project.pdf'),
-    margin: {
-      top: '0px',
-      right: '0px',
-      bottom: '0px',
-      left: '0px',
-    },
-    printBackground: true,
-    format: 'A4',
-    scale: 1
-  });
+//   const pdf = await page.pdf({
+//     path: join(pdfPath, 'project.pdf'),
+//     margin: {
+//       top: '0px',
+//       right: '0px',
+//       bottom: '0px',
+//       left: '0px',
+//     },
+//     printBackground: true,
+//     format: 'A4',
+//     scale: 1
+//   });
 
-  await browser.close();
+//   await browser.close();
 
-  // const html = await fetch(url).then(res => res.text());
-
-  // const pdf = wkhtmltopdf(html, {
-  //   pageSize: 'A4',
-    
-  // }).pipe(res);
-
-  fs.createReadStream(join(pdfPath, 'project.pdf'))
-    .pipe(res);
-});
+//   fs.createReadStream(join(pdfPath, 'project.pdf'))
+//     .pipe(res);
+// });
  
 projects.post('/create', json(), getProjectPath, createProject);
 
