@@ -2,7 +2,7 @@ import { Router, json, urlencoded } from 'express';
 import multer from "multer";
 import fs from 'fs';
 
-import { composeProject, createProject, deleteProject, getCustomer, getImageFromUrl, getProjectInfo, getProjectPath, getProjectState, updateProject, viewProject } from '../controllers/order.js';
+import { composeProject, createProject, deleteProject, getCustomer, getImageFromUrl, getProjectInfo, getProjectPath, getProjectState, updateProject, updateProjectStatus, viewProject } from '../controllers/order.js';
 
 import { join } from 'path';
 import cron from 'node-cron';
@@ -30,7 +30,7 @@ cron.schedule('* */30 * * * *', async (now) => {
 
   const toDelete = anonimsProjects.filter(project => {
     const timeDiff = (now - project.updatedAt) / 1000;
-    return timeDiff >= 100;
+    return timeDiff >= 10 * 24 * 60 * 60;
   });
 
   const deleted = await Promise.all(toDelete.map(project => {
@@ -169,7 +169,7 @@ projects.get('/compose', composeProject);
  
 projects.post('/create', json(), getProjectPath, createProject);
 
-projects.post('/update/:orderId', json(), getProjectPath, updateProject);
+projects.post('/update/:orderId', updateProjectStatus, json(), getProjectPath, updateProject);
 
 projects.get('/checkout/:orderId', getProjectPath, async (req, res) => {
   const { id } = req.project;
@@ -186,6 +186,8 @@ projects.get('/checkout/:orderId', getProjectPath, async (req, res) => {
   }
 
   project.set('status', 'active');
+
+  await project.save()
 
   res.sendStatus(200);
 });

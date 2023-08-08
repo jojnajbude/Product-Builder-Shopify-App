@@ -1,5 +1,7 @@
 'use strict';
 
+const baseURL = 'https://product-builder.dev-test.pro';
+
 const cookiesTime = {
   anonimUser: 10
 }
@@ -7,23 +9,39 @@ const cookiesTime = {
 function moneyFormat(price, currency) {
   const formatter = new Intl.NumberFormat(undefined, {
     style: 'currency',
-    currency: currency || 'USD',
+    currency: window.currency,
   });
 
   return formatter.format(Number(price));
 };
 
-const backButton = document.querySelector('[data-back-button]');
-if (backButton) {
-  backButton.addEventListener('click', () => {
-    window.history.go(-1);
-  })
-}
+const backButton = (function backButtonInit() {
+  const button = document.querySelector('[data-back-button]');
 
-const checkoutButton = document.querySelector('[data-checkout-button]');
-if (checkoutButton) {
-  checkoutButton.addEventListener('click', async () => {
+  if (!button) {
+    return;
+  }
+
+  button.addEventListener('click', () => {
+    window.history.go(-1);
+  });
+
+  return button;
+})();
+
+const checkoutButton = (function checkoutButtonInit() {
+  const button = document.querySelector('[data-checkout-button]');
+
+  if (!button) {
+    return;
+  }
+
+  button.addEventListener('click', async () => {
     const projectId = productParams.get('project-id');
+
+    if (!Studio.state.product) {
+      return;
+    }
 
     const relatedProduct = await Studio.relatedProducts.getRelatedProducts();
 
@@ -37,11 +55,11 @@ if (checkoutButton) {
 
       const { product } = Studio.state;
 
-      let currVariant = shopifyProduct.variants[0]
+      let currVariant = shopifyProduct.variants[0];
 
-      if (shopifyProduct.variants.length > 1) {
-        currVariant = shopifyProduct.variants.find(variant => variant.options.includes('Set of 3')) || currVariant;
-      }
+      // if (shopifyProduct.variants.length > 1) {
+      //   currVariant = shopifyProduct.variants.find(variant => variant.options.includes('Set of 3')) || currVariant;
+      // }
 
       let quantityToAdd;
 
@@ -108,7 +126,9 @@ if (checkoutButton) {
       }
     }
   });
-}
+
+  return button;
+})();
 
 function globalResize() {
   window.bodySize = document.body.offsetWidth >= 750 ? 'desktop' : 'mobile';
@@ -163,7 +183,6 @@ function globalResize() {
     }
   }
 }
-
 const adaptiveActions = globalResize();
 
 const domReader = new DOMParser();
@@ -214,9 +233,8 @@ function getResolution(width, height) {
   }
 }
 
-
-(function() {
-  window.blockCounter = 0;
+function initIdsHandlers() {
+  let blockCounter = 0;
 
   const getCode = (l) => {
     let result = '';
@@ -248,7 +266,7 @@ function getResolution(width, height) {
     let childID;
 
     do {
-      childID = 'childBlock-' + window.blockCounter++;
+      childID = 'childBlock-' + blockCounter++;
     } while (document.querySelector(StudioView.selectors.childBlockById(childID)));
 
     return childID;
@@ -258,21 +276,20 @@ function getResolution(width, height) {
     let blockID;
 
     do {
-      blockID = 'block-' + window.blockCounter++;
+      blockID = 'block-' + blockCounter++;
     } while (document.querySelector(StudioView.selectors.childBlockById(blockID)));
 
     return blockID;
   }
 
-  window.uniqueID = {
+  return {
     childBlock,
     block,
     draft,
     anonim
   }
-})();
-
-const baseURL = 'https://getcocun-stage-qa5ol.ondigitalocean.app';
+};
+const uniqueID = initIdsHandlers();
 
 const layouts = {
   whole: {
@@ -297,7 +314,7 @@ const layouts = {
         </defs>
       </svg>
       `,
-    types: ['photobook'],
+    types: ['photobook-page'],
     blocks: ['editable-picture']
   },
   wholeFrameless: {
@@ -321,7 +338,7 @@ const layouts = {
         </defs>
       </svg>
       `,
-    types: ['photobook'],
+    types: ['photobook-page'],
     blocks: ['editable-picture']
   },
   rightImageWithText: {
@@ -349,7 +366,7 @@ const layouts = {
         </defs>
       </svg>
       `,
-    types: ['photobook'],
+    types: ['photobook-page'],
     blocks: ['text', 'editable-picture']
   },
   leftImageWithText: {
@@ -377,7 +394,7 @@ const layouts = {
         </defs>
       </svg>
       `,
-    types: ['photobook'],
+    types: ['photobook-page'],
     blocks: ['editable-picture', 'text']
   },
   bigWithThreeSquare: {
@@ -405,7 +422,7 @@ const layouts = {
         </defs>
       </svg>
     `,
-    types: ['photobook'],
+    types: ['photobook-page'],
     blocks: ['editable-picture','editable-picture','editable-picture','editable-picture']
   },
   twoRectangleImagesWithText: {
@@ -433,8 +450,111 @@ const layouts = {
         </defs>
       </svg>
     `,
-    types: ['photobook'],
+    types: ['photobook-page'],
     blocks: ['editable-picture', 'text', 'editable-picture', 'text']
+  },
+  wholeTextCover: {
+    id: 'wholeTextCover',
+    icon: `
+    <svg width="29" height="34" viewBox="0 0 29 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g filter="url(#filter0_d_0_1)">
+      <path d="M0 0H29V17V34H0V0Z" fill="white"/>
+      <path d="M0.5 0.5H28.5V17V33.5H0.5V0.5Z" stroke="#D9D9D9"/>
+      </g>
+      <rect x="6" y="23" width="19" height="18" transform="rotate(-90 6 23)" fill="#D9D9D9"/>
+      <rect x="8.28516" y="27.2002" width="13.1672" height="1.36" rx="0.68" fill="#FF8714"/>
+      <defs>
+      <filter id="filter0_d_0_1" x="0" y="0" width="29" height="34" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_1" result="shape"/>
+      </filter>
+      </defs>
+    </svg>
+      `,
+    types: ['photobook-cover'],
+    blocks: ['editable-picture', 'text']
+  },
+  wholeFramelessCover: {
+    id: 'wholeFramelessCover',
+    icon: `
+    <svg width="28" height="34" viewBox="0 0 28 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g filter="url(#filter0_d_0_1)">
+      <path d="M0 0H28V17V34H0V0Z" fill="white"/>
+      <path d="M0.5 0.5H27.5V17V33.5H0.5V0.5Z" stroke="#D9D9D9"/>
+      </g>
+      <rect y="34" width="34" height="28" transform="rotate(-90 0 34)" fill="#D9D9D9"/>
+      <defs>
+      <filter id="filter0_d_0_1" x="0" y="0" width="28" height="34" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_1" result="shape"/>
+      </filter>
+      </defs>
+    </svg>
+    `,
+    types: ['photobook-cover'],
+    blocks: ['editable-picture']
+  },
+  wholeUpWithTextCover: {
+    id: 'wholeUpWithTextCover',
+    icon: `
+    <svg width="29" height="34" viewBox="0 0 29 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g filter="url(#filter0_d_0_1)">
+      <path d="M0 0H29V17V34H0V0Z" fill="white"/>
+      <path d="M0.5 0.5H28.5V17V33.5H0.5V0.5Z" stroke="#D9D9D9"/>
+      </g>
+      <rect y="23" width="23" height="29" transform="rotate(-90 0 23)" fill="#D9D9D9"/>
+      <rect x="8.28516" y="27.2002" width="13.1672" height="1.36" rx="0.68" fill="#FF8714"/>
+      <defs>
+      <filter id="filter0_d_0_1" x="0" y="0" width="29" height="34" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_1" result="shape"/>
+      </filter>
+      </defs>
+    </svg>
+    `,
+    types: ['photobook-cover'],
+    blocks: ['editable-picture', 'line']
+  },
+  wholeDownWithTextCover: {
+    id: 'wholeUpwholeDownWithTextCoverWithTextCover',
+    icon: `
+    <svg width="29" height="34" viewBox="0 0 29 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g filter="url(#filter0_d_0_1)">
+      <path d="M0 0H29V17V34H0V0Z" fill="white"/>
+      <path d="M0.5 0.5H28.5V17V33.5H0.5V0.5Z" stroke="#D9D9D9"/>
+      </g>
+      <rect x="1" y="33" width="22" height="27" transform="rotate(-90 1 33)" fill="#D9D9D9"/>
+      <rect x="8.28516" y="5.44043" width="13.1672" height="1.36" rx="0.68" fill="#FF8714"/>
+      <defs>
+      <filter id="filter0_d_0_1" x="0" y="0" width="29" height="34" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_1" result="shape"/>
+      </filter>
+      </defs>
+    </svg>
+    `,
+    types: ['photobook-cover'],
+    blocks: ['line', 'editable-picture']
   }
 }
 
@@ -569,7 +689,8 @@ class ProductBuilder extends HTMLElement {
 
       if (prevState.panel.blockCount !== currState.panel.blockCount
         && currState.panel.blockCount !== currState.view.blocks.length
-        && currState.product.quantity.type === 'set-of') {
+        && currState.product.quantity.type === 'set-of'
+        && currState.view.blocks.length > 0) {
         const { blocks } = currState.view;
 
         const count = currState.panel.blockCount;
@@ -619,6 +740,27 @@ class ProductBuilder extends HTMLElement {
           })
           .filter(item => item);
 
+        if (!imagesFromUrl.length) {
+          const firstFreeBlock = currState.view.blocks.find(block => {
+            return block.childBlocks
+              .filter(child => child.type === 'editable-picture')
+              .every(child => !child.imageUrl);
+          });
+
+          if (firstFreeBlock) {
+            const image = currState.imagesToDownload;
+
+            const pictureIds = firstFreeBlock.childBlocks
+              .filter(child => child.type === 'editable-picture')
+              .map(child => child.id);
+
+            imagesFromUrl.push({
+              pictureIds,
+              imageUrl: image
+            });
+          }         
+        }
+
         this.studioView.setState({ imagesToDownload: imagesFromUrl });
       } else {
         const imageFromObj = currState.imagesToDownload
@@ -660,95 +802,147 @@ class ProductBuilder extends HTMLElement {
       const isSelectedBlocks = blocks.some(block => block.selected);
       const isSelectedChildren = blocks.some(block => block.activeChild);
 
-      if (!isSelectedBlocks && !isSelectedChildren) {
+      // if (this.product && this.product.type.id === 'photobook') {
+        if (!isSelectedBlocks && !isSelectedChildren) {
 
-      } else if (!isSelectedBlocks && isSelectedChildren) {
-        const newBlocks = blocks
-          .map(block => {
-            if (block.activeChild) {
-              const newChildren = block.childBlocks
-                .map(child => {
-                  if (child.selected) {
-                    const { settings } = child;
-
-                    const newSettings = {};
-
-                    for (const tool in settings) {
-                      if (tools[tool]) {
-                        if (tool === 'backgroundColor' && block.settings.backgroundColor) {
-                          newSettings[tool] = {
-                            value: block.settings.backgroundColor.value
-                          };
-                        } else {
-                          newSettings[tool] = tools[tool].value;
+        } else if (!isSelectedBlocks && isSelectedChildren) {
+          const newBlocks = blocks
+            .map(block => {
+              if (block.activeChild) {
+                const newChildren = block.childBlocks
+                  .map(child => {
+                    if (child.selected) {
+                      const { settings } = child;
+  
+                      const newSettings = {};
+  
+                      for (const tool in settings) {
+                        if (tools[tool]) {
+                          if (tool === 'backgroundColor' && block.settings.backgroundColor) {
+                            newSettings[tool] = {
+                              value: block.settings.backgroundColor.value
+                            };
+                          } else {
+                            newSettings[tool] = tools[tool].value;
+                          }
                         }
                       }
-                    }
-
-                    return {
-                      ...child,
-                      settings: newSettings
-                    }
-                  }
-
-                  return child
-                });
-
-              return {
-                ...block,
-                childBlocks: newChildren
-              }
-            }
-
-            return block;
-          });
-
-        this.studioView.setState({ blocks: newBlocks });
-      } else {
-        const newSelectedBlocks = blocks
-          .map(block => {
-            if (block.selected) {
-              const { settings } = block;
-
-              const newSettings = {};
-
-              let children = block.childBlocks;
   
-              for (const tool in settings) {
-                if (tool === 'backgroundColor') {
-                  newSettings[tool] = tools[tool].value;
-
-                  children = children.map(child => {
-                    const newChildSettings = { ...child.settings };
-
-                    if (newChildSettings.backgroundColor) {
-                      newChildSettings.backgroundColor = {
-                        value: tools[tool].value.value
-                      };
+                      return {
+                        ...child,
+                        settings: newSettings
+                      }
                     }
-
-                    return {
-                      ...child,
-                      settings: newChildSettings
-                    }
-                  })
-                } else {
-                  newSettings[tool] = tools[tool].value;
+  
+                    return child
+                  });
+  
+                return {
+                  ...block,
+                  childBlocks: newChildren
                 }
               }
   
-              return {
-                ...block,
-                childBlocks: children,
-                settings: newSettings
-              };
-            }
+              return block;
+            });
+  
+          this.studioView.setState({ blocks: newBlocks });
+        } else {
+          const newSelectedBlocks = blocks
+            .map(block => {
+              if (block.selected) {
+                const { settings } = block;
+  
+                const newSettings = {};
+  
+                let children = block.childBlocks;
+    
+                for (const tool in settings) {
+                  if (tool === 'backgroundColor') {
+                    newSettings[tool] = tools[tool].value;
+  
+                    children = children.map(child => {
+                      const newChildSettings = { ...child.settings };
+  
+                      if (newChildSettings.backgroundColor) {
+                        newChildSettings.backgroundColor = {
+                          value: tools[tool].value.value
+                        };
+                      }
+  
+                      return {
+                        ...child,
+                        settings: newChildSettings
+                      }
+                    })
+                  } else {
+                    newSettings[tool] = tools[tool].value;
+                  }
+                }
+    
+                return {
+                  ...block,
+                  childBlocks: children,
+                  settings: newSettings
+                };
+              }
+  
+              return block;            
+            });
+  
+          this.studioView.setState({ blocks: newSelectedBlocks });
+        }
+      // } else {
+      //   const newBlocks = blocks.map(block => {
+      //     if (!block.selected) {
+      //       return block;
+      //     }
 
-            return block;            
-          });
+      //     const { settings } = block;
+  
+      //     const newSettings = {};
 
-        this.studioView.setState({ blocks: newSelectedBlocks });
-      }
+      //     for (const tool in settings) {
+      //       newSettings[tool] = tools[tool].value;
+      //     }
+
+      //     const newChildren = block.childBlocks
+      //       .map(child => {
+      //         if (child.selected) {
+      //           const { settings } = child;
+
+      //           const newChildSettings = {};
+
+      //           for (const tool in settings) {
+      //             if (tools[tool]) {
+      //               if (tool === 'backgroundColor' && block.settings.backgroundColor) {
+      //                 newChildSettings[tool] = {
+      //                   value: newSettings.backgroundColor.value
+      //                 };
+      //               } else {
+      //                 newChildSettings[tool] = tools[tool].value;
+      //               }
+      //             }
+      //           }
+
+      //           return {
+      //             ...child,
+      //             settings: newChildSettings
+      //           }
+      //         }
+
+      //         return child
+      //       });
+
+      //     return {
+      //       ...block,
+      //       childBlocks: newChildren,
+      //       settings: newSettings
+      //     };
+      //   });
+        
+      //   this.studioView.setState({ blocks: newBlocks });
+      // }
     }
   }
 
@@ -765,7 +959,12 @@ class ProductBuilder extends HTMLElement {
             this.projectId = order.projectId;
 
             this.setOrderPath();
-            this.orderCreating = false;
+
+            this.getOrderInfo(this.projectId).then(info => {
+              this.orderInfo = info;
+
+              this.orderCreating = false;
+            });
           })
         }
       }
@@ -773,52 +972,149 @@ class ProductBuilder extends HTMLElement {
       const selectedBlock = blocks.find(block => block.selected);
       const blockWithActiveChild = blocks.find(block => block.activeChild);
 
-      if (!selectedBlock) {
-        if (blockWithActiveChild) {
-          const selectedChild = blockWithActiveChild.childBlocks.find(child => child.selected);
-
-          if (selectedChild) {
-            const tools = selectedChild.tools.filter(tool => {
-              switch(tool) {
-                case 'rotate':
-                  return this.product.settings.hasRotate;
-                case 'crop':
-                  return this.product.settings.hasCrop;
-                case 'filter':
-                  return this.product.settings.hasFilter;
-                case 'text':
-                  return this.product.settings.hasText;
-                default:
-                  return true;
-              }
-            });
-
-            this.setTools({
-              toolsList: tools,
-              selected: selectedChild
-            });
-          }
-        }
-      } else if (selectedBlock || blockWithActiveChild) {
+      if (blocks.every(block => !block.selected && !block.activeChild)) {
         this.setTools({
-          selected: selectedBlock
+          remove: true
         });
+      } else if (Studio.state.product && Studio.state.product.type.id === 'photobook') {
+        if (!selectedBlock) {
+          if (blockWithActiveChild) {
+            const selectedChild = blockWithActiveChild.childBlocks.find(child => child.selected);
+  
+            if (selectedChild) {
+              const tools = selectedChild.tools.filter(tool => {
+                switch(tool) {
+                  case 'rotate':
+                    return this.product.settings.hasRotate;
+                  case 'crop':
+                    return this.product.settings.hasCrop;
+                  case 'filter':
+                    return this.product.settings.hasFilter;
+                  case 'text':
+                    return this.product.settings.hasText;
+                  default:
+                    return true;
+                }
+              });
+  
+              this.setTools({
+                toolsList: tools,
+                selected: selectedChild
+              });
+            }
+          }
+        } else if (selectedBlock || blockWithActiveChild) {
+          this.setTools({
+            selected: selectedBlock
+          });
+        }
+      } else if (Studio.state.product && blocks.some(block => block.selected || block.activeChild)) {
+        this.setTools({
+          all: true,
+        })
       }
-
     }
+
+    Studio.panel.tools.setImageSelected(currState.view.blocks);
 
     this.studioView.setState(currState.view);
   }
 
-  setTools({ toolsList, selected }) {
+  setTools({ toolsList, selected, all = false, remove = false}) {
     const { tools } = JSON.parse(Studio.panel.getAttribute('state'));
+
+    const updatedTools = { ...tools };
+
+    if (remove) {
+      for (const tool in updatedTools) {
+        updatedTools[tool] = {
+          ...updatedTools[tool],
+          show: false,
+        }
+      }
+
+      Studio.utils.change({
+        panel: {
+          ...JSON.parse(Studio.panel.getAttribute('state')),
+          tools: updatedTools
+        }
+      }, 'product builder - set tools(remove all)');
+
+      return;
+    }
+
+    if (all) {
+      const { settings } = this.product;
+
+      for (const tool in updatedTools) {
+        switch(tool) {
+          case 'backgroundColor':
+            updatedTools[tool] = {
+              ...updatedTools[tool],
+              show: settings.hasBackground,
+              value: Studio.state.panel.tools[tool].value
+            }
+            break;
+          case 'layout':
+            updatedTools[tool] = {
+              ...updatedTools[tool],
+              show: settings.hasLayout,
+              value: Studio.state.panel.tools[tool].value
+            }
+            break;
+          case 'rotate':
+            updatedTools[tool] = {
+              ...updatedTools[tool],
+              show: settings.hasRotate,
+              value: Studio.state.panel.tools[tool].value
+            }
+            break;
+          case 'crop':
+            updatedTools[tool] = {
+              ...updatedTools[tool],
+              show: settings.hasCrop,
+              value: Studio.state.panel.tools[tool].value
+            }
+            break;
+          case 'frame':
+            updatedTools[tool] = {
+              ...updatedTools[tool],
+              show: settings.hasFrame,
+              value: Studio.state.panel.tools[tool].value
+            }
+            break;
+          case 'text':
+            updatedTools[tool] = {
+              ...updatedTools[tool],
+              show: settings.hasText,
+              value: Studio.state.panel.tools[tool].value
+            }
+            break;
+          case 'filter':
+            updatedTools[tool] = {
+              ...updatedTools[tool],
+              show: settings.hasFilter,
+              value: Studio.state.panel.tools[tool].value
+            }
+            break;
+        }
+      }
+
+      Studio.utils.change({
+        panel: {
+          ...JSON.parse(Studio.panel.getAttribute('state')),
+          tools: updatedTools
+        }
+      }, 'product builder - set tools(all accepted)');
+
+      return;
+    }
 
     if (!selected) {
       return;
     }
 
     const { settings: selectedSettings } = selected;
-    const updatedTools = { ...tools };
 
     if (!toolsList) {
       const { settings } = this.product;
@@ -889,12 +1185,19 @@ class ProductBuilder extends HTMLElement {
   }
 
   downloadFacebookAPI() {
-    return new Promise((res, rej) => {
+    return new Promise(async (res, rej) => {
       const facebookScripts = document.createElement('script');
+
+      const credentials = await fetch(baseURL + '/api/social/credentials').then(res => res.json());
+
+      if (!credentials || !credentials.facebook ) {
+        res();
+        return;
+      }
 
       facebookScripts.onload = () => {
         FB.init({
-          appId: '535186395254481',
+          appId: credentials.facebook.id,
           autoLogAppEvent: true,
           version: 'v16.0'
         });
@@ -1003,6 +1306,9 @@ class ProductBuilder extends HTMLElement {
       } else {
         this.projectId = await this.createOrder();
 
+        
+        this.orderInfo = await this.getOrderInfo(id);
+
         this.setOrderPath();
       }
     }
@@ -1045,8 +1351,6 @@ class ProductBuilder extends HTMLElement {
       },
       body: JSON.stringify(Studio.state)
     }).then(res => res.json()).then(data => {
-      console.log(data);
-
       return data;
     });
   }
@@ -1060,6 +1364,8 @@ class ProductBuilder extends HTMLElement {
   }
 
   setOrderPath() {
+    // const size = (this.state);
+
     const nextURL = location.origin + location.pathname + `?project-id=${this.projectId}`;
     const nextTitle = document.title;
     const nextState = { additionalInformation: 'Product builder with order history' };
@@ -1081,33 +1387,38 @@ class ProductBuilder extends HTMLElement {
     productParams = new URLSearchParams(location.search);
   }
 
+  async getOrderInfo(id) {
+    const customerId = Studio.customer
+      ? Studio.customer.shopify_id
+      : Studio.anonimCustomerId;
+
+    return await fetch(`product-builder/orders/info/${id}?id=${customerId}`)
+    .then(res => res.json())
+    .then(data => {
+      if (!data.error) {
+        return data;
+      }
+
+      Studio.errorToast.error( {
+        text: data.error,
+        type: "User's access"
+      });
+      return;
+    });
+  }
+
   async getOrderState(id) {
     const customerId = Studio.customer
       ? Studio.customer.shopify_id
       : Studio.anonimCustomerId;
     
     if (!customerId && id) {
-      console.log('no user')
       return;
     } else if (!customerId || !id) {
       return;
     }
 
-    this.orderInfo = await fetch(`product-builder/orders/info/${id}?id=${customerId}`)
-      .then(res => res.json())
-      .then(data => {
-        if (!data.error) {
-          return data;
-        }
-
-        console.log(data.error);
-
-        Studio.errorToast.error( {
-          text: data.error,
-          type: "User's access"
-        });
-        return;
-      });
+    this.orderInfo = await this.getOrderInfo(id);
 
     if (!this.orderInfo) {
       return;
@@ -1195,7 +1506,7 @@ customElements.define('product-builder', ProductBuilder);
 
 const utils = {
   change: (state, initiator) => {
-    // console.log(initiator);
+    // console.log(initiator, state);
 
     const changeEvent = new CustomEvent('studio:change', {
       detail: {
@@ -1691,8 +2002,6 @@ class AdaptiveContent extends HTMLElement {
   }
 
   onResize(event) {
-    console.log(event.detail.size);
-
     const { size } = event.detail;
 
     switch(size) {
@@ -1769,8 +2078,6 @@ class ProductInfo extends AdaptiveContent {
 
     this.parent = this.parentNode;
 
-    console.log(Studio.panel.tools);
-
     this.setPoints({
       mobile: {
         position: 'after',
@@ -1845,7 +2152,7 @@ class ProductInfo extends AdaptiveContent {
     if (!sizeOptions) {
       this.destroySelector();
     }
-    
+
     this.elements.selector.setData(sizeOptions, selectedValue);
 
     let blockCount = 0;
@@ -1911,6 +2218,14 @@ class ProductInfo extends AdaptiveContent {
     }
 
     this.checkDoneProduct();
+
+    if (
+      +this.elements.quantity.current.textContent
+      && +this.elements.quantity.current.textContent === +this.elements.quantity.request.textContent) {
+      checkoutButton.disabled = false;
+    } else {
+      checkoutButton.disabled = true
+    }
   }
 
   checkDoneProduct() {
@@ -2181,7 +2496,26 @@ class LayoutTool extends Tool {
     }
   }
 
+  setAvailableLayouts() {
+    const selectedBlock = Studio.state.view.blocks.find(block => block.selected && !block.activeChild);
+
+    if (!selectedBlock) {
+      return;
+    }
+
+    this.layouts.forEach(icon => {
+      const layout = layouts[icon.layoutId];
+
+      if (layout.types.includes(selectedBlock.type) && !icon.isexists()) {
+        icon.append();
+      } else if (!layout.types.includes(selectedBlock.type)) {
+        icon.remove();
+      }
+    })
+  }
+
   setValue(state) {
+    this.setAvailableLayouts();
     this.selected.unselect();
 
     if (!state || !state.layout) {
@@ -2246,15 +2580,22 @@ class LayoutTool extends Tool {
 
     icon.addEventListener('click', select);
 
+    let removeTimer;
+
     icon.innerHTML = iconSVG;
 
     icon.append(border);
 
     layoutIcon = Object.assign(layoutIcon, {
-      append: () => { this.collapsible.inner.append(icon) },
+      append: () => { 
+        clearTimeout(removeTimer);
+        this.collapsible.inner.append(icon);
+      },
       icon,
       select,
       unselect,
+      isexists: () => document.contains(icon),
+      remove: () => icon.remove(),
       layoutId: layout
     })
 
@@ -3389,9 +3730,7 @@ class Tools extends HTMLElement {
             this.edit.tools[tool].create(value);
           }
         } else {
-          if (this.edit.tools[tool].isExists()) {
-            this.edit.tools[tool].remove();
-          }
+          this.edit.tools[tool].remove();
         }
       }
     }
@@ -3604,7 +3943,7 @@ class Tools extends HTMLElement {
       <div class="page__product-info">
         <div class="page__product-title">${product.title}</div>
 
-        <div class="page__product-price">${product.price !== undefined ? `$${product.price}` : '$10,90'}</div>
+        <div class="page__product-price">${product.price !== undefined ? moneyFormat(product.price) : 'not priced'}</div>
       </div>
     `;
 
@@ -3802,6 +4141,15 @@ class Tools extends HTMLElement {
     imageWrapper.classList.add('page__image-wrapper', 'is-loading');
     imageWrapper.toggleAttribute('data-image');
 
+    image.addEventListener('drag', (event) => {
+    });
+
+    image.addEventListener('dragstart', (event) => {
+      event.dataTransfer.clearData();
+
+      event.dataTransfer.setData('text/plain', image.src.split('?').shift());
+    })
+
     imageWrapper.addEventListener('click', (event) => {
       const toDeleteBtn = imageWrapper.querySelector('[data-delete]');
 
@@ -3920,7 +4268,9 @@ class Tools extends HTMLElement {
               body: formData
             }).then(res => {
               if (res.error) {
-                console.log(error);
+                Studio.errorToast.error({
+                  text: 'No uploads'
+                })
               }
 
               return res;
@@ -4378,16 +4728,33 @@ class Panel extends HTMLElement {
 customElements.define('customization-panel', Panel);
 
 class EditablePicture extends HTMLElement {
-  static emptyState = `
-    <div class="editable-picture__empty-state" data-empty-state>
+  static emptyState = (bigSize) => {
+    const empty = document.createElement('div');
+    empty.classList.add('editable-picture__empty-state');
+
+    const icon = `
       <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M1.10156 3.98131C1.10156 3.00356 1.89418 2.21094 2.87193 2.21094H13.9367C14.9145 2.21094 15.7071 3.00356 15.7071 3.98131V12.3906C15.7071 13.3683 14.9145 14.1609 13.9367 14.1609H2.87193C1.89418 14.1609 1.10156 13.3683 1.10156 12.3906V3.98131Z" stroke="#FF0079" stroke-width="1.77037" stroke-linejoin="round"/>
         <path d="M4.08594 14.1618L10.9214 6.7567C11.5568 6.06839 12.6184 5.99415 13.3434 6.58732L15.704 8.51875" stroke="#FF0079" stroke-width="1.77037" stroke-linecap="round" stroke-linejoin="round"/>
         <path d="M1.10156 6.85938L6.2467 12.0045" stroke="#FF0079" stroke-width="1.77037"/>
         <path d="M8.73299 8.85104C8.73299 8.18715 7.54405 6.85938 6.07743 6.85938C4.61081 6.85938 3.42188 8.18715 3.42188 8.85104" stroke="#FF0079" stroke-width="1.77037" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
-    </div>
-  `;
+    `;
+    
+
+    empty.innerHTML = icon;
+
+    if (bigSize) {
+      empty.classList.add('empty-state--big');
+
+      const text = document.createElement('span');
+      text.textContent = 'Drag & Drop pictures here';
+
+      empty.append(text);
+    }
+
+    return empty;
+  };
 
   static defaultValue = {
     crop: CropTool.defaultValue,
@@ -4405,13 +4772,43 @@ class EditablePicture extends HTMLElement {
 
   constructor() {
     super();
+
+    this.addEventListener('dragenter', () => {
+      this.classList.add('is-dragover');
+    }, true);
+
+    this.addEventListener('dragleave', (event) => {
+        this.classList.remove('is-dragover');
+    });
+
+    this.addEventListener('dragover', (event) => {
+      event.preventDefault();
+    });
+
+    this.addEventListener('drop', (event) => {
+      event.preventDefault();
+      this.classList.remove('is-dragover');
+
+      const source = event.dataTransfer.getData('text');
+
+      if (source) {
+        const data = [
+          {
+            pictureIds: [this.getAttribute('child-block')],
+            imageUrl: source
+          }
+        ];
+
+        Studio.utils.change({ imagesToDownload: data }, 'dragged');
+      }
+    });
   }
 
   connectedCallback() {
     this.toggleAttribute('editable-picture');
 
     if (!this.getAttribute('child-block')) {
-      this.setAttribute('child-block', window.uniqueID.childBlock());
+      this.setAttribute('child-block', uniqueID.childBlock());
     }
 
     this.controls = ProductControls.createPictureControls(this.getAttribute('child-block'));
@@ -4426,7 +4823,10 @@ class EditablePicture extends HTMLElement {
 
     this.pageConfig = getResolution(resolutionWidth, resolutionHeight);
 
-    this.emptyState = this.querySelector(EditablePicture.selectors.emptyState);
+    this.emptyState = EditablePicture.emptyState(this.offsetWidth > 300);
+
+    this.append(this.emptyState);
+
     if (this.emptyState) {
       this.emptyState.addEventListener('click', () => {
         Studio.panel.tools.focusOnTab('images');
@@ -4468,7 +4868,7 @@ class EditablePicture extends HTMLElement {
   select() {
     this.classList.add('is-selected');
 
-    if (!this.classList.contains('is-empty')) {
+    if (!this.classList.contains('is-empty') && Studio.product.type.id === 'photobook') {
       this.appendControls();
     }
   }
@@ -4485,13 +4885,14 @@ class EditablePicture extends HTMLElement {
   unselect() {
     this.classList.remove('is-selected');
 
-    this.controls.remove();
+    if (document.contains(this.controls)) {
+      this.controls.remove();
+    }
   }
 
   getToolsList() {
     return ['rotate', 'crop', 'filter'];
   }
-  
   
   setImage(imageUrl) {
     if (this.image) {
@@ -4540,7 +4941,7 @@ class EditablePicture extends HTMLElement {
     const getParams = () => {
       const size = this.pageConfig;
 
-      if (this.parentBlock.hasAttribute('photobook-page')) {
+      if (this.parentBlock.hasAttribute('layout')) {
 
         const widthProcent = Math.round(((this.offsetWidth * 100) / this.parentBlock.offsetWidth))
         const heightProcent = Math.round((this.offsetHeight * 100) / this.parentBlock.offsetHeight);
@@ -4589,7 +4990,31 @@ class EditablePicture extends HTMLElement {
 
   setValue(settings) {
     clearTimeout(this.timer);
-    const { crop, rotate, backgroundColor } = settings;
+
+    const [
+      prevCrop,
+      prevRotate,
+      prevBackground,
+      prevSource
+     ] = [
+      +this.getAttribute('crop'),
+      +this.getAttribute('rotate'),
+      this.getAttribute('background-color'),
+      this.image ? this.image.src : null
+     ];
+
+     const { crop, rotate, backgroundColor } = settings;
+
+    if (prevCrop === crop.value
+        && prevRotate === rotate.value
+        && prevBackground === backgroundColor.value
+        && this.image
+        && prevSource === this.image.src
+        && !(this.parentElement instanceof PhotobookElement)
+      ) {
+      this.image.style.opacity = 1;
+      return;
+    }
 
     const toChange = this.classList.contains('is-selected')
       || (
@@ -4659,7 +5084,9 @@ class EditablePicture extends HTMLElement {
 customElements.define('editable-picture', EditablePicture);
 
 class EditableText extends HTMLElement {
-  static defaultValue = TextTool.defaultValue;
+  static defaultValue = {
+    text: TextTool.defaultValue
+  };
 
   static ToolList = ['text'];
 
@@ -4677,7 +5104,7 @@ class EditableText extends HTMLElement {
     this.toggleAttribute('editable-text')
 
     if (!this.getAttribute('child-block')) {
-      this.setAttribute('child-block', window.uniqueID.childBlock());
+      this.setAttribute('child-block', uniqueID.childBlock());
     }
 
     if (!this.hasAttribute('text-align')) {
@@ -4768,6 +5195,8 @@ class EditableText extends HTMLElement {
 
     if (text) {
       this.editableArea.textContent = text;
+    } else {
+      this.editableArea.textContent = 'Add text here';
     }
 
     if (maxSize) {
@@ -4842,7 +5271,7 @@ class ProductControls extends HTMLElement {
       </svg>
     `,
     edit: `
-      <svg width="19" height="18" viewBox="0 0 19 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg width="19" height="19" viewBox="0 0 19 18" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M3.30143 11.8619L13.6969 1.46643C13.7062 1.46378 13.7158 1.4611 13.7258 1.45839C13.8626 1.42133 14.0605 1.38264 14.2925 1.37944C14.7367 1.37331 15.3279 1.49293 15.9134 2.07843C16.4989 2.66392 16.6185 3.25504 16.6123 3.69925C16.6091 3.93131 16.5705 4.1292 16.5334 4.266C16.5307 4.27601 16.528 4.28563 16.5254 4.29486L6.12986 14.6904L2.91574 15.076L3.30143 11.8619Z" stroke="white" stroke-width="2" stroke-linecap="round"/>
         <path d="M3.30143 11.8619L13.6969 1.46643C13.7062 1.46378 13.7158 1.4611 13.7258 1.45839C13.8626 1.42133 14.0605 1.38264 14.2925 1.37944C14.7367 1.37331 15.3279 1.49293 15.9134 2.07843C16.4989 2.66392 16.6185 3.25504 16.6123 3.69925C16.6091 3.93131 16.5705 4.1292 16.5334 4.266C16.5307 4.27601 16.528 4.28563 16.5254 4.29486L6.12986 14.6904L2.91574 15.076L3.30143 11.8619Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         <path d="M11.1003 2.64844L15.141 6.68905" stroke="white" stroke-width="2"/>
@@ -4898,8 +5327,8 @@ class ProductControls extends HTMLElement {
 
     editBtn.append(editTooltip);
 
-    if (blockElem && blockElem.getAttribute('block-type') === 'photobook-page' || Studio.product.quantity.type === 'single') {
-      productControls.append(removeBtn, editBtn);
+    if (blockElem && blockElem.getAttribute('block-type').startsWith('photobook') || Studio.product.quantity.type === 'single') {
+      productControls.append(editBtn);
     } else {
       productControls.toggleAttribute('is-quantitative');
       productControls.append(removeBtn, controlsQuantity, editBtn);
@@ -5030,36 +5459,73 @@ class ProductControls extends HTMLElement {
   }
 
   removeBlock() {
-    const newBlocks = Studio.state.view.blocks
-      .map(block => {
-        if (block.id === this.getAttribute('block-controls')) {
-          const newChildren = block.childBlocks
-            .map(child => {
-              if (child.type === 'editable-picture') {
-                return {
-                  ...child,
-                  imageUrl: null
-                }
-              }
+    // const newBlocks = Studio.state.view.blocks
+    //   .map(block => {
+    //     if (block.id === this.getAttribute('block-controls')) {
+    //       const newChildren = block.childBlocks
+    //         .map(child => {
+    //           if (child.type === 'editable-picture') {
+    //             return {
+    //               ...child,
+    //               imageUrl: null
+    //             }
+    //           }
 
-              return child;
-            })
+    //           return child;
+    //         })
 
-          return {
-            ...block,
-            childBlocks: newChildren
-          }
+    //       return {
+    //         ...block,
+    //         childBlocks: newChildren
+    //       }
+    //     }
+
+    //     return block;
+    //   });
+
+    // Studio.utils.change({
+    //   view: {
+    //     ...Studio.state.view,
+    //     blocks: newBlocks
+    //   }
+    // }, 'controls - remove block')
+
+    const { blocks } = Studio.state.view;
+    const { product } = Studio.state;
+
+    const minCount = 0;
+    let currCount;
+
+    const minimum = product.quantity.minimum;
+
+    const blocksCount = Studio.studioView.getBlocksCount(blocks);
+
+    console.log(blocksCount);
+
+    const newBlocks = blocks.map(block => {
+      if (block.id === this.productId && blocksCount - block.count >= minimum) {
+        currCount = 0;
+
+        return {
+          ...block,
+          count: currCount
         }
+      }
 
-        return block;
-      });
+      return block;
+    });
 
     Studio.utils.change({
+      panel: {
+        ...Studio.state.panel,
+        blockCount: Studio.state.panel.blockCount - 1
+      },
       view: {
         ...Studio.state.view,
-        blocks: newBlocks
+        blocks: newBlocks,
+        blockCount: Studio.state.panel.blockCount - 1
       }
-    }, 'controls - remove block')
+    }, 'controls - decrease');
   }
 
   removePicture() {
@@ -5171,6 +5637,14 @@ class ProductControls extends HTMLElement {
     }
   }
 
+  setStateRemoveBtn(isDisable) {
+    if (isDisable && !this.elements.decreaseQuantity.hasAttribute('disabled')) {
+      this.elements.remove.toggleAttribute('disabled');
+    } else if (!isDisable && this.elements.decreaseQuantity.hasAttribute('disabled')) {
+      this.elements.remove.toggleAttribute('disabled');
+    }
+  }
+
   setStateIncreaseBtn(isDisable) {
     if (isDisable && !this.elements.increaseQuantity.hasAttribute('disabled')) {
       this.elements.increaseQuantity.toggleAttribute('disabled');
@@ -5198,7 +5672,7 @@ class ProductElement extends HTMLElement {
   constructor() {
     super();
 
-    this.addEventListener('click', this.select.bind(this));
+    // this.addEventListener('click', this.select.bind(this));
 
     this.state = {
       selectedPicture: this.querySelector('editable-picture'),
@@ -5228,7 +5702,6 @@ class ProductElement extends HTMLElement {
       'is-empty'
     );
 
-    picture.innerHTML += EditablePicture.emptyState;
     this.appendChild(picture);
 
     this.style.opacity = 0;
@@ -5282,8 +5755,6 @@ class ProductElement extends HTMLElement {
       'editable-picture',
       'is-empty'
     );
-
-    picture.innerHTML += EditablePicture.emptyState;
 
     if (state) {
       const { id, imageUrl, settings } = state;
@@ -5361,57 +5832,17 @@ class ProductElement extends HTMLElement {
 }
 customElements.define('product-element', ProductElement);
 
-class PhotobookPage extends HTMLElement {
-  static selectors = {
-    picture: 'editable-picture',
-    text: 'editable-text',
-    child: 'photobook-page > [data-child]'
-  }
-
-  static config = {
-    '20x20': {
-      width: 4724,
-      height: 2362
-    },
-    '15x15': {
-      width: 3543,
-      height: 1772
-    }
-  }
-
+class PhotobookElement extends HTMLElement {
   static get observedAttributes() {
-    return ['photobook-page', 'background-color', 'is-white'];
+    return ['layout', 'background-color', 'is-white'];
   }
-  
+
   constructor() {
     super();
   }
 
   connectedCallback() {
-    if (!this.getAttribute('block')) {
-      this.setAttribute('block', uniqueID.block());
-    }
-
-    this.setAttribute('photobook-size', '20x20');
-
-    this.setAttribute('block-type', 'photobook-page');
-
-    if (!this.hasAttribute('background-color')) {
-      this.setAttribute('background-color', '#fff');
-      this.setAttribute('is-white', false);
-    }
-
-    this.controls = ProductControls.createBlockControls(this.getAttribute('block'));
-
-    this.parentElement.append(this.controls);
-  
     this.init();
-
-    this.addEventListener('click', (event) => {
-      if (event.target === this) {
-        Studio.panel.tools.focusOnTab('edit');
-      }
-    })
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -5420,7 +5851,8 @@ class PhotobookPage extends HTMLElement {
     }
 
     switch(name) {
-      case 'photobook-page':
+      case 'layout':
+
         this.layout = layouts[newValue];
         if (this.layout.id !== oldValue) {
           this.selectLayout();
@@ -5441,16 +5873,35 @@ class PhotobookPage extends HTMLElement {
   }
 
   init() {
-    this.layout = layouts[this.getAttribute('photobook-page')];
+    if (!this.getAttribute('block')) {
+      this.setAttribute('block', uniqueID.block());
+    }
+
+    this.controls = ProductControls.createBlockControls(this.getAttribute('block'));
+
+    this.parentElement.append(this.controls);
+
+    this.classList.add('photobook-element');
+
+    if (!this.hasAttribute('background-color')) {
+      this.setAttribute('background-color', '#fff');
+      this.setAttribute('is-white', false);
+    }
 
     this.midGradiend = this.initMiddleGradient();
     this.midGradiend.create();
+
+    this.addEventListener('click', (event) => {
+      if (event.target === this) {
+        Studio.panel.tools.focusOnTab('edit');
+      }
+    })
   }
 
   setValue(settings, block) {
     const { layout, backgroundColor } = settings;
 
-    if (layout && this.layout !== layout.value) {
+    if (layout && this.layout !== layout.layout) {
       const editablePictures = block.childBlocks
         .filter(child => child.type === 'editable-picture');
 
@@ -5471,12 +5922,10 @@ class PhotobookPage extends HTMLElement {
     }
   }
 
-  setBackgroundColor() {
-    if (!this.backgroundColor) {
-      return;
-    }
-
-    this.style.backgroundColor = this.backgroundColor;
+  setLayout(layout, editablePicturesJSON, editableTextJSON) {
+    this.editablePicturesJSON = editablePicturesJSON;
+    this.editableTextJSON = editableTextJSON;
+    this.setAttribute('layout', layout);
   }
 
   selectLayout() {
@@ -5491,10 +5940,12 @@ class PhotobookPage extends HTMLElement {
     }
   }
 
-  setLayout(layout, editablePicturesJSON, editableTextJSON) {
-    this.editablePicturesJSON = editablePicturesJSON;
-    this.editableTextJSON = editableTextJSON;
-    this.setAttribute('photobook-page', layout);
+  setBackgroundColor() {
+    if (!this.backgroundColor) {
+      return;
+    }
+
+    this.style.backgroundColor = this.backgroundColor;
   }
 
   initMiddleGradient() {
@@ -5533,8 +5984,6 @@ class PhotobookPage extends HTMLElement {
       'editable-picture',
       'is-empty'
     );
-
-    picture.innerHTML += EditablePicture.emptyState;
 
     if (state) {
       const { id, imageUrl, settings } = state;
@@ -5599,6 +6048,41 @@ class PhotobookPage extends HTMLElement {
     return () => {
       return states[queryCount++];
     };
+  }
+}
+
+class PhotobookPage extends PhotobookElement {
+  static selectors = {
+    picture: 'editable-picture',
+    text: 'editable-text',
+    child: 'photobook-page > [data-child]'
+  }
+
+  static config = {
+    '20x20': {
+      width: 4724,
+      height: 2362
+    },
+    '15x15': {
+      width: 3543,
+      height: 1772
+    }
+  }
+  
+  constructor() {
+    super();
+
+    this.default = layouts.whole;
+  }
+
+  connectedCallback() {  
+    this.init();
+
+    this.layout = layouts[this.getAttribute('layout')];
+
+    this.setAttribute('photobook-size', '20x20');
+
+    this.setAttribute('block-type', 'photobook-page');
   }
 
   wholeLayout() {
@@ -5683,6 +6167,113 @@ class PhotobookPage extends HTMLElement {
   }
 }
 customElements.define('photobook-page', PhotobookPage);
+
+class PhotobookCover extends PhotobookElement {
+  static layouts = {
+    
+  }
+
+  constructor() {
+    super();
+
+    this.default = layouts.wholeTextCover;
+  }
+
+  connectedCallback() {  
+    this.init();
+
+    this.layout = layouts[this.getAttribute('layout')];
+
+    this.setAttribute('photobook-size', '20x20');
+
+    this.setAttribute('block-type', 'photobook-cover');
+  }
+
+  initMiddleGradient() {
+    const gradient = document.createElement('div');
+    gradient.classList.add('photobook-cover__gradient');
+
+    const gradientColors = document.createElement('div');
+
+    gradientColors.classList.add('gradient__colors');
+    
+    gradient.append(gradientColors);
+
+    const remove = () => {
+      gradient.style.opacity = 0;
+
+      setTimeout(() => {
+        gradient.style.opacity = null;
+        gradient.remove()
+      }, 100); 
+    }
+
+    const create = () => {
+      gradient.style.opacity = 0;
+      this.append(gradient)
+
+      setTimeout(() => {
+        gradient.style.opacity = null;
+      }, 10);
+    }
+
+    return {
+      create,
+      remove,
+      container: gradient
+    }
+  }
+
+  wholeTextCoverLayout() {
+    this.clearLayout();
+
+    const editablePictureQuery = this.editableQuery(this.editablePicturesJSON);
+    const editableTextQuery = this.editableQuery(this.editableTextJSON);
+
+    const bigImage = this.getEditable(editablePictureQuery());
+
+    const text = this.getText(editableTextQuery());
+
+    this.append(bigImage, text);
+  }
+
+  wholeFramelessCoverLayout() {
+    this.clearLayout();
+
+    const editablePicQuery = this.editableQuery(this.editablePicturesJSON);
+
+    const bigImage = this.getEditable(editablePicQuery());
+
+    this.append(bigImage);
+  }
+
+  wholeDownWithTextCoverLayout() {
+    this.clearLayout()
+
+    const editablePicQuery  = this.editableQuery(this.editablePicturesJSON);
+    const editableTextQuery = this.editableQuery(this.editableTextJSON);
+
+    const bigImage = this.getEditable(editablePicQuery());
+
+    const text =  this.getText(editableTextQuery());
+
+    this.append(bigImage, text);    
+  }
+
+  wholeUpWithTextCoverLayout() {
+    this.clearLayout()
+
+    const editablePicQuery  = this.editableQuery(this.editablePicturesJSON);
+    const editableTextQuery = this.editableQuery(this.editableTextJSON);
+
+    const bigImage = this.getEditable(editablePicQuery());
+
+    const text =  this.getText(editableTextQuery());
+
+    this.append(text, bigImage);  
+  }
+}
+customElements.define('photobook-cover', PhotobookCover);
 
 class Prints extends ProductElement {
   static getConfig = (type) => {
@@ -6415,7 +7006,7 @@ class StudioView extends HTMLElement {
 
     this.viewControls = this.querySelector(StudioView.selectors.viewControls);
 
-    this.addEventListener('click', this.eventSelectedBulk.bind(this));
+    // this.addEventListener('click', this.eventSelectedBulk.bind(this));
 
     this.addBlockBtn = this.initAddBlockBtn();
   }
@@ -6423,6 +7014,8 @@ class StudioView extends HTMLElement {
   attributeChangedCallback(name, oldValue, newValue) {
     const prevState = JSON.parse(oldValue);
     const currState = JSON.parse(newValue);
+
+    let createdBlocks;
 
     if (name === 'zoomed') {
       if (currState) {
@@ -6448,7 +7041,7 @@ class StudioView extends HTMLElement {
 
       // this.clearViewSync();
 
-      this.setProductElements(currState.blockCount, currState.blocks);
+      createdBlocks = this.setProductElements(currState.blockCount, currState.blocks);
     }
 
     if (!compareObjects(prevState.blocks, currState.blocks)) {
@@ -6457,7 +7050,7 @@ class StudioView extends HTMLElement {
 
       this.toggleSelected(prevState.blocks, currState.blocks);
 
-      const newBlocks = this.setBlocksValue(prevState.blocks, currState.blocks);
+      const newBlocks = this.setBlocksValue(prevState.blocks, createdBlocks || currState.blocks);;
 
       if (Studio.orderInfo && Studio.orderInfo.status === 'active'
         && prevCounts !== currCounts
@@ -6477,17 +7070,14 @@ class StudioView extends HTMLElement {
         this.setCurrentCartQuantity(currVariant.key, newQuantity)
           .then(_ => {
             Studio.getCart();
-          })
+          });
       }
 
       if (newBlocks) {
-        this.setProductElements(null, newBlocks);
+        createdBlocks = this.setProductElements(null, newBlocks);
       } else {
-        this.setProductElements(null, currState.blocks);
+        createdBlocks = this.setProductElements(null, currState.blocks);
       }
-    }
-    
-    if (currState.product && prevState.blockCount !== currState.blockCount) {
     }
 
     if (currState.imagesToDownload && !compareObjects(currState.imagesToDownload, prevState.imagesToDownload)) {      
@@ -6498,7 +7088,12 @@ class StudioView extends HTMLElement {
       }, 'reset images to download')
     }
 
-    Studio.panel.tools.setImageSelected(currState.blocks);
+    if (createdBlocks) {
+      Studio.utils.change({ view: {
+        ...JSON.parse(this.getAttribute('state')),
+        blocks: createdBlocks
+      }}, 'set product elements(created blocks)');
+    }
   }
 
   setImages({ blocks, imagesToDownload }) {
@@ -6508,7 +7103,7 @@ class StudioView extends HTMLElement {
       .forEach(({ pictureIds, imageUrl }) => {
         pictureIds.forEach(pictureId => {
           const picture = this.querySelector(StudioView.selectors.childBlockById(pictureId));
-          if (picture) {
+          if (picture && picture.setImage) {
             picture.setImage(imageUrl);
           }
 
@@ -6793,66 +7388,103 @@ class StudioView extends HTMLElement {
 
     const isActiveChild = currBlocks.some(block => block.childBlocks.some(child => child.selected));
 
-    selectedBlocks
-      .forEach(selectedBlock => {
-        const selected = this.querySelector(
-          StudioView.selectors.blockById(selectedBlock.id)
-        );
+    if (!Studio.state.product) {
+      return;
+    }
 
-        const currStateThisBlock = toSelectBlocks.find(block => block.id === selectedBlock.id);
+    // if (Studio.state.product.type.id === 'photobook') {
+      selectedBlocks
+        .forEach(selectedBlock => {
+          const selected = this.querySelector(
+            StudioView.selectors.blockById(selectedBlock.id)
+          );
 
-        if (selected) {
-          if (!currStateThisBlock || (currStateThisBlock && !currStateThisBlock.selected && !currStateThisBlock.activeChild)) {
-            selected.unselect();
-          }
-    
-          if (selectedBlock.activeChild && !selectedBlock.selected) {
-            const childJSON = selectedBlock.childBlocks.find(child => child.selected);
+          const currStateThisBlock = toSelectBlocks.find(block => block.id === selectedBlock.id);
 
-            if (childJSON) {
-              const child = this.querySelector(StudioView.selectors.childBlockById(childJSON.id));
+          if (selected) {
+            if (!currStateThisBlock || (currStateThisBlock && !currStateThisBlock.selected && !currStateThisBlock.activeChild)) {
+              
+              selected.unselect();
+            }
+      
+            if (selectedBlock.activeChild && !selectedBlock.selected) {
+              const childJSON = selectedBlock.childBlocks.find(child => child.selected);
 
-              const currStateThisChild = currStateThisBlock
-                ? currStateThisBlock.childBlocks.find(tiny => tiny.id === childJSON.id)
-                : null;
+              if (childJSON) {
+                const child = this.querySelector(StudioView.selectors.childBlockById(childJSON.id));
 
-              const toUnselect = !currStateThisChild || (
-                currStateThisChild && !currStateThisChild.selected
-              );
+                const currStateThisChild = currStateThisBlock
+                  ? currStateThisBlock.childBlocks.find(tiny => tiny.id === childJSON.id)
+                  : null;
 
-              if (child && toUnselect) {
-                child.unselect();
+                const toUnselect = !currStateThisChild || (
+                  currStateThisChild && !currStateThisChild.selected
+                );
+
+                if (child && toUnselect) {
+                  child.unselect();
+                }
               }
             }
           }
-        }
-      });
+        });
 
-    toSelectBlocks
-      .forEach(toSelectBlock => {
-        const toSelect = this.querySelector(
-          StudioView.selectors.blockById(toSelectBlock.id)
-        );
-    
-        if (toSelect) {
-          if (!(isActiveChild && !toSelect.activeChild)) {
-            toSelect.select();
-          }
+      toSelectBlocks
+        .forEach(toSelectBlock => {
+          const toSelect = this.querySelector(
+            StudioView.selectors.blockById(toSelectBlock.id)
+          );
 
-    
-          if (toSelectBlock.activeChild && !toSelectBlock.selected) {
-            const childrenJSON = toSelectBlock.childBlocks.filter(child => child.selected);
-
-            childrenJSON.forEach(childJSON => {
-              const child = this.querySelector(StudioView.selectors.childBlockById(childJSON.id));
-    
-              if (child) {
-                child.select();
+            if (toSelect) {
+              if (!(isActiveChild && !toSelect.activeChild)) {
+                toSelect.select();
               }
-            })
+    
+        
+              if (toSelectBlock.activeChild && !toSelectBlock.selected) {
+                const childrenJSON = toSelectBlock.childBlocks.filter(child => child.selected);
+    
+                childrenJSON.forEach(childJSON => {
+                  const child = this.querySelector(StudioView.selectors.childBlockById(childJSON.id));
+        
+                  if (child) {
+                    child.select();
+                  }
+                })
+              }
+            }
           }
-        }
-      })
+        );
+    // } else {
+    //   currBlocks
+    //     .forEach(toSelectBlock => {
+    //       const toSelect = this.querySelector(StudioView.selectors.blockById(toSelectBlock.id));
+
+    //       if (!toSelect) {
+    //         return;
+    //       }
+
+    //       if (toSelectBlock.selected) {
+    //         toSelect.select();
+    //       } else {
+    //         toSelect.unselect();
+    //       }
+    
+    //       toSelectBlock.childBlocks.forEach(child => {
+    //         const childElem = this.querySelector(StudioView.selectors.childBlockById(child.id))
+
+    //         if (!childElem) {
+    //           return;
+    //         }
+            
+    //         if (child.selected) {
+    //           childElem.select();
+    //         } else {
+    //           childElem.unselect();
+    //         }
+    //       })
+    //     });
+    // }
   }
 
   setBlocksValue(prevBlocks, currBlocks) {
@@ -6894,6 +7526,7 @@ class StudioView extends HTMLElement {
 
           elementControls.setStateDecreaseBtn(disableDecreaseButton);
           elementControls.setStateIncreaseBtn(disableIncreaseButton);
+          elementControls.setStateRemoveBtn(countPerBlock - block.count < Studio.state.product.quantity.minimum);
         }
 
         let prevSettings = {};
@@ -6910,19 +7543,34 @@ class StudioView extends HTMLElement {
 
         let children = null;
 
-        if (!compareObjects(prevSettings, block.settings) && element) {
-          element.setValue(block.settings, block);
+
+        if (block.settings.layout && !compareObjects(prevSettings.layout, block.settings.layout)) {
+          const blockLayouts = layouts;
+
+          const pictures = block.childBlocks.filter(child => child.type === 'editable-picture');
+          const text = block.childBlocks.filter(child => child.type === 'text');
+
+          children = blockLayouts[block.settings.layout.layout].blocks
+            .map((child, idx) => {
+              const previousChildState = child === 'editable-picture'
+                ? pictures.shift()
+                : text.shift();
+
+              return this.getChildsJSON(child, undefined, previousChildState);
+            });
         }
 
-        if (block.settings.layout && !compareObjects(prevSettings, block.settings)) {
-          children = layouts[block.settings.layout.layout].blocks
-            .map((child, idx) => this.getChildsJSON(child, undefined, block.childBlocks));
-        }
-
-        return {
+        const newBlock = {
           ...block,
           childBlocks: children ? children : block.childBlocks
         };
+
+        if (!compareObjects(prevSettings, block.settings) && element) {
+          element.setValue(block.settings, newBlock);
+        }
+
+
+        return newBlock;
       });
 
     const prevChildren = prevBlocks.map(block => block.childBlocks);
@@ -6934,12 +7582,12 @@ class StudioView extends HTMLElement {
       returnedBlocks = this.setChildsValue(prevChildren, currChildren, newBlocks);
     } else {
       returnedBlocks = newBlocks;
-      Studio.utils.change({
-        view: {
-          ...JSON.parse(this.getAttribute('state')),
-          blocks: newBlocks
-        }
-      }, 'set block value')
+      // Studio.utils.change({
+      //   view: {
+      //     ...JSON.parse(this.getAttribute('state')),
+      //     blocks: newBlocks
+      //   }
+      // }, 'set block value')
     }
 
     const prevSelected = prevBlocks.filter(block => block.selected || block.activeChild).map(block => block.id);
@@ -7011,12 +7659,12 @@ class StudioView extends HTMLElement {
         return block
       });
 
-    Studio.utils.change({
-      view: {
-        ...JSON.parse(this.getAttribute('state')),
-        blocks: newBlocks
-      }
-    }, 'set block value - from set child value');
+    // Studio.utils.change({
+    //   view: {
+    //     ...JSON.parse(this.getAttribute('state')),
+    //     blocks: newBlocks
+    //   }
+    // }, 'set block value - from set child value');
 
     return newBlocks;
   }
@@ -7032,45 +7680,78 @@ class StudioView extends HTMLElement {
 
     const turnOfChilds = (activeChild ? !activeChild : true) || isBlockSelected;
 
-    const newBlocks = blocks
-      .map(sBlock => {
-        let isSelected;
+    // if (block.getAttribute('block-type').startsWith('photobook')) {
+      const newBlocks = blocks
+        .map(sBlock => {
+          let isSelected;
 
-        if (isBulk) {
-          const blockElement = this.querySelector(StudioView.selectors.blockById(sBlock.id));
-          
-          if (blockElement) {
-            isSelected = blockElement.classList.contains('is-selected');
+          if (isBulk) {
+            const blockElement = this.querySelector(StudioView.selectors.blockById(sBlock.id));
+            
+            if (blockElement) {
+              isSelected = blockElement.classList.contains('is-selected');
+            }
           }
-        }
 
-        if (sBlock.id !== selectedBlock.id) {
+          if (sBlock.id !== selectedBlock.id) {
+            return {
+              ...sBlock,
+              selected: isBulk ? isSelected : false,
+              activeChild: false,
+              childBlocks: turnOfChilds
+                ? sBlock.childBlocks.map(child => ({ ...child, selected: false }))
+                : sBlock.childBlocks
+            }
+          }
+
           return {
             ...sBlock,
-            selected: isBulk ? isSelected : false,
-            activeChild: false,
+            selected: !activeChild,
+            activeChild: activeChild && isBlockSelected,
             childBlocks: turnOfChilds
-              ? sBlock.childBlocks.map(child => ({ ...child, selected: false }))
-              : sBlock.childBlocks
+                ? sBlock.childBlocks.map(child => ({ ...child, selected: false }))
+                : sBlock.childBlocks
           }
-        }
+        })
 
-        return {
-          ...sBlock,
-          selected: !activeChild,
-          activeChild: activeChild && isBlockSelected,
-          childBlocks: turnOfChilds
-              ? sBlock.childBlocks.map(child => ({ ...child, selected: false }))
-              : sBlock.childBlocks
+      Studio.utils.change({
+        view: {
+          ...JSON.parse(this.getAttribute('state')),
+          blocks: newBlocks
         }
-      })
+      }, 'set selected blocks');
 
-    Studio.utils.change({
-      view: {
-        ...JSON.parse(this.getAttribute('state')),
-        blocks: newBlocks
-      }
-    }, 'set selected blocks');
+      return;
+    // }
+
+    // const currentBlock = blocks.find(fBlock => fBlock.id === block.getAttribute('block'));
+
+    // if (!currentBlock) {
+    //   return;
+    // }
+
+    // const newBlocks = blocks
+    //   .map(sBlock => {
+    //     if (sBlock.id !== currentBlock.id) {
+    //       return sBlock;
+    //     }
+
+    //     return {
+    //       ...sBlock,
+    //       selected: !currentBlock.selected,
+    //       activeChild: !currentBlock.selected,
+    //       childBlocks: currentBlock.selected
+    //           ? sBlock.childBlocks.map(child => ({ ...child, selected: false }))
+    //           : sBlock.childBlocks.map(child => ({ ...child, selected: true }))
+    //     }
+    //   });
+
+    // Studio.utils.change({
+    //   view: {
+    //     ...JSON.parse(this.getAttribute('state')),
+    //     blocks: newBlocks
+    //   }
+    // }, 'set selected blocks');
   }
 
   setSelectedChild(child, isBulk) {
@@ -7090,80 +7771,106 @@ class StudioView extends HTMLElement {
       return false;
     });
 
-    childJSON = {
-      ...childJSON,
-      selected: true
-    }
-
-    this.lastSelectedChild = childJSON;
-    this.lastSelected = null;
-
-    const newChildBlocks = blockJSON.childBlocks.map(child => {
-      let isSelected;
-
-      if (isBulk) {
-        const childElement = this.querySelector(StudioView.selectors.childBlockById(child.id));
+    // if (blockJSON.type.startsWith('photobook')) {
+      childJSON = {
+        ...childJSON,
+        selected: true
+      }
+  
+      this.lastSelectedChild = childJSON;
+      this.lastSelected = null;
+  
+      const newChildBlocks = blockJSON.childBlocks.map(child => {
+        let isSelected;
+  
+        if (isBulk) {
+          const childElement = this.querySelector(StudioView.selectors.childBlockById(child.id));
+          
+          if (childElement) {
+            isSelected = childElement.classList.contains('is-selected');
+          }
+        }
         
-        if (childElement) {
-          isSelected = childElement.classList.contains('is-selected');
+        if (child.id === childID) {
+          return {
+            ...childJSON,
+            selected: true
+          }
         }
+  
+        if (isBulk) {
+          return child
+        } else {
+          return {
+            ...child,
+            selected: false
+          }
+        }
+      })
+  
+      const isActiveChild = newChildBlocks.some(children => children.selected);
+  
+      const newBlock = {
+        ...blockJSON,
+        selected: !isActiveChild,
+        activeChild: isActiveChild,
+        childBlocks: newChildBlocks
       }
-      
-      if (child.id === childID) {
-        return {
-          ...childJSON,
-          selected: true
+  
+      const newBlocksList = blocks
+        .map(block => {
+          if (block.id === newBlock.id) {
+            return newBlock
+          }
+  
+          const newChildren = isBulk
+            ? block.childBlocks
+            : block.childBlocks
+              .map(child => ({ ...child, selected: false }));
+  
+          const isActiveChild = newChildren.some(child => child.selected);
+  
+          const blockWithNoActiveChild = {
+            ...block,
+            selected: false,
+            activeChild: isActiveChild,
+            childBlocks: newChildren
+          }
+  
+          return blockWithNoActiveChild
+        });
+  
+      Studio.utils.change({
+        view: {
+          ...JSON.parse(this.getAttribute('state')),
+          blocks: newBlocksList
         }
-      }
+      }, 'set selected child(photobook)');
+    //   return;
+    // }
 
-      if (isBulk) {
-        return child
-      } else {
-        return {
-          ...child,
-          selected: false
-        }
-      }
-    })
+    // const newBlocks = blocks
+    //   .map(sBlock => {
+    //     if (sBlock.id !== blockJSON.id) {
+    //       return sBlock;
+    //     }
 
-    const isActiveChild = newChildBlocks.some(children => children.selected);
+    //     return {
+    //       ...sBlock,
+    //       selected: !blockJSON.selected,
+    //       activeChild: !blockJSON.selected,
+    //       childBlocks: blockJSON.selected
+    //           ? sBlock.childBlocks.map(child => ({ ...child, selected: false }))
+    //           : sBlock.childBlocks.map(child => ({ ...child, selected: true }))
+    //     }
+    //   });
 
-    const newBlock = {
-      ...blockJSON,
-      selected: !isActiveChild,
-      activeChild: isActiveChild,
-      childBlocks: newChildBlocks
-    }
-
-    const newBlocksList = blocks
-      .map(block => {
-        if (block.id === newBlock.id) {
-          return newBlock
-        }
-
-        const newChildren = isBulk
-          ? block.childBlocks
-          : block.childBlocks
-            .map(child => ({ ...child, selected: false }));
-
-        const isActiveChild = newChildren.some(child => child.selected);
-
-        const blockWithNoActiveChild = {
-          ...block,
-          selected: false,
-          activeChild: isActiveChild,
-          childBlocks: newChildren
-        }
-
-        return blockWithNoActiveChild
-      });
-
-    Studio.utils.change({
-      view: {
-        ...JSON.parse(this.getAttribute('state')),
-        blocks: newBlocksList
-      }
-    }, 'set selected child')
+    // Studio.utils.change({
+    //   view: {
+    //     ...JSON.parse(this.getAttribute('state')),
+    //     blocks: newBlocks
+    //   }
+    // }, 'set selected child(default)')
   }
 
   initEventListeners() {
@@ -7220,13 +7927,32 @@ class StudioView extends HTMLElement {
 
     const page = document.createElement('photobook-page');
     page.classList.add('photobook-page', 'product-builder__element');
-    page.setAttribute('photobook-page', block.settings.layout.layout);
-
+    
     page.setAttribute('block', id);
     page.setAttribute('block-type', type);
     
     this.blockClickedListener(page);
+    
+    page.setValue(settings, block);
+    // page.setAttribute('photobook-page', block.settings.layout.layout);
 
+    studioBlock.append(page);
+
+    this.elements.container.append(studioBlock);
+  }
+
+  createPhotobookCover(block) {
+    const studioBlock = this.createStudioBlock('photobook-cover');
+    const { id, type, settings } = block;
+
+    const page = document.createElement('photobook-cover');
+    page.classList.add('photobook-cover', 'product-builder__element');
+    
+    page.setAttribute('block', id);
+    page.setAttribute('block-type', type);
+    
+    this.blockClickedListener(page);
+    
     page.setValue(settings, block);
 
     studioBlock.append(page);
@@ -7234,7 +7960,7 @@ class StudioView extends HTMLElement {
     this.elements.container.append(studioBlock);
   }
 
-  createPrint(block) {
+  createPrint(block, variant) {
     const { id, type, settings } = block;
 
     const studioBlock = this.createStudioBlock('product-prints');
@@ -7243,9 +7969,7 @@ class StudioView extends HTMLElement {
     
     this.blockClickedListener(print);
 
-    const { width, height } = Studio.product.resolution;
-
-    print.setAttribute('print-type', `${width}-${height}`);
+    print.setAttribute('print-type', variant);
 
     print.setAttribute('block', id);
     print.setAttribute('block-type', type);
@@ -7257,7 +7981,7 @@ class StudioView extends HTMLElement {
     this.elements.container.append(studioBlock);
   }
 
-  createCanvas(block, productHandle) {
+  createCanvas(block, variant) {
     const { id, type, settings } = block;
     const studioBlock = this.createStudioBlock('product-canvas');
 
@@ -7265,10 +7989,8 @@ class StudioView extends HTMLElement {
     
     this.blockClickedListener(canvas);
 
-    const canvasType = Canvas.printTypes.find(type => productHandle.includes(type));
-
     if (type) {
-      canvas.setAttribute('print-type', canvasType);
+      canvas.setAttribute('print-type', variant);
     }
 
     canvas.setAttribute('block', id);
@@ -7306,7 +8028,7 @@ class StudioView extends HTMLElement {
       if (childJSON) {
         const { imageUrl, settings } = childJSON;
 
-        if (imageUrl) {
+        if (imageUrl && child.setImage) {
           child.setImage(imageUrl);
         }
 
@@ -7317,7 +8039,7 @@ class StudioView extends HTMLElement {
     })
   }
 
-  createPuzzle(block, productHandle) {
+  createPuzzle(block, variant) {
     const { id, type, settings } = block;
 
     const studioBlock = this.createStudioBlock('product-puzzle');
@@ -7326,11 +8048,7 @@ class StudioView extends HTMLElement {
     
     this.blockClickedListener(puzzle);
 
-    if (productHandle) {
-      const puzzleType = Puzzle.types.find(type => productHandle.includes(type));
-
-      puzzle.setAttribute('puzzle-type', puzzleType);
-    }
+    puzzle.setAttribute('puzzle-type', variant);
 
     puzzle.setAttribute('block', id);
     puzzle.setAttribute('block-type', type);
@@ -7342,7 +8060,7 @@ class StudioView extends HTMLElement {
     this.elements.container.append(studioBlock);
   }
 
-  createMagnets(block, productHandle) {
+  createMagnets(block, variant) {
     const { id, type, settings } = block;
     const studioBlock = this.createStudioBlock('product-magnet');
 
@@ -7352,13 +8070,7 @@ class StudioView extends HTMLElement {
 
     studioBlock.append(magnet);
 
-    const MagnetType = productHandle.includes('heart')
-      ? 'heart'
-      : productHandle.includes('circle')
-        ? 'circle'
-        : 'square';
-
-    magnet.setAttribute('magnet-type', MagnetType);
+    magnet.setAttribute('magnet-type', variant);
 
     magnet.setAttribute('block', id);
     magnet.setAttribute('block-type', type);
@@ -7380,8 +8092,6 @@ class StudioView extends HTMLElement {
 
     tile.setAttribute('block', id);
     tile.setAttribute('block-type', type);
-
-    // console.log(block);
 
     tile.setValue(settings, block);
     
@@ -7493,8 +8203,10 @@ class StudioView extends HTMLElement {
       }, 0) || 0;
   }
 
-  getBlocksJSON() {
+  getBlocksJSON(options) {
     const product = Studio.product;
+
+    const { additionalType } = options || {};
 
     let type;
     let childList;
@@ -7503,14 +8215,22 @@ class StudioView extends HTMLElement {
 
     switch (product.type.id) {
       case 'photobook':
-        type = 'photobook-page';
-        childList = layouts.whole.blocks;
+        if (additionalType === 'photobook-cover') {
+          type = 'photobook-cover';
+          childList = layouts.wholeTextCover.blocks
+        } else {
+          type = 'photobook-page';
+          childList = layouts.wholeTextCover.blocks;
+        }
         break;
       case 'prints':
-        if (product.handle.includes('polaroid') || product.handle.includes('retro')) {
+        if (product.type.variant === 'polaroid') {
           type = 'polaroid';
           childList = ['editable-picture', 'text'];
           childOptions.isLine = true;
+        } else if (product.type.variant === 'photostrip') {
+          type = 'photostrip';
+          childList = [];
         } else {
           type = 'prints'
           childList = ['editable-picture'];
@@ -7529,7 +8249,7 @@ class StudioView extends HTMLElement {
         childList = ['editable-picture'];
         break;
       case 'boxes':
-        if (product.handle.includes('polaroid') || product.handle.includes('retro')) {
+        if (product.type.variant === 'polaroid') {
           type = 'polaroid';
           childList = ['editable-picture', 'text'];
         } else {
@@ -7553,8 +8273,14 @@ class StudioView extends HTMLElement {
       .reduce((obj, tool) => {
         switch(tool) {
           case 'hasLayout':
-            if (settings[tool]) {
-              obj.layout = LayoutTool.defaultValue;
+            if (settings[tool] && type === 'photobook-page') {
+              obj.layout = {
+                layout: 'whole'
+              };
+            } else if (type === 'photobook-cover') {
+              obj.layout = {
+                layout: 'wholeTextCover'
+              };
             }
             break;
           case 'hasBackground':
@@ -7588,7 +8314,11 @@ class StudioView extends HTMLElement {
     };
   }
 
-  getChildsJSON(type, options = {}) {
+  getChildsJSON(type, options = {}, state) {
+    if (state) {
+      return state;
+    }
+
     const id = uniqueID.childBlock();
 
     const { isLine = false } = options;
@@ -7618,7 +8348,7 @@ class StudioView extends HTMLElement {
         }
       case 'line':
         return {
-          type,
+          type: 'text',
           id,
           isLine: true,
           selected: false,
@@ -7650,30 +8380,32 @@ class StudioView extends HTMLElement {
     const waitToClear = [];
 
     const createBlock = (block) => {
-
       switch(block.type) {
         case 'photobook-page':
-          this.createPhotobookPage(block);
+          this.createPhotobookPage(block, product.type.variant);
+          break;
+        case 'photobook-cover':
+          this.createPhotobookCover(block, product.type.variant);
           break;
         case 'prints':
-          this.createPrint(block, productHandle);
+          this.createPrint(block, product.type.variant);
           break;
         case 'polaroid':
           this.createPolaroidPrints(block);
           break;
         case 'puzzle':
-          this.createPuzzle(block, productHandle);
+          this.createPuzzle(block, product.type.variant);
           break;
         case 'canvas':
-          this.createCanvas(block, productHandle);
+          this.createCanvas(block, product.type.variant);
           break;
         case 'magnet':
-          this.createMagnets(block, productHandle);
+          this.createMagnets(block, product.type.variant);
           break;
         case 'boxes':
-          if (product.handle.includes('polaroid')) {
+          if (product.type.variant === 'polaroid') {
             this.createPolaroidPrints();
-          } else if (product.handle.includes('10-15')) {
+          } else if (product.type.variant === '10-15') {
             this.createPrint(block, '10-15');
           }
           break;
@@ -7703,6 +8435,10 @@ class StudioView extends HTMLElement {
 
     this.clearViewSync(null, elemsToRemove);
 
+    if (product.type.id === 'photobook' && !newBlocks.find(block => block.type === 'photobook-cover')) {
+      newBlocks.push(this.getBlocksJSON({ additionalType: 'photobook-cover' }));
+    }
+
     if (!options.clearAll && size) {
       if (size > newBlocks.length) {
         toUpdate = true;
@@ -7726,13 +8462,11 @@ class StudioView extends HTMLElement {
       return elem.getAttribute('block') === block.id;
     }));
 
-    
     newBlocks = newBlocks.filter(block => !elemsToRemove.includes(block.id));
     
     if (blocksToCreate !== 0) {
       toUpdate = true;
     }
-    // console.log(newBlocks, toUpdate);
 
     if (!toUpdate) {
       return;
@@ -7749,10 +8483,7 @@ class StudioView extends HTMLElement {
       this.addBlockBtn.setSize(offsetWidth > controlsWidth ? offsetWidth : controlsWidth, offsetHeight);
     }
 
-      Studio.utils.change({ view: {
-        ...JSON.parse(this.getAttribute('state')),
-        blocks: newBlocks
-      }}, 'set product elements');
+    return newBlocks;
 
     Promise.all(waitToClear).then(_ => {
       // do something on async block delete
@@ -8264,7 +8995,7 @@ class ImageChooser extends HTMLElement {
 
         this.classList.add('is-loading');
 
-        fetch(`https://graph.facebook.com/v16.0/${userID}/photos/uploaded?fields=id,name,images,created_time&access_token=${token}`)
+        fetch(`https://graph.facebook.com/v17.0/${userID}/photos/uploaded?fields=id,name,images,created_time&access_token=${token}`)
           .then(res => res.json())
           .then(data => {
             const photos = data.data.map(photo => {
@@ -8348,7 +9079,6 @@ class RelatedProducts extends HTMLElement {
 
     this.elements = {
       exitBtn: this.querySelector(RelatedProducts.selectors.exitBtn),
-      productImage: this.querySelector(RelatedProducts.selectors.productImage),
       productsList: this.querySelector(RelatedProducts.selectors.productsList),
       checkoutButton: this.querySelector(RelatedProducts.selectors.checkoutBtn)
     };
@@ -8425,14 +9155,6 @@ class RelatedProducts extends HTMLElement {
     }, 300);
   }
 
-  setImage(imageUrl) {
-    if (typeof imageUrl !== 'string') {
-      return;
-    }
-
-    this.elements.productImage.src = imageUrl;
-  }
-
   async init() {
     const { product } = Studio.state;
 
@@ -8440,9 +9162,9 @@ class RelatedProducts extends HTMLElement {
       this.relatedProductsElems.forEach(elem => elem.remove());
     }
 
-    this.setImage(product.imageUrl);
-
     this.relatedProducts = product.relatedProducts;
+
+    this.length = this.relatedProducts.length;
 
     this.initRelatedProducts();
   }
@@ -8472,6 +9194,17 @@ class RelatedProducts extends HTMLElement {
     `;
 
     container.append(check);
+
+    if (image) {
+      const img = new Image();
+      img.src = image.url;
+      img.classList.add('related-product__image');
+      img.width = 100;
+      img.height = 85;
+
+      container.append(img);
+    }
+
 
     if (options.length === 1) {
       container.setAttribute('data-variant', options[0]);
@@ -8583,6 +9316,11 @@ class RelatedProducts extends HTMLElement {
 
   getRelatedProducts() {
     return new Promise((resolve, reject) => {
+      if (!this.relatedProducts.length) {
+        resolve([]);
+        return;
+      }
+
       this.open(false);
 
       subscribeToActionController({

@@ -28,6 +28,10 @@ export default function Orders() {
     refetchTimer: null
   });
 
+  const { data: shopCurrency, isLoading: currencyIsLoading } = useAppQuery({
+    url: 'api/shop'
+  });
+
   const {
     data: orders,
     isLoading,
@@ -68,6 +72,7 @@ export default function Orders() {
         </IndexTable.Cell>
 
         <IndexTable.Cell>
+          { order.currency }
           { moneyFormat(parseInt(order.current_subtotal_price), order.currency || 'USD') }
         </IndexTable.Cell>
 
@@ -97,7 +102,7 @@ export default function Orders() {
     }
   }, []);
 
-  if (isLoading) {
+  if (isLoading || currencyIsLoading) {
     const SkeletonRow = (i) => (
       <IndexTable.Row id={'1'} key={i} position={1}>
         <IndexTable.Cell>

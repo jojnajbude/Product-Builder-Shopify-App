@@ -3,7 +3,7 @@ import { useAppQuery, useAuthenticatedFetch } from "../hooks";
 import { useCallback, useEffect, useState } from "react";
 import moneyFormat from "../assets/moneyFormat.js";
 
-export default function lineItem({ item, shopifyOrderID, customer }) {
+export default function lineItem({ item, shopifyOrderID, customer, currency }) {
   const [comsposeStatus, setcomsposeStatus] = useState('inactive');
 
   const [downloadPercent, setDownloadPercent] = useState(0);
@@ -122,7 +122,7 @@ export default function lineItem({ item, shopifyOrderID, customer }) {
             </Link>
 
             <Text>
-              Order id: { project_id.split('-').slice(1).join('-') }
+              Project id: { project_id.split('-').slice(1).join('-') }
             </Text>
           </div>
 
@@ -135,7 +135,7 @@ export default function lineItem({ item, shopifyOrderID, customer }) {
             }}
           >
             <Text>
-              { moneyFormat(price * quantity) }
+              { moneyFormat(price * quantity, currency) }
             </Text>
           </div>
 

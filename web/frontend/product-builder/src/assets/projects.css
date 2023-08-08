@@ -81,6 +81,15 @@
   margin-right: 10px;
 }
 
+.order .button.is-disabled::before {
+  opacity: 0.5;
+}
+
+.order .button:disabled,
+.order .button.is-disabled {
+  cursor: not-allowed;
+}
+
 .order .order__button-group .button--delete {
   background-color: #fff;
   padding-right: 15px;

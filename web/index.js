@@ -26,6 +26,7 @@ import Order from "./models/Order.js";
 import { create } from 'express-handlebars';
 
 import mongoose from "./database/index.js";
+import { shopRegister, webhookProductUpdate, webhookProductsDelete, webhookRegister } from "./controllers/index.js";
 
 dotenv.config();
 
@@ -108,58 +109,8 @@ app.get(shopify.config.auth.path, shopify.auth.begin());
 app.get(
   shopify.config.auth.callbackPath,
   shopify.auth.callback(),
-  async (req, res, next) => {
-    const shop = new Shop({
-      session: res.locals.shopify.session,
-      name: res.locals.shopify.session.shop
-    });
-
-    const shopExists = await Shop.findOne({ name: res.locals.shopify.session.shop });
-
-    if (!shopExists) {
-      await shop.save();
-    } else {
-      shopExists.set('session', res.locals.shopify.session).save();
-    }
-
-    next();
-  },
-  async (req, res, next) => {
-    const webhookToCreate = new shopify.api.rest.Webhook({
-      session: res.locals.shopify.session
-    }); 
-
-    webhookToCreate.address = "https://product-builder.dev-test.pro/api/customers/create";
-    webhookToCreate.topic = "customers/create";
-    webhookToCreate.format = "json";
-    await webhookToCreate.save({ 
-      update: true,
-    });
-
-    const webhookToDelete = new shopify.api.rest.Webhook({
-      session: res.locals.shopify.session
-    });
-
-    webhookToDelete.address = "https://product-builder.dev-test.pro/api/customers/delete";
-    webhookToDelete.topic = "customers/delete";
-    webhookToDelete.format = "json";
-    await webhookToDelete.save({
-      update: true,
-    });
-
-    const webhookShopifyOrder = new shopify.api.rest.Webhook({
-      session: res.locals.shopify.session 
-    });
-
-    webhookShopifyOrder.address = "https://product-builder.dev-test.pro/product-builder/orders/shopify/order/create";
-    webhookShopifyOrder.topic = "orders/create";
-    webhookShopifyOrder.format = "json";
-    await webhookShopifyOrder.save({
-      update: true,
-    });
-
-    next();
-  },
+  shopRegister,
+  webhookRegister,
   shopify.redirectToShopifyOrAppRoot()
 );
 app.post(
@@ -568,7 +519,27 @@ app.post('/api/facebookOAth', express.json(), async (req, res) => {
   });
 });
 
+app.post('/api/products/webhook/update', express.json(), webhookProductUpdate);
+app.post('/api/products/webhook/delete', express.json(), webhookProductsDelete);
+
 app.use("/api/*", shopify.validateAuthenticatedSession());
+
+app.get('/api/shop', async (req, res) => {
+  const { session } = res.locals.shopify;
+
+  const [shop] = await shopify.api.rest.Shop.all({ session });
+
+  if (shop && shop.currency) {
+    res.send({
+      currency: shop.currency
+    });
+    return;
+  }
+
+  res.status(404).send({
+    error: 'no shop provided'
+  });
+})
 
 app.use(express.json());
 
@@ -625,7 +596,7 @@ app.get('/api/shopify/products', async (req, res) => {
   res.status(200).send(products);
 });
 
-app.get('/api/products', async (req, res) => {
+app.get('/api/products', async (req, res) => { 
   const idToString = (idNumber) => `gid://shopify/Product/${idNumber}`;
 
   const { id } = req.query;
@@ -799,12 +770,13 @@ app.post('/api/products/update', async (req, res) => {
     return;
   }
 
-  console.log(state.relatedProducts);
+  console.log(state.relatedProducts, );
 
   await ProductModel.findOneAndUpdate({ shopify_id: id }, {
     type: {
       id: currType?.id,
-      title: currType?.title
+      title: currType?.title,
+      variant: state?.variant
     },
     status: state.status,
     settings: state.settings,
@@ -817,6 +789,7 @@ app.post('/api/products/update', async (req, res) => {
 
   res.status(200).send(product);
 });
+
 
 app.get('/api/product/delete', async (req, res) => {
   const client = new shopify.api.clients.Graphql({

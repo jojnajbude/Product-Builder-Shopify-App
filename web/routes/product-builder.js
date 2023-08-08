@@ -6,10 +6,11 @@ import Customer from '../models/Customer.js';
 
 
 import { join } from 'path';
-import { getCustomerUploads, getUploadPath, removeImage, sharpImage } from '../controllers/product-builder.js';
+import { createLayout, getCustomerUploads, getText, getUploadPath, removeImage, sharpImage } from '../controllers/product-builder.js';
 import { createDir, downloadFile, existsFile, readDirectory, uploadFile } from '../utils/cdnApi.js';
 import Shop from '../models/Shop.js';
 import shopify from '../shopify.js';
+import sharp from 'sharp';
 
 const PROXY_PATH = `${process.cwd()}/frontend/product-builder/src`;
 
@@ -24,6 +25,24 @@ productBuilder.get('/', async (req, res) => {
 
   res.sendFile(pagePath); 
 });
+
+productBuilder.get('/products/linked', async (req, res) => {
+  const { id } = req.query;
+
+  if (!id) {
+    res.sendStatus(400);
+    return;
+  }
+
+  const product = await ProductModel.findOne({ shopify_id: `gid://shopify/Product/${id}` });
+
+  if (product) {
+    res.sendStatus(200);
+    return;
+  }
+
+  res.send(404);
+})
 
 productBuilder.get('/testBunny', async (req, res) => {
   // const response = await downloadFile(join('shops'), 'block-8 - image-3 - original.jpg');
@@ -168,6 +187,10 @@ productBuilder.use('/orders', projects);
 productBuilder.get('/uploads/list', getCustomerUploads);
 
 productBuilder.post('/uploads/remove', express.json(), removeImage);
+
+productBuilder.post('/text', express.json(), getText);
+
+productBuilder.post('/photobook', express.json(), createLayout);
 
 productBuilder.use('/', express.static(PROXY_PATH));
 

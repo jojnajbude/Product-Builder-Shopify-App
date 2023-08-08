@@ -52,7 +52,7 @@ export async function uploadFile(path, fileName, file) {
   const response = await fetch(url, {
     method: 'PUT',
     headers,
-    body: file ? Buffer.from(file.buffer) : ''
+    body: file ? file : ''
   }).then(res => res.json());
 
   if (response.HttpCode === 201) {
@@ -152,6 +152,8 @@ export async function deleteFile(path, {
   isDirectory
 } = defaultDeleteConfig) {
   const url = bunnyHost + '/' + path + (isDirectory ? '/' : '');
+
+  console.log(url);
 
   const response = await fetch(url, {
     method: 'DELETE',

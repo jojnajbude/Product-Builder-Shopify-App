@@ -3,14 +3,15 @@ import fs from 'fs';
 
 import Project from '../models/Projects.js';
 import Order from '../models/Order.js';
+import { composeOrder } from '../controllers/order.js';
 
 const shopifyOrders = Router();
 
 shopifyOrders.post('/order/create', json(), async (req, res) => {
   const shopifyOrder = req.body;
+  res.sendStatus(200);
 
   if (!shopifyOrder) {
-    res.sendStatus(400);
     return;
   }
 
@@ -38,7 +39,6 @@ shopifyOrders.post('/order/create', json(), async (req, res) => {
     }));
 
   if (!projects.length) {
-    res.sendStatus(200);
     return;
   }
 
@@ -58,9 +58,23 @@ shopifyOrders.post('/order/create', json(), async (req, res) => {
 
   await order.save();
 
-  console.log(name, projects);
+  await Promise.all(projects.map(async project => {
+    const projectDoc = await Project.findOne({ projectId: project.project_id });
 
-  res.sendStatus(200);
+    if (!projectDoc) {
+      return;
+    }
+
+    projectDoc.set('status', 'ordered');
+
+    await projectDoc.save();
+
+    return;
+  }))
+
+  console.log(name, projects);
 });
+
+shopifyOrders.get('/order/compose', composeOrder);
 
 export default shopifyOrders;

@@ -140,9 +140,9 @@ class SocialAuth extends HTMLElement {
       return;
     }
 
-    data.email = inputEmail.value;
+    data.email = inputEmail.value; 
     data.password = inputPassword.value;
-
+ 
     const inputName = this.form.querySelector('input[name="customer[first_name]"]');
     const inputLastName = this.form.querySelector('input[name="customer[last_name]"]');
 
@@ -198,7 +198,7 @@ class SocialAuth extends HTMLElement {
         FB.init({
           appId: this.credentials.facebook.id,
           autoLogAppEvent: true,
-          version: 'v16.0'
+          version: 'v17.0'
         });
         res();
       };
@@ -498,7 +498,7 @@ class SocialAuth extends HTMLElement {
       FB.login(this.faceBookLoginFunc.bind(this), {
         scope: 'public_profile email user_photos'
       });
-    })
+    });
 
     this.container.appendChild(button);
   }

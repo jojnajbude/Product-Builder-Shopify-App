@@ -39,7 +39,12 @@ export default function Product() {
   const id = useMemo(() => searchParams.get('id'), [searchParams]);
 
   const [selectedType, setSelectedType] = useState('none');
-  const handleSelectChange = useCallback((value) => setSelectedType(value), []);
+  const handleSelectChange = useCallback((value) => {
+    setSelectedType(value)
+  }, []);
+
+  const [selectedVariant, setSelectedVariant] = useState('none');
+  const handleSelectedVariant = useCallback(value => setSelectedVariant(value), []);
 
   const [selectedStatus, setSelectedStatus] = useState('active');
   const handleSelectedStatus = useCallback(value => setSelectedStatus(value), []);
@@ -152,8 +157,6 @@ export default function Product() {
       return;
     }
 
-    console.log(relatedProducts);
-
     const response = await fetch(`api/products/update?id=${product.shopify_id}`, {
       method: 'POST',
       headers: {
@@ -161,6 +164,7 @@ export default function Product() {
       },
       body: JSON.stringify({
         type: selectedType,
+        variant: types[selectedType].variants[selectedVariant],
         status: selectedStatus,
         settings: settings,
         relatedProducts,
@@ -175,6 +179,10 @@ export default function Product() {
 
     if (response.ok) {
       setSaveToast(true);
+
+    const newVariant = Object.keys(types[selectedType].variants)
+      .find(variant => newProduct.type.variant === types[selectedType].variants[variant]);
+
       setInitialState({
         type: newProduct.type.id,
         status: newProduct.status,
@@ -182,13 +190,14 @@ export default function Product() {
         relatedProducts: newProduct.relatedProducts,
         quantity: newProduct.quantity,
         resolution: newProduct.resolution,
+        variant: newVariant,
         onStart: true
       });
 
       setIsLoadingButtons(current => current.filter(button => button !== saveButtonId));
     }
 
-  }, [relatedProducts, selectedType, selectedStatus, product, settings, productQuantity, minimQuantity, maximumQuantity, resolution]);
+  }, [relatedProducts, selectedType, selectedStatus, product, settings, productQuantity, minimQuantity, maximumQuantity, resolution, selectedVariant]);
 
   const discardChanges = useCallback(() => {
     setSelectedStatus(initialState.status);
@@ -196,6 +205,8 @@ export default function Product() {
     setSettings({ settings: initialState.settings });
     setRelatedProducts(initialState.relatedProducts);
     setProductQuantity(initialState.quantity.type);
+
+    setSelectedVariant(initialState.variant);
 
     setResolution(initialState.resolution);
 
@@ -218,13 +229,12 @@ export default function Product() {
     discardAction.setOptions({
       onAction: discardChanges
     });
-  }, [product, settings, isLoadingButtons, selectedStatus, selectedType, minimQuantity, productQuantity, maximumQuantity, hasMaximum, resolution, relatedProducts]);
+  }, [product, settings, isLoadingButtons, selectedStatus, selectedType, minimQuantity, productQuantity, maximumQuantity, hasMaximum, resolution, relatedProducts, selectedVariant]);
 
   useEffect(() => {
     if (product && types) {
       setSelectedStatus(product.status);
 
-      console.log(product);
       setProductQuantity(product.quantity.type);
 
       if (product.quantity.type === 'multiply') {
@@ -259,6 +269,15 @@ export default function Product() {
         setTypeSettings({ selectedLayouts: [] });
       }
 
+      let productVariant;
+
+      if (product.type) {
+        productVariant = Object.keys(types[typeToSet].variants)
+          .find(variant => product.type  && product.type.variant === types[typeToSet].variants[variant]);
+      } else {
+        productVariant = 'none'
+      }
+
       if (!initialState.onStart) {
         setInitialState({
           type: typeToSet, 
@@ -267,6 +286,7 @@ export default function Product() {
           relatedProducts: product.relatedProducts,
           quantity: product.quantity,
           resolution: product.resolution,
+          variant: productVariant,
           onStart: true
         });
       }
@@ -308,6 +328,11 @@ export default function Product() {
         settingsToSet = { selectedLayouts: [] };
       }
 
+      setSelectedVariant(types[selectedType]
+        ? Object.keys(types[selectedType].variants)[0]
+        : 'none'
+      );
+
       setTypeSettings(settingsToSet);
     }
   }, [selectedType]);
@@ -321,7 +346,8 @@ export default function Product() {
         && JSON.stringify(productQuantity) === JSON.stringify(initialState.quantity.type)
         && (productQuantity === 'multiply' ? minimQuantity === initialState.quantity.minimum : true)
         && (productQuantity === 'multiply' && hasMaximum ? maximumQuantity === initialState.quantity.maximum : true)
-        && JSON.stringify(resolution) === JSON.stringify(initialState.resolution);
+        && JSON.stringify(resolution) === JSON.stringify(initialState.resolution)
+        && initialState.variant === selectedVariant;
 
       if (notEdited) {
         setIsEdited(false);
@@ -331,7 +357,7 @@ export default function Product() {
         setIsEdited(true);
       }
     }
-  }, [selectedStatus, selectedType, settings, initialState, relatedProducts, productQuantity, minimQuantity, maximumQuantity, hasMaximum, resolution]);
+  }, [selectedStatus, selectedType, settings, initialState, relatedProducts, productQuantity, minimQuantity, maximumQuantity, hasMaximum, resolution, selectedVariant]);
 
   useEffect(() => { 
     if (isEdited) {
@@ -515,6 +541,33 @@ export default function Product() {
                   onChange={handleSelectChange}
                   name='Type'
                 />
+
+                {types[selectedType] && (
+                  <>
+                    <div style={{ marginBottom: 10, marginTop: 20 }}>
+                      <Text
+                        alignment="start"
+                        as="h2"
+                        variant="headingMd"
+                      >
+                        Variant
+                      </Text>
+                    </div>
+
+                    <Select
+                      options={types[selectedType]
+                        ? [
+                          ...Object.keys(types[selectedType].variants).map(variant => ({ label: variant, value: variant }))
+                        ]
+                        : []
+                      }
+                      value={selectedVariant}
+                      onChange={handleSelectedVariant}
+                      name='Variant'
+                      disabled={types[selectedType] && Object.keys(types[selectedType].variants).length <= 1}
+                    />
+                  </>
+                )}
               </LegacyCard.Section>
 
               <LegacyCard.Section>

@@ -10,12 +10,20 @@ const Tiles = {
     hasRotate: true,
     hasFilter: true,
     hasBackground: false
+  },
+  variants: {
+    '20/20 cm': '20-20'
   }
 };
 
 const Puzzle = {
   id: 'puzzle',
   title: 'Puzzle',
+  variants: {
+    '96 Pieces': '96',
+    '192 Pieces': '192',
+    '513 Pieces': '513'
+  },
   settings: {
     hasLayout: false,
     selectedLayouts: [],
@@ -40,6 +48,15 @@ const Prints = {
     hasRotate: true,
     hasFilter: true,
     hasBackground: true
+  },
+  variants: {
+    '9/13 cm': '9-13',
+    '10/15 cm': '10-15',
+    '15/21 cm': '15-21',
+    '20/30 cm': '20-30',
+    '30/40 cm': '30-40',
+    'Photostrip': 'photostrip',
+    'Polaroid': 'polaroid'
   }
 };
 
@@ -55,6 +72,11 @@ const Magnets = {
     hasRotate: true,
     hasFilter: true,
     hasBackground: false
+  },
+  variants: {
+    'Square': 'square',
+    'Heart': 'heart',
+    'Circle': 'circle'
   }
 };
 
@@ -70,6 +92,10 @@ const Boxes = {
     hasRotate: true,
     hasFilter: true,
     hasBackground: true
+  },
+  variants: {
+    '10/15 cm': '10-15',
+    'polaroid': 'polaroid'
   }
 };
 
@@ -85,6 +111,11 @@ const Canvas = {
     hasRotate: true,
     hasFilter: true,
     hasBackground: false
+  },
+  variants: {
+    '30/40 cm': '30-40',
+    '30/30 cm': '30-30',
+    '40/40 cm': '40-40'
   }
 };
 
@@ -100,6 +131,12 @@ const Photobook = {
     hasRotate: true,
     hasFilter: true,
     hasBackground: true
+  },
+  variants: {
+    'Layflat 20/20 cm': 'layflat-20-20',
+    'Layflat 25/25 cm': 'layflat-25-25',
+    'Glossy 15/15 cm': 'glossy-15-15',
+    'Glossy 20/20 cm': 'glossy-20-20'
   }
 };
 
@@ -115,6 +152,10 @@ const Stickybook = {
     hasRotate: true,
     hasFilter: true,
     hasBackground: false
+  },
+  variants: {
+    '20/30 cm': '20-30-250',
+    '20-30 cm': '20-30-500'
   }
 };
 

@@ -11,7 +11,8 @@ const ProductSchema = new mongoose.Schema({
   options: [Schema.Types.Mixed],
   type: {
     id: String,
-    title: String
+    title: String,
+    variant: String
   },
   quantity: Schema.Types.Mixed,
   resolution: Schema.Types.Mixed,

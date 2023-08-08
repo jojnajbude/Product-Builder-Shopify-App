@@ -114,12 +114,11 @@ const onImageLoad = async (picture, src) => {
 
 const orderItem = (draft) => {
   return new Promise(async (res, rej) => {
-    const { projectId: id, product, updatedAt } = draft;
+    const { projectId: id, product, updatedAt, status } = draft;
 
-    console.log(draft);
-  
     const li = document.createElement('li');
     li.classList.add('order', 'is-loading');
+    li.setAttribute('data-project', id);
 
     const picture = new Image();
     picture.width = 100;
@@ -132,7 +131,24 @@ const orderItem = (draft) => {
 
     const title = document.createElement('div');
     title.classList.add('order__title');
-    title.textContent = product.title;
+
+    let additionalInfo = '';
+
+    switch (status) {
+      case 'active':
+        additionalInfo = ' (added to cart)';
+        break;
+      case 'draft':
+        break;
+      case 'ordered':
+        additionalInfo = ' (ordered)'
+        break;
+      default:
+        additionalInfo = ' (completed)'
+        break;
+    }
+
+    title.textContent = product.title + additionalInfo;
 
     const lastUpdated = document.createElement('div');
 
@@ -160,10 +176,24 @@ const orderItem = (draft) => {
     editBtn.textContent = 'Edit';
     editBtn.classList.add('button', 'button--primary');
     editBtn.href = location.origin + `/apps/product-builder?project-id=${id}`;
+    editBtn.disabled = status !== 'draft' && status !== 'active';
+    if (status !== 'draft' && status !== 'active') {
+      editBtn.href = '';
+      editBtn.classList.add('is-disabled');
+
+      editBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+      })
+    }
 
     const deleteBtn = document.createElement('button');
+    deleteBtn.disabled = status !== 'draft' && status !== 'active';
 
     deleteBtn.addEventListener('click', () => {
+      if (status !== 'draft' && status !== 'active') {
+        return;
+      }
+
       confirmModal.getConfirm({
         text: 'Are you sure you want to delete?',
         callback: () => {
@@ -210,7 +240,9 @@ const orderItem = (draft) => {
 const setOrders = (orders) => {
   draftsList.querySelectorAll('li.order').forEach(order => order.remove());
 
-  const ordersItems = orders.map(order => orderItem(order));
+  const ordersItems = orders
+    .sort((projectA, projectB) => projectB.updatedAt - projectA.updatedAt)
+    .map(order => orderItem(order));
 
   Promise.all(ordersItems).then(items => {
     draftsList.append(...items);

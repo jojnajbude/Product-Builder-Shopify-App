@@ -3,8 +3,51 @@ import { join } from 'path';
 
 import sharp from 'sharp';
 import { deleteFile, downloadFile, existsFile, readDirectory } from '../utils/cdnApi.js';
+import { PhotobookElement } from './layouts.js';
 
 const PROXY_PATH = `${process.cwd()}/frontend/product-builder/src`;
+
+const textOptions = ['bold', 'align', 'font', 'italic', 'underline', 'text', 'color', 'fontSize'];
+
+const options = [
+  'rotate', 'flip', 'flop', 'crop',
+  'resize', 'filter', 'thumbnail', 'format',
+  'container', 'background', 'type',
+  ...textOptions
+];
+
+const getRGBValue = (color) => {
+  if (typeof color !== 'string') {
+    return new Error('color must be a string');
+  }
+
+  if (!color) {
+    return {
+      r: 255,
+      b: 255,
+      g: 255,
+      alpha: 1
+    }
+  }
+
+  const [ r, g, b, alpha = 1] = color.match(/\d+/gm).map(item => +item);
+
+  return { r, g, b, alpha };
+}
+
+const getFontColor = (color) => {
+  if (!color) {
+    return;
+  }
+
+  const { r, g, b } = color;
+
+  if (((255 + 255 + 255) / 2) >= (r + g + b)) {
+    return 'white';
+  }
+
+  return 'black';
+}
 
 export const getUploadPath = (params) => {
   if (!params) {
@@ -77,24 +120,18 @@ export const sharpImage = async (req, res) => {
 
   const path = join('shops', ...pathArr.slice(startFrom));
 
-  const options = ['rotate', 'flip', 'flop', 'crop', 'resize', 'filter', 'thumbnail', 'format', 'container', 'background', 'type'];
+  const textConfig = {};
 
   const config = Object.keys(req.query)
     .reduce((obj, key) => {
-      if (options.includes(key) && req.query[key]) {
+      if (options.includes(key) && req.query[key] && !textOptions.includes(key)) {
         if (key === 'background') {
           try {
             const backgroundColor = JSON.stringify(req.query[key]);
 
             if (backgroundColor.includes('rgb')) {
-              const rgb = backgroundColor.match(/\d+/g).map(item => +item);
-
-              obj[key] = {
-                r: rgb[0] ?? 255,
-                g: rgb[1] ?? 255,
-                b: rgb[2] ?? 255,
-                alpha: rgb[3] ?? 1
-              };
+              obj[key] = getRGBValue(backgroundColor);
+              textConfig[key] = getRGBValue(backgroundColor);
             } else {
               obj[key] = '#' + req.query[key];
             }
@@ -119,7 +156,13 @@ export const sharpImage = async (req, res) => {
             obj[key] = req.query[key];
           }
         }
-      } 
+      } else if (textOptions.includes(key)) {
+        try {
+          textConfig[key] = JSON.parse(req.query[key]);
+        } catch {
+          textConfig[key] = req.query[key];
+        }
+      }
 
       return obj;
     }, {})
@@ -224,7 +267,7 @@ export const sharpImage = async (req, res) => {
   const readyFile = await file.toBuffer();
 
   if (type === 'polaroid') {
-    file = await createPolaroid(readyFile, null, {
+    file = await createPolaroid(readyFile, textConfig, {
       background
     });
 
@@ -360,37 +403,147 @@ const cropImage = async (file, crop, background) => {
   return file;
 }
 
-const createPolaroid = async (img, text, {
+const createPolaroid = async (img, textConfig, {
   background
 }) => {
   let polaroid = sharp({
     create: {
-      width: 600,
-      height: 800,
+      width: 1200,
+      height: 1800,
       channels: 4,
-      background
+      background,
     }
   });
 
   let picture = await sharp(img)
     .resize({
-      width: 500,
-      height: 500
+      width: 1004,
+      height: 1004
     })
     .jpeg()
     .toBuffer();
+
+  const Text = await createText(textConfig);
 
   polaroid = polaroid
     .composite([
       {
         input: picture,
-        top: 50,
-        left: 50
+        top: 98,
+        left: 98
+      },
+      {
+        input: Text,
+        top: 1300,
+        left: 98,        
       }
     ]);
 
   polaroid = await polaroid.jpeg().toBuffer();
 
   return polaroid;
+}
+
+async function createText(config) {
+  const {
+    align = 'center',
+    font = 'Arial',
+    bold = false,
+    italic = false,
+    underline = false,
+    text = 'no text',
+    background,
+    color,
+    fontSize = 20
+  } = config;
+
+  const textSVG = await fetch(`${process.env.HOST}/product-builder/text`, {
+    method: "POST",
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      align,
+      font,
+      fontStyle: {
+          bold,
+          italic,
+          underline
+      },
+      text,
+      color: color ? color : getFontColor(background),
+      fontSize
+    })
+  }).then(res => res.blob());
+
+  const textBuffer = Buffer.from(await textSVG.arrayBuffer());
+
+  const textSharp = await sharp(textBuffer)
+    .resize({
+      width: 1004,
+      height: 300,
+      background: { r: 0, b: 0, g: 0, alpha: 0 }
+    }).png().toBuffer();
+
+    return textSharp;
+}
+
+export const getText = async (req, res) => {
+  const textSettings = req.body;
+
+  if (!textSettings) {
+    res.send({
+      error: {
+        message:  'text settings no provided'
+      }
+    })
+    return;
+  }
+
+  const { align, font, fontStyle, text, color, fontSize } = textSettings;
+
+  const { bold, italic, underline } = fontStyle;
+
+  const svg = `
+    <svg
+      viewBox="0 0 200 100"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+    <style>
+      text {
+        width: 100%;
+
+        font-size: ${fontSize}px;
+        fill: ${color};
+        text-align: ${align};
+        font-family: ${font}, sans-serif;
+        ${underline ? 'text-decoration: underline;' : ''}
+        ${bold ? 'font-weight: 700;' : ''}
+        ${italic ? 'font-style: italic;' : ''}
+      }
+    </style>
+
+      <text
+        x="50%"
+        y="50%"
+        dominant-baseline="middle"
+        text-anchor="middle"
+      >${text || 'no text'}</text>
+    </svg>
+  `;
+
+  res.contentType('image/svg+xml');
+
+  res.send(svg);
+}
+
+export const createLayout = async (req, res) => {
+  const block = req.body;
+
+  const page = new PhotobookElement(block);
+
+  res.setHeader('Content-Type', 'image/jpeg');
+
+  res.send(await page.draw());
 }
   
