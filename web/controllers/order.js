@@ -137,8 +137,6 @@ export const updateProjectStatus = async (req, res, next) => {
   const { status } = req.query;
   const { orderId: projectId } = req.params;
 
-  console.log(status);
-
   if (status) {
     const project = await Project.findOne({ projectId });
 
@@ -284,86 +282,92 @@ export const getImageFromUrl = async (url) => {
 async function UploadImagesFromBlock(state, uploadPath) {
   const blocks = state.view.blocks
     .filter(block => block.childBlocks.some(child => child.imageUrl))
-    .map(block => ({
-      id: block.id,
-      images: block.childBlocks
-        .filter(child => child.imageUrl)
-        .map(child => ({
-          url: child.imageUrl,
-          settings: child.settings,
-          resolution: child.resolution
-        }))
-        .map(image => {
-          const { crop, rotate, backgroundColor } = image.settings;
+    .map(block => {
+      const { backgroundColor = { value: 'rgb(255,255,255)' }, layout } = block.settings;
 
-          const cropValue = 1 + (Math.round((crop.value / 50) * 100) / 100);
+      return ({
+        id: block.id,
+        images: block.childBlocks
+          .filter(child => child.imageUrl)
+          .map(child => ({
+            url: child.imageUrl,
+            settings: child.settings,
+            resolution: child.resolution
+          }))
+          .map(image => {
+            const { crop, rotate } = image.settings;
+  
+            const cropValue = 1 + (Math.round((crop.value / 50) * 100) / 100);
+  
+            const { width, height } = image.resolution || {
+              width: 10,
+              height: 10
+            };
+  
+            const resize = width && height
+              ? [width, height]
+              : null; 
+  
+            const type = block.type === 'polaroid'
+              ? '&type=polaroid'
+              : '';
+  
+            let editedUrl;
+  
+            switch(block.type) {
+              case 'polaroid':
+                const textBlock = block.childBlocks.find(child => child.type === 'text');
+  
+                // console.log(textBlock.settings);
+  
+                const textSettings = Object.assign({
+                  align: 'center',
+                  font: 'Times New Roman',
+                  fontStyle: {
+                    bold: false,
+                    italic: false,
+                    underline: false
+                  },
+                  text: ''
+                }, textBlock.settings);
+  
+                const { align, font, fontStyle: { bold, italic, underline }, text} = textSettings;
+  
+                const textQuery = `align=${align}&font=${font}&bold=${bold}&italic=${italic}&underline=${underline}&text=${text.split('\n').join('0x0A')}`;
+  
+                editedUrl = image.url + `?${
+                  resize
+                    ? `resize=${JSON.stringify(resize)}&`
+                    : ''
+                  }crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}
+                  &type=polaroid&${textQuery}
+                `;
+                break;
+              case 'tiles':
+                editedUrl = image.url + `?${
+                  resize
+                    ? `resize=${JSON.stringify(resize)}&`
+                    : ''
+                  }crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}
+                  &type=${layout.layout}
+                `
+                break;
+              default:
+                editedUrl = image.url + `?${
+                  resize
+                    ? `resize=${JSON.stringify(resize)}&`
+                    : ''
+                  }crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}`
+                break;
+            }
 
-          const { width, height } = image.resolution || {
-            width: 10,
-            height: 10
-          };
-
-          const resize = width && height
-            ? [width, height]
-            : null;
-
-          const type = block.type === 'polaroid'
-            ? '&type=polaroid'
-            : '';
-
-          let editedUrl;
-
-          switch(block.type) {
-            case 'polaroid':
-              const textBlock = block.childBlocks.find(child => child.type === 'text');
-
-              console.log(textBlock.settings);
-
-              const textSettings = Object.assign({
-                align: 'center',
-                font: 'Times New Roman',
-                fontStyle: {
-                  bold: false,
-                  italic: false,
-                  underline: false
-                },
-                text: ''
-              }, textBlock.settings.text);
-
-              const { align, font, fontStyle: { bold, italic, underline }, text} = textSettings;
-
-              const textQuery = `
-                align=${align}
-                &font=${font}
-                &bold=${bold}
-                &italic=${italic}
-                &underline=${underline}
-                &text=${text}
-              `;
-
-              editedUrl = image.url + `?${
-                resize
-                  ? `resize=${JSON.stringify(resize)}&`
-                  : ''
-                }crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}
-                &type=polaroid&${textQuery}
-              `;
-              break;
-            default:
-              editedUrl = image.url + `?${
-                resize
-                  ? `resize=${JSON.stringify(resize)}&`
-                  : ''
-                }crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}`
-              break;
-          }
-
-          return { 
-            original: image.url,
-            edited: editedUrl
-          }
-        })
-    }));
+            return { 
+              original: image.url,
+              edited: editedUrl
+            }
+          })
+      })
+    });
  
   const blocksReady = blocks.map((block, idx) => new Promise(async (res, rej) => {
     const images = block.images.map(image => new Promise(async res => {

@@ -11,6 +11,8 @@ shopifyOrders.post('/order/create', json(), async (req, res) => {
   const shopifyOrder = req.body;
   res.sendStatus(200);
 
+  console.log(shopifyOrder);
+
   if (!shopifyOrder) {
     return;
   }

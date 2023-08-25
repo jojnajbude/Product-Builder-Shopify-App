@@ -44,20 +44,6 @@ productBuilder.get('/products/linked', async (req, res) => {
   res.send(404);
 })
 
-productBuilder.get('/testBunny', async (req, res) => {
-  // const response = await downloadFile(join('shops'), 'block-8 - image-3 - original.jpg');
-
-  // const file = fs.readFileSync(join(PROXY_PATH, 'assets', 'main.css'));
-
-  // const isExists = await existsFile(join('shops', 'hladkevych-dev.myshopify.com', 'anonims'));
-
-  // const filePath = await uploadFile(join('shops'), 'style.css', file);
-
-  const response = await createDir('testDir');
-
-  res.send(response);
-})
-
 productBuilder.get('/product', async (req, res) => {
   const { id } = req.query;
 
@@ -196,4 +182,4 @@ productBuilder.use('/', express.static(PROXY_PATH));
 
 productBuilder.get('/*', sharpImage); 
 
-export default productBuilder;
+export default productBuilder; 

@@ -75,3 +75,15 @@ body > .studio-view {
 .product-element.Purple {
   color: #fff;
 }
+
+.textarea-container[text-align="center"] {
+  text-align: center;
+}
+
+.textarea-container[text-align="left"] {
+  text-align: left;
+}
+
+.textarea-container[text-align="right"] {
+  text-align: right;
+}

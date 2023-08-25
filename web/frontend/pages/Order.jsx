@@ -8,7 +8,12 @@ import { authenticatedFetch } from "@shopify/app-bridge-utils";
 
 const DownloadsState = {
   default: 'Download Order',
-  composing: 'Waiting to project compose',
+  composing: [
+    'Waiting to project compose',
+    'Waiting to project compose.',
+    'Waiting to project compose..',
+    'Waiting to project compose...',
+  ],
   downloading: (loaded, toload) => `Loading: ${loaded}Mb from ${toload}Mb`
 }
 
@@ -20,6 +25,7 @@ export default function Order() {
   const id = useMemo(() => searchParams.get('id'), [searchParams]);
 
   const [downloadState, setdownloadState] = useState(DownloadsState.default);
+  const composeInterval = useRef(null);
 
   const {
     data: order,
@@ -65,11 +71,21 @@ export default function Order() {
 
       a.click();
 
+      clearInterval(composeInterval.current);
+
       setdownloadState(DownloadsState.default);
     };
 
     toComposeXHR.send();
-    setdownloadState(DownloadsState.composing);
+
+    let i = 0;
+    composeInterval.current = setInterval(() => {
+      setdownloadState(DownloadsState.composing[i]);
+
+      if (++i === DownloadsState.composing.length) {
+        i = 0;
+      }
+    }, 250);
   }, [id, order]);
 
   if (isLoading || currencyIsLoading) {
@@ -108,7 +124,7 @@ export default function Order() {
                   key={item.properties.find(prop => prop.name === 'project_id').value}
                   item={item}
                   shopifyOrderID={id}
-                  currency={shopCurrency.currency}
+                  currency={shopCurrency ? shopCurrency.currency : 'RON'}
                   customer={{
                     first_name: order.customer.first_name,
                     last_name: order.customer.last_name,

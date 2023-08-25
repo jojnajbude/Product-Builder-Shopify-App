@@ -72,8 +72,7 @@ export default function Orders() {
         </IndexTable.Cell>
 
         <IndexTable.Cell>
-          { order.currency }
-          { moneyFormat(parseInt(order.current_subtotal_price), order.currency || 'USD') }
+          { moneyFormat(parseInt(order.current_subtotal_price), shopCurrency ? shopCurrency.currency : 'RON') }
         </IndexTable.Cell>
 
         <IndexTable.Cell>

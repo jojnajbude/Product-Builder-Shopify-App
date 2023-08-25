@@ -43,6 +43,20 @@ const checkoutButton = (function checkoutButtonInit() {
       return;
     }
 
+    const blocksCount = Studio.studioView.getBlocksCount(Studio.state.view.blocks);
+    const minimum = Studio.product.quantity.minimum;
+
+    const blockDiff = minimum - blocksCount;
+
+    if (
+      Studio.product.quantity.type === 'multiply'
+      && blocksCount < minimum) {
+      Studio.errorToast.error({
+        text: `Not enough products quantity. Add ${blockDiff} more ${blockDiff === 1 ? 'block' : 'blocks' } to add project to the cart`
+      })
+      return;
+    }
+
     const relatedProduct = await Studio.relatedProducts.getRelatedProducts();
 
     if (relatedProduct.rejected) {
@@ -128,7 +142,7 @@ const checkoutButton = (function checkoutButtonInit() {
   });
 
   return button;
-})();
+})(); 
 
 function globalResize() {
   window.bodySize = document.body.offsetWidth >= 750 ? 'desktop' : 'mobile';
@@ -555,7 +569,49 @@ const layouts = {
     `,
     types: ['photobook-cover'],
     blocks: ['line', 'editable-picture']
-  }
+  },
+  squareTile: {
+    id: 'squareTile',
+    icon: `
+      <svg width="35" height="35" viewBox="0 0 35 35" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="33" height="33" fill="#DDDDDD" fill-opacity="0.866667" stroke="#BFBFBF"/>
+        <rect x="5" y="5" width="25" height="25" rx="1" fill="white"/>
+      </svg>
+    `,
+    types: ['tiles'],
+    blocks: ['editable-picture'],
+    mask: `
+      <svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M160 0H0V160H160V0ZM19 14C16.2383 14 14 16.2383 14 19V141C14 143.762 16.2383 146 19 146H141C143.762 146 146 143.762 146 141V19C146 16.2383 143.762 14 141 14H19Z" fill="white"/>
+      </svg>
+    `
+  },
+  squareFramelessTile: {
+    id: 'squareFramelessTile',
+    icon: `
+      <svg width="35" height="35" viewBox="0 0 35 35" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="33" height="33" fill="#DDDDDD" fill-opacity="0.866667" stroke="#BFBFBF"/>
+      </svg>    
+    `,
+    types: ['tiles'],
+    blocks: ['editable-picture']
+  },
+  roundTile: {
+    id: 'roundTile',
+    icon: `
+      <svg width="35" height="35" viewBox="0 0 35 35" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="33" height="33" fill="#DDDDDD" fill-opacity="0.866667" stroke="#BFBFBF"/>
+        <rect x="5" y="5" width="25" height="25" rx="12.5" fill="white"/>
+      </svg>    
+    `,
+    types: ['tiles'],
+    blocks: ['editable-picture'],
+    mask: `
+      <svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M160 0H0V160H160V0ZM80 14C43.5508 14 14 43.5488 14 80C14 116.451 43.5508 146 80 146C116.449 146 146 116.451 146 80C146 43.5488 116.449 14 80 14Z" fill="white"/>
+      </svg>
+    `
+  },
 }
 
 window.ImageLimits = {
@@ -607,7 +663,7 @@ const compareObjects = (obj1, obj2) => {
   return JSON.stringify(obj1) === JSON.stringify(obj2);
 }
 
-let productParams = new URLSearchParams(location.search); 
+let productParams = new URLSearchParams(location.search);
 
 class ProductBuilder extends HTMLElement {
   static selectors = {
@@ -623,6 +679,20 @@ class ProductBuilder extends HTMLElement {
   
   constructor() {
     super();
+
+    adaptiveActions.subscribe(this, (event) => {
+      const { size } = event.detail;
+
+      switch (size) {
+        case 'desktop':
+          this.classList.add('desktop');
+          this.classList.remove('mobile');
+          break;
+        case 'mobile':
+          this.classList.add('mobile')
+          this.classList.remove('desktop');
+      }
+    })
 
     const instToRedirect = localStorage.getItem('instToRedirect');
 
@@ -697,7 +767,7 @@ class ProductBuilder extends HTMLElement {
 
         if (prevState.panel.blockCount < count) {
           const newBlocks = Array(count - prevState.panel.blockCount)
-            .fill(null).map(_ => this.studioView.getBlocksJSON());
+            .fill(null).map(_ => this.studioView.getBlockJSON());
 
           Studio.utils.change({
             view: {
@@ -791,7 +861,7 @@ class ProductBuilder extends HTMLElement {
           return count + block.count;
         }, 0);
 
-      this.panel.productInfo.setCompleteCount(completedBlocks, allBlocksCount)
+      this.panel.productInfo.setCompleteCount(completedBlocks, allBlocksCount);
     }
 
     if (this.product && !compareObjects(prevState.panel.tools, currState.panel.tools)) {
@@ -806,24 +876,66 @@ class ProductBuilder extends HTMLElement {
         if (!isSelectedBlocks && !isSelectedChildren) {
 
         } else if (!isSelectedBlocks && isSelectedChildren) {
+          const { product } = currState;
+
           const newBlocks = blocks
             .map(block => {
               if (block.activeChild) {
+                let newBlockSettings = { ...block.settings };
+
+                if (product && product.type.id !== 'photobook') {
+                  for (const tool in block.settings) {
+                    if (tools[tool]) {
+                      newBlockSettings[tool] = tools[tool].value;
+                    }
+                  }
+                }
+
                 const newChildren = block.childBlocks
                   .map(child => {
-                    if (child.selected) {
+                    if (product && product.type.id !== 'photobook') {
                       const { settings } = child;
   
-                      const newSettings = {};
+                      let newSettings = {};
   
-                      for (const tool in settings) {
-                        if (tools[tool]) {
-                          if (tool === 'backgroundColor' && block.settings.backgroundColor) {
-                            newSettings[tool] = {
-                              value: block.settings.backgroundColor.value
-                            };
-                          } else {
-                            newSettings[tool] = tools[tool].value;
+
+                      if (child.type === 'text') {
+                        newSettings = tools.text.value;
+                      } else {
+                        for (const tool in settings) {
+                          if (tools[tool]) {
+                            if (tool === 'backgroundColor' && newBlockSettings.backgroundColor) {
+                              newSettings[tool] = {
+                                value: newBlockSettings.backgroundColor.value
+                              };
+                            } else {
+                              newSettings[tool] = tools[tool].value;
+                            }
+                          }
+                        }
+                      }
+  
+                      return {
+                        ...child,
+                        settings: newSettings
+                      }
+                    } else if (child.selected) {
+                      const { settings } = child;
+  
+                      let newSettings = {};
+
+                      if (child.type === 'text') {
+                        newSettings = tools.text.value;
+                      } else {
+                        for (const tool in settings) {
+                          if (tools[tool]) {
+                            if (tool === 'backgroundColor' && block.settings.backgroundColor) {
+                              newSettings[tool] = {
+                                value: block.settings.backgroundColor.value
+                              };
+                            } else {
+                              newSettings[tool] = tools[tool].value;
+                            }
                           }
                         }
                       }
@@ -839,47 +951,76 @@ class ProductBuilder extends HTMLElement {
   
                 return {
                   ...block,
-                  childBlocks: newChildren
+                  childBlocks: newChildren,
+                  settings: newBlockSettings
                 }
               }
   
               return block;
             });
-  
+
           this.studioView.setState({ blocks: newBlocks });
         } else {
           const newSelectedBlocks = blocks
             .map(block => {
               if (block.selected) {
                 const { settings } = block;
+                const { product } = currState;
   
                 const newSettings = {};
   
                 let children = block.childBlocks;
-    
+
                 for (const tool in settings) {
-                  if (tool === 'backgroundColor') {
-                    newSettings[tool] = tools[tool].value;
-  
-                    children = children.map(child => {
-                      const newChildSettings = { ...child.settings };
-  
-                      if (newChildSettings.backgroundColor) {
-                        newChildSettings.backgroundColor = {
-                          value: tools[tool].value.value
-                        };
-                      }
-  
-                      return {
-                        ...child,
-                        settings: newChildSettings
-                      }
-                    })
-                  } else {
-                    newSettings[tool] = tools[tool].value;
-                  }
+                  newSettings[tool] = tools[tool].value;
                 }
     
+                if (product.type.id === 'photobook') {
+                    if (newSettings.backgroundColor) {    
+                      children = children.map(child => {
+                        const newChildSettings = { ...child.settings };
+    
+                        if (newChildSettings.backgroundColor) {
+                          newChildSettings.backgroundColor = {
+                            value: newSettings.backgroundColor.value
+                          };
+                        }
+    
+                        return {
+                          ...child,
+                          settings: newChildSettings
+                        }
+                      })
+                  }
+                } else {
+                  children = children.map(child => {
+                    const { settings: childSettings } = child;
+
+                    let newChildSettings = { ...childSettings };
+
+                    if (child.type === 'text') {
+                      newChildSettings = tools.text.value;
+                    } else {
+                      for (const tool in newChildSettings) {
+                        if (tools[tool]) {
+                          if (tool === 'backgroundColor' && block.settings.backgroundColor) {
+                            newChildSettings[tool] = {
+                              value: block.settings.backgroundColor.value
+                            };
+                          } else {
+                            newChildSettings[tool] = tools[tool].value;
+                          }
+                        }
+                      }
+                    }
+
+                    return {
+                      ...child,
+                      settings: newChildSettings
+                    }
+                  });
+                  }
+
                 return {
                   ...block,
                   childBlocks: children,
@@ -888,10 +1029,10 @@ class ProductBuilder extends HTMLElement {
               }
   
               return block;            
-            });
-  
+            })
+
           this.studioView.setState({ blocks: newSelectedBlocks });
-        }
+        };
       // } else {
       //   const newBlocks = blocks.map(block => {
       //     if (!block.selected) {
@@ -908,7 +1049,6 @@ class ProductBuilder extends HTMLElement {
 
       //     const newChildren = block.childBlocks
       //       .map(child => {
-      //         if (child.selected) {
       //           const { settings } = child;
 
       //           const newChildSettings = {};
@@ -929,9 +1069,7 @@ class ProductBuilder extends HTMLElement {
       //             ...child,
       //             settings: newChildSettings
       //           }
-      //         }
 
-      //         return child
       //       });
 
       //     return {
@@ -988,8 +1126,8 @@ class ProductBuilder extends HTMLElement {
                     return this.product.settings.hasRotate;
                   case 'crop':
                     return this.product.settings.hasCrop;
-                  case 'filter':
-                    return this.product.settings.hasFilter;
+                  // case 'filter':
+                  //   return this.product.settings.hasFilter;
                   case 'text':
                     return this.product.settings.hasText;
                   default:
@@ -1011,6 +1149,7 @@ class ProductBuilder extends HTMLElement {
       } else if (Studio.state.product && blocks.some(block => block.selected || block.activeChild)) {
         this.setTools({
           all: true,
+          selected: selectedBlock || blockWithActiveChild
         })
       }
     }
@@ -1045,6 +1184,9 @@ class ProductBuilder extends HTMLElement {
 
     if (all) {
       const { settings } = this.product;
+      
+      const picture = selected ? selected.childBlocks.find(child => child.type === 'editable-picture') : null;
+      const text = selected ? selected.childBlocks.find(child => child.type === 'text') : null;
 
       for (const tool in updatedTools) {
         switch(tool) {
@@ -1052,51 +1194,52 @@ class ProductBuilder extends HTMLElement {
             updatedTools[tool] = {
               ...updatedTools[tool],
               show: settings.hasBackground,
-              value: Studio.state.panel.tools[tool].value
+              value: selected.settings.backgroundColor ? selected.settings.backgroundColor : BackgroundColorTool.defaultValue
             }
             break;
           case 'layout':
             updatedTools[tool] = {
               ...updatedTools[tool],
               show: settings.hasLayout,
-              value: Studio.state.panel.tools[tool].value
+              value: selected.settings.layout ? selected.settings.layout : LayoutTool.defaultValue
             }
             break;
           case 'rotate':
             updatedTools[tool] = {
               ...updatedTools[tool],
               show: settings.hasRotate,
-              value: Studio.state.panel.tools[tool].value
+              value: picture && picture.settings.rotate ? picture.settings.rotate : RotateTool.defaultValue
             }
             break;
           case 'crop':
             updatedTools[tool] = {
               ...updatedTools[tool],
               show: settings.hasCrop,
-              value: Studio.state.panel.tools[tool].value
+              value: picture && picture.settings.crop ? picture.settings.crop : CropTool.defaultValue
             }
+
             break;
           case 'frame':
             updatedTools[tool] = {
               ...updatedTools[tool],
               show: settings.hasFrame,
-              value: Studio.state.panel.tools[tool].value
+              value: selected.settings.frame ? selected.settings.frame : FrameTool.defaultValue
             }
             break;
           case 'text':
             updatedTools[tool] = {
               ...updatedTools[tool],
               show: settings.hasText,
-              value: Studio.state.panel.tools[tool].value
+              value: text ? text.settings : TextTool.defaultValue
             }
             break;
-          case 'filter':
-            updatedTools[tool] = {
-              ...updatedTools[tool],
-              show: settings.hasFilter,
-              value: Studio.state.panel.tools[tool].value
-            }
-            break;
+          // case 'filter':
+          //   updatedTools[tool] = {
+          //     ...updatedTools[tool],
+          //     show: settings.hasFilter,
+          //     value: picture && picture.settings.filter ? picture.settings.filter.value : {}
+          //   }
+          //   break;
         }
       }
 
@@ -1190,6 +1333,8 @@ class ProductBuilder extends HTMLElement {
 
       const credentials = await fetch(baseURL + '/api/social/credentials').then(res => res.json());
 
+      this.credentials = credentials;
+
       if (!credentials || !credentials.facebook ) {
         res();
         return;
@@ -1199,10 +1344,11 @@ class ProductBuilder extends HTMLElement {
         FB.init({
           appId: credentials.facebook.id,
           autoLogAppEvent: true,
-          version: 'v16.0'
+          version: 'v17.0'
         });
         res();
       };
+
       facebookScripts.onerror = () => rej();
   
       facebookScripts.src = "https://connect.facebook.net/en_US/sdk.js";
@@ -1667,12 +1813,18 @@ class ErrorToast extends HTMLElement {
   constructor() {
     super();
 
+    this.conditions = [];
+
     this.errorContainer = this.querySelector(ErrorToast.selectors.errorsContainer);
 
     this.addEventListener('error:show', this.showErrors.bind(this));
   }
 
-  error(detail) {
+  error(detail, condition) {
+    if (condition) {
+      this.conditions.push(condition);
+    }
+
     this.dispatchEvent(new CustomEvent('error:show', {
       detail
     }));
@@ -1688,6 +1840,10 @@ class ErrorToast extends HTMLElement {
       : `Error type: ${type}.`);
 
     clearTimeout(this.timeout);
+
+    // if (this.conditions.length) {
+    //   this.toggleAttribute('show');
+    // }
 
     this.timeout = setTimeout(() => {
       this.toggleAttribute('show');
@@ -2238,7 +2394,19 @@ class ProductInfo extends AdaptiveContent {
       return;
     }
 
-    if (current === required) {
+    const { product } = Studio.state;
+
+    let isEnough = false;
+
+    if (product && (product.type.id === 'photobook' || product.quantity.type === 'single')) {
+      isEnough = true;
+    } else if (product && product.quantity.type === 'multiply') {
+      isEnough = current >= product.quantity.minimum;
+    } else if (product && product.quantity.type === 'set-of') {
+      isEnough = true;
+    }
+
+    if (current === required && isEnough) {
       this.elements.quantity.wrapper.classList.remove('is-not-enough');
     } else {
       this.elements.quantity.wrapper.classList.add('is-not-enough');
@@ -2266,7 +2434,6 @@ class Tool {
 
     this.container = document.createElement('div');
     this.container.classList.add('tool', 'page__tool');
-
 
     this.icon = (() => {
       const icon = document.createElement('span');
@@ -2397,7 +2564,11 @@ class Tool {
 
     return {
       title,
-      setLabel: (label) => { title.textContent = label }
+      setLabel: (label) => { 
+        title.textContent = label;
+
+        this.container.setAttribute('data-tool', label);
+      }
     };
   }
 
@@ -2479,6 +2650,10 @@ class LayoutTool extends Tool {
     this.icon.setIcon(icon);
   }
 
+  connectedCallback() {
+    this.setAvailableLayouts();
+  }
+
   setContent() {
     this.layouts = Object.keys(layouts)
       .map(layout => this.layoutIconTemplate(layout));
@@ -2497,7 +2672,7 @@ class LayoutTool extends Tool {
   }
 
   setAvailableLayouts() {
-    const selectedBlock = Studio.state.view.blocks.find(block => block.selected && !block.activeChild);
+    const selectedBlock = Studio.state.view.blocks.find(block => block.selected || block.activeChild);
 
     if (!selectedBlock) {
       return;
@@ -2609,8 +2784,8 @@ class LayoutTool extends Tool {
         ...Studio.state.panel,
         tools: {
           ...Studio.state.panel.tools,
-          backgroundColor: {
-            ...Studio.state.panel.tools.backgroundColor,
+          layout: {
+            ...Studio.state.panel.tools.layout,
             value: LayoutTool.defaultValue
           }
         }
@@ -2673,11 +2848,13 @@ class TextTool extends Tool {
       italic: false,
       underline: false
     },
-    text: ''
+    text: ``
   }
 
   constructor() {
     super();
+
+    this.container.classList.add('center');
 
     this.label.setLabel('Text');
 
@@ -2977,19 +3154,59 @@ class TextTool extends Tool {
     }, 'font change')
   }
 
-  onTextInput() {
+  onTextInput(event) {
     this.text.style.height = (this.text.scrollHeight) + 'px';
 
     const isLine = Studio.state.view.blocks
       .filter(block => block.selected || block.activeChild)
       .some(block => block.childBlocks.some(child => child.isLine));
 
+    const lines = Math.min(...Studio.state.view.blocks
+      .filter(block => block.selected || block.activeChild)
+      .filter(block => block.childBlocks.some(child => child.type === 'text'))
+      .map(block => block.childBlocks.filter(child => child.type === 'text' && child.lines))
+      .reduce((txts, blockTxts) => [...txts, ...blockTxts], [])
+      .map(text => text.lines))
+
+    const currentLines = this.text.value.split('\n').length;
+
+    if (lines && lines < currentLines) {
+      this.text.value = this.text.value
+        .split('\n')
+        .filter(text => text)
+        .filter((_, idx) => idx < lines)
+        .join('\n');
+    }
+      
     const { value } = this.text;
+
     const maxSize = this.maxSize !== Infinity
       ? this.maxSize
       : isLine ? 20 : 300;
 
-    if (value.length > maxSize && isLine) {
+    if (lines) {
+      const newValue = value.split('\n')
+        .map(line => {
+          if (line.length > maxSize) {
+            return line.substring(0, maxSize);
+          }
+
+          const WCount = line.split('')
+            .filter(x => x.toLowerCase() === 'w').length;
+
+          if (WCount > 5) {
+            return line.substring(0, maxSize - 5);
+          }
+          
+          return line;
+        })
+        .join('\n');
+
+      this.text.value = newValue;
+
+      this.text.focus();
+      this.text.setSelectionRange(this.text.value.length, this.text.value.length);
+    } else if (value.length > maxSize && isLine) {
       this.text.value = value.substring(0, maxSize);
 
       this.text.focus();
@@ -3027,16 +3244,21 @@ class TextTool extends Tool {
       .filter(block => block.selected || block.activeChild)
       .some(block => block.childBlocks.some(child => child.isLine));
 
-    this.maxSize = Math.min(...Studio.state.view.blocks
-      .filter(block => block.activeChild)
-      .map(block => block.childBlocks
-          .filter(child => child.selected
-            && child.type === 'text' 
-            && child.settings.text.maxSize
-            && typeof child.settings.text.maxSize === 'number'
-          )
-      ).map(children => children.map(child => child.settings.text.maxSize))
-      .reduce((arr, children) => [...arr, ...children], []));
+    const textAreas = Studio.state.view.blocks
+      .filter(block => block.activeChild || block.selected)
+      .map(block => {
+
+        return block.childBlocks
+          .filter(child => child.type === 'text' 
+            && child.maxSize
+            && typeof child.maxSize === 'number'
+          );
+      }
+      )
+      .map(children => children.map(child => child.maxSize))
+      .reduce((arr, children) => [...arr, ...children], []);
+
+    this.maxSize = Math.min(...textAreas);
 
     if (isLine) {
       this.selectType.setValue('Line');
@@ -3046,12 +3268,16 @@ class TextTool extends Tool {
 
     const { text, fontStyle, align, font } = value;
 
-    if (text) {
+    if (typeof text === 'string') {
       this.text.value = text;
     }
 
     if (align) {
       this.tools.setAlign(align);
+      
+      this.container.classList.remove('center', 'right', 'left');
+
+      this.container.classList.add(align);
     }
 
     if (fontStyle) {
@@ -3080,8 +3306,8 @@ class TextTool extends Tool {
         ...Studio.state.panel,
         tools: {
           ...Studio.state.panel.tools,
-          backgroundColor: {
-            ...Studio.state.panel.tools.backgroundColor,
+          text: {
+            ...Studio.state.panel.tools.text,
             value: TextTool.defaultValue
           }
         }
@@ -3132,7 +3358,7 @@ class RotateTool extends Tool {
         tools: {
           ...Studio.state.panel.tools,
           backgroundColor: {
-            ...Studio.state.panel.tools.backgroundColor,
+            ...Studio.state.panel.tools.rotate,
             value: RotateTool.defaultValue
           }
         }
@@ -3217,6 +3443,8 @@ class RotateTool extends Tool {
     const { value } = state;
 
     this.slider.setValue(value);
+    setTimeout(() => {
+    }, 10);
   }
 
   getValue() {
@@ -3252,8 +3480,8 @@ class CropTool extends Tool {
         ...Studio.state.panel,
         tools: {
           ...Studio.state.panel.tools,
-          backgroundColor: {
-            ...Studio.state.panel.tools.backgroundColor,
+          crop: {
+            ...Studio.state.panel.tools.crop,
             value: CropTool.defaultValue
           }
         }
@@ -3341,6 +3569,8 @@ class CropTool extends Tool {
     const { value } = state;
 
     this.slider.setValue(value);
+    setTimeout(() => {
+    }, 10)
   }
 }
 
@@ -3659,7 +3889,7 @@ class FrameTool extends Tool {
         tools: {
           ...Studio.state.panel.tools,
           frame: {
-            ...Studio.state.panel.tools.backgroundColor,
+            ...Studio.state.panel.tools.frame,
             value: FrameTool.defaultValue
           }
         }
@@ -3730,7 +3960,7 @@ class Tools extends HTMLElement {
             this.edit.tools[tool].create(value);
           }
         } else {
-          this.edit.tools[tool].remove();
+          this.edit.tools[tool] && this.edit.tools[tool].remove();
         }
       }
     }
@@ -3777,7 +4007,14 @@ class Tools extends HTMLElement {
       tabToFocus.click();
     }
 
-    this.parentElement.openOnTab(40);
+    const tabName = tabToFocus.getAttribute('data-tab');
+
+    if (tabName === 'edit') {
+      this.parentElement.openOnTab(20);
+    } else {
+      this.parentElement.openOnTab(40);
+    }
+
   }
 
   initTabs() {
@@ -3816,7 +4053,15 @@ class Tools extends HTMLElement {
     this.moveRunner();
     this.changePage();
 
-    this.parentElement.openOnTab(50);
+    this.parentElement.openOnTab(20);
+
+    setTimeout(() => {
+      const toolToExpand = this.querySelector(Tools.selectors.pages.edit.tool);
+
+      if (toolToExpand && Studio.classList.contains('mobile')) {
+        this.edit.tools[toolToExpand.getAttribute('data-tool').toLowerCase()].open();
+      }
+    }, 300);
 
     Studio.dispatchEvent(new CustomEvent('change', {
       detail: {
@@ -4044,7 +4289,7 @@ class Tools extends HTMLElement {
             data-import-from-pc
           >
           <label for="image-from-pc">
-            From PC
+            From My Device
           </label>
         </div>
         <div class="upload__variant" data-from-instagram>
@@ -4108,6 +4353,12 @@ class Tools extends HTMLElement {
     this.inputFromPC = inputFromPC;
 
     inputFromPC.addEventListener('change', (async () => {
+      uploadSelector.classList.remove('is-open');
+
+      setTimeout(() => {
+        uploadSelector.style.height = null;
+      }, 300);
+
       Object.keys(inputFromPC.files)
         .forEach((file) => {
           const imageTemplate = this.createNewImage(inputFromPC.files[file]);
@@ -4347,7 +4598,7 @@ class Tools extends HTMLElement {
         rotate: new RotateTool(),
         crop: new CropTool(),
         backgroundColor: new BackgroundColorTool(),
-        filter: new FilterTool(),
+        // filter: new FilterTool(),
         frame: new FrameTool(),
       }
     }
@@ -4475,8 +4726,6 @@ class Panel extends HTMLElement {
       prevTranslateY: 0
     };
 
-    this.mobileGradient = this.initMobileGradient();
-
     this.mobileTrigger.addEventListener('mousedown', this.event.mobileMouseDown);
     this.mobileTrigger.addEventListener('mouseup', this.event.mobileMouseUp);
     window.addEventListener('mouseup', this.event.windowMouseUp);
@@ -4506,7 +4755,7 @@ class Panel extends HTMLElement {
         product: currState.product
       });
 
-      this.tools.resetTools();
+      // this.tools.resetTools();
     }
 
     if (!compareObjects(prevState.tools, currState.tools)) {
@@ -4552,12 +4801,12 @@ class Panel extends HTMLElement {
     if (size !== 'mobile') {
       this.style.translate = null;
       this.event.prevTranslateY = 0;
-      this.mobileGradient.remove();
     } else {
-      this.mobileGradient.append();
       document.querySelectorAll(Panel.selectors.mobileAdaptiveButtons)
         .forEach(btn => btn.classList.add('unshow'));
     }
+
+    this.pagesHeight();
   }
 
   initMobileGradient() {
@@ -4611,6 +4860,7 @@ class Panel extends HTMLElement {
       document.querySelectorAll(Panel.selectors.mobileAdaptiveButtons)
         .forEach(btn => btn.classList.remove('unshow'));
     }
+    this.pagesHeight();
   }
 
   mobileMouseDown(event) {
@@ -4646,11 +4896,7 @@ class Panel extends HTMLElement {
         .forEach(btn => btn.classList.remove('unshow'));
     }
 
-    if (this.event.prevTranslateY * -1 < 90) {
-      this.mobileGradient.unshow();
-    } else {
-      this.mobileGradient.show();
-    }
+    this.pagesHeight();
 
     if (this.event.prevTranslateY * -1 > (this.offsetHeight - this.offsetHeight * 0.1)) {
       this.style.translate = `0px -${this.offsetWidth}`;
@@ -4678,12 +4924,7 @@ class Panel extends HTMLElement {
         .forEach(btn => btn.classList.remove('unshow'));
     }
 
-
-    if (this.event.prevTranslateY * -1 < 90) {
-      this.mobileGradient.unshow();
-    } else {
-      this.mobileGradient.show();
-    }
+    this.pagesHeight();
 
     if (this.event.prevTranslateY * -1 > (this.offsetHeight - 90)) {
       this.style.translate = `0px -${this.offsetWidth}`;
@@ -4698,6 +4939,23 @@ class Panel extends HTMLElement {
     this.style.translate = `0px ${this.event.prevTranslateY}px`;
 
     this.event.prevClientY = currY;
+  }
+
+  pagesHeight() {
+    const selectedPage = this.querySelector(Tools.selectors.pages.page + '.is-selected');
+
+    if (!selectedPage) {
+      return;
+    }
+
+    if (Studio.classList.contains('desktop')) {
+      selectedPage.style.height = null;
+      return;
+    }
+
+    const clientRect = selectedPage.getBoundingClientRect();
+    
+    selectedPage.style.height = window.innerHeight - clientRect.y + 'px';
   }
 
   mobileMouseUp(event) {
@@ -4770,6 +5028,10 @@ class EditablePicture extends HTMLElement {
     emptyState: '[data-empty-state]'
   }
 
+  static get observedAttributes() {
+    return ['picture-type'];
+  }
+
   constructor() {
     super();
 
@@ -4802,6 +5064,14 @@ class EditablePicture extends HTMLElement {
         Studio.utils.change({ imagesToDownload: data }, 'dragged');
       }
     });
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    switch (name) {
+      case 'picture-layout':
+        this.prevType = oldValue;
+        break;
+    }
   }
 
   connectedCallback() {
@@ -4893,16 +5163,37 @@ class EditablePicture extends HTMLElement {
   getToolsList() {
     return ['rotate', 'crop', 'filter'];
   }
+
+  createMask(type) {
+    if (!type) {
+      return;
+    }
+
+    const mask = document.createElement('div');
+
+    mask.classList.add('editable-picture__mask');
+
+    const setMask = (maskType) => {
+      const layout = layouts[maskType];
+
+      if (!layout || !layout.mask) {
+        mask.innerHTML = '';
+        return;
+      }
+
+      mask.innerHTML = layout.mask;
+    }
+
+    mask.set = setMask;
+
+    return mask;
+  }
   
   setImage(imageUrl) {
     if (this.image) {
       this.oldImage = this.image;
       this.oldImage.remove();
     }
-
-    const pictureJSON = Studio.state.view.blocks
-      .reduce((childs, block) => [...childs, ...block.childBlocks], [])
-      .find(child => child.id === this.getAttribute('child-block'));
 
     if (this.previewImage) {
       this.oldPreviewImage = this.previewImage;
@@ -4938,6 +5229,13 @@ class EditablePicture extends HTMLElement {
       this.image.style.opacity = null;
     }
 
+    this.classList.add('is-loading');
+
+    Promise.all([
+      new Promise(res => this.image.addEventListener('load', () => res())),
+      new Promise(res => this.previewImage.addEventListener('load', res())),
+    ]).then(_ => this.classList.remove('is-loading'));
+
     const getParams = () => {
       const size = this.pageConfig;
 
@@ -4966,11 +5264,46 @@ class EditablePicture extends HTMLElement {
     this.image.src = this.defaultImageUrl;
 
     this.classList.remove('is-empty');
-    this.append(this.previewImage, this.image);
+
+    this.mask = this.createMask(this.getAttribute('picture-type'));
+
+    if (this.mask) {
+      this.append(this.previewImage, this.mask, this.image);
+    } else {
+      this.append(this.previewImage, this.image);
+    }
   }
 
   setBackground(background) {
     this.setAttribute('background-color', background);
+  }
+
+  setType(type) {
+    this.setAttribute('picture-type', type);
+
+    if (!this.image) {
+      return;
+    }
+
+    const onLoad = () => {
+      this.classList.remove('is-loading');
+
+      this.image.removeEventListener('load', onLoad);
+    }
+
+    this.image.addEventListener('load', onLoad);
+
+    const imageUrl = new URL(this.image.src);
+
+    imageUrl.searchParams.set('type', type);
+
+    if (this.mask) {
+      this.mask.set(this.getAttribute('picture-type'));
+    }
+
+    this.classList.add('is-loading');
+
+    this.image.src = imageUrl.href;
   }
 
   removeImage() {
@@ -4991,6 +5324,10 @@ class EditablePicture extends HTMLElement {
   setValue(settings) {
     clearTimeout(this.timer);
 
+    const type = this.getAttribute('picture-type')
+      ? `&type=${this.getAttribute('picture-type')}`
+      : '';
+
     const [
       prevCrop,
       prevRotate,
@@ -5005,22 +5342,20 @@ class EditablePicture extends HTMLElement {
 
      const { crop, rotate, backgroundColor } = settings;
 
-    if (prevCrop === crop.value
-        && prevRotate === rotate.value
-        && prevBackground === backgroundColor.value
-        && this.image
-        && prevSource === this.image.src
-        && !(this.parentElement instanceof PhotobookElement)
-      ) {
-      this.image.style.opacity = 1;
-      return;
-    }
+     const notTransparent = prevCrop === crop.value
+      && prevRotate === rotate.value
+      && prevBackground === backgroundColor.value
+      && this.image
+      && prevSource === this.image.src
+      && this.image.complete
+      && this.prevType === this.getAttribute('picture-type');
 
     const toChange = this.classList.contains('is-selected')
       || (
         !compareObjects(this.crop, crop)
           || !compareObjects(this.rotate, rotate)
-      ) || !compareObjects(this.previousBackground, backgroundColor);
+      ) || !compareObjects(this.previousBackground, backgroundColor)
+      || this.prevType === this.getAttribute('picture-type');
 
     this.crop = crop;
     this.rotate = rotate;
@@ -5037,8 +5372,15 @@ class EditablePicture extends HTMLElement {
       this.setAttribute('background-color', backgroundColor.value);
     }
 
+    if (!this.image) {
+      return;
+    }
+
+    const imageUrl = new URL(this.image.src);
+    const previewImageUrl = new URL(this.previewImage.src);
+
     if (this.image && crop && rotate && toChange) {
-      this.image.style.opacity = 0;
+      this.image.style.opacity = notTransparent ? 1 : 0;
       this.previewImage.style.opacity = null;
 
       this.previewImage.style.transform = `rotate(${rotate.value}deg) scale(${1 + (crop.value / 50)})`;
@@ -5047,7 +5389,9 @@ class EditablePicture extends HTMLElement {
     if (backgroundColor && this.image) {
       this.previousBackground = backgroundColor;
 
-      this.previewImage.src = this.defaultImageUrl + `&background=${backgroundColor.value}`
+      previewImageUrl.searchParams.set('background', backgroundColor.value);
+
+      this.previewImage.src = previewImageUrl.href;
     }
 
     if (this.image && rotate && toChange || (this.image && backgroundColor)) {
@@ -5060,9 +5404,19 @@ class EditablePicture extends HTMLElement {
       }
 
       this.timer = setTimeout(() => {
-        const cropValue = 1 + (Math.round((crop.value / 50) * 100) / 100);
+        const cropValue = (1 + (Math.round((crop.value / 50) * 100) / 100)).toFixed(2);
 
-        this.image.src = `${this.defaultImageUrl}&rotate=${rotate.value}&crop=${cropValue}&background=${backgroundColor.value}`;
+        imageUrl.searchParams.set('rotate', rotate.value);
+        imageUrl.searchParams.set('crop', cropValue);
+        imageUrl.searchParams.set('background', backgroundColor.value);
+
+        imageUrl.searchParams.set('type', this.getAttribute('picture-type'));
+
+        if (this.mask) {
+          this.mask.set(this.getAttribute('picture-type'));
+        }
+
+        this.image.src = imageUrl.href;
       }, 600);
     }
   }
@@ -5070,12 +5424,12 @@ class EditablePicture extends HTMLElement {
   getValue() {
     return {
       crop: {
-        value: +this.getAttribute('crop')
+        value: +this.getAttribute('crop') 
       },
       rotate: {
         value: +this.getAttribute('rotate')
       },
-      backgroundColor: {
+      backgroundColor: { 
         value: this.getAttribute('background-color')
       }
     }
@@ -5084,9 +5438,7 @@ class EditablePicture extends HTMLElement {
 customElements.define('editable-picture', EditablePicture);
 
 class EditableText extends HTMLElement {
-  static defaultValue = {
-    text: TextTool.defaultValue
-  };
+  static defaultValue = TextTool.defaultValue;
 
   static ToolList = ['text'];
 
@@ -5096,7 +5448,7 @@ class EditableText extends HTMLElement {
     this.editableArea = document.createElement('span');
     this.editableArea.classList.add('textarea');
 
-    this.editableArea.textContent = 'Add your description here';
+    this.editableArea.innerHTML = 'Add your description here';
   }
 
   connectedCallback() {
@@ -5194,9 +5546,9 @@ class EditableText extends HTMLElement {
     const { text, align, fontStyle, font, maxSize } = settings;
 
     if (text) {
-      this.editableArea.textContent = text;
+      this.editableArea.innerHTML = this.formatText(text);
     } else {
-      this.editableArea.textContent = 'Add text here';
+      this.editableArea.innerHTML = this.formatText('Add text here');
     }
 
     if (maxSize) {
@@ -5228,23 +5580,42 @@ class EditableText extends HTMLElement {
     }
   }
 
+  formatText(text) {
+    if (text === '') {
+      return '';
+    }
+
+    const lines = text.split('\n');
+
+    const paragraph = lines.map(line => {
+      const p = document.createElement('p');
+
+      p.textContent = line;
+
+      return p;
+    });
+
+    return paragraph.map(p => p.outerHTML).join('');
+  }
+
   getValue() {
+    const text = this.editableArea.querySelectorAll('p')
+      .map(p => p.textContent)
+      .join('\n');
+
     return {
-      text: {
-        text: this.editableArea.textContent,
-        align: this.getAttribute('text-align'),
-        fontStyle: {
-          bold: JSON.parse(this.getAttribute('is-bold')),
-          italic: JSON.parse(this.getAttribute('is-italic')),
-          underline: JSON.parse(this.getAttribute('is-underline')),
-        },
-        maxSize: +this.getAttribute('max-size')
+      text: text,
+      align: this.getAttribute('text-align'),
+      fontStyle: {
+        bold: JSON.parse(this.getAttribute('is-bold')),
+        italic: JSON.parse(this.getAttribute('is-italic')),
+        underline: JSON.parse(this.getAttribute('is-underline')),
       }
     }
   }
 
   setDefaultText(text) {
-    this.editableArea.textContent = text;
+    this.editableArea.innerHTML = text;
   }
 }
 customElements.define('editable-text', EditableText);
@@ -5500,10 +5871,11 @@ class ProductControls extends HTMLElement {
 
     const blocksCount = Studio.studioView.getBlocksCount(blocks);
 
-    console.log(blocksCount);
-
     const newBlocks = blocks.map(block => {
-      if (block.id === this.productId && blocksCount - block.count >= minimum) {
+      // const allowToDelete = blocksCount - block.count >= minimum;
+      const allowToDelete = true;
+
+      if (block.id === this.productId && allowToDelete) {
         currCount = 0;
 
         return {
@@ -5778,6 +6150,8 @@ class ProductElement extends HTMLElement {
   }) {
     const { line, defaultText, maxSize } = options;
 
+    const { maxSize: maxLength } = state;
+
     const textarea = document.createElement('editable-text');
 
     if (line) {
@@ -5788,6 +6162,10 @@ class ProductElement extends HTMLElement {
       if (maxSize && !textarea.hasAttribute('max-size')) {
         textarea.setAttribute('max-size', maxSize);
       }
+    }
+
+    if (maxLength) {
+      textarea.setAttribute('max-size', maxLength);
     }
 
     if (defaultText) {
@@ -6459,13 +6837,19 @@ class PolaroidPrints extends Prints {
     const editableQueryText = this.editableQuery(this.editableText);
 
     const picture = this.getEditable(editableQueryPicture());
+
+    const textWrapper = document.createElement('div');
+    textWrapper.classList.add('polaroid__text-wrapper');
+
     const text = this.getText(editableQueryText(), {
       line: true,
       defaultText: 'Add text here',
       maxSize: 20
     });
 
-    this.append(picture, text);
+    textWrapper.append(text);
+
+    this.append(picture, textWrapper);
   }
 
   setValue(settings, block) {
@@ -6673,12 +7057,130 @@ customElements.define('product-magnet', Magnet);
 
 class Tiles extends ProductElement {
   static frames = {
-    black: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0.5 161 161"><path fill="#373737" fill-rule="evenodd" d="M0 .5h161v161H0V.5Zm151.45 8.54H8.55v142.7H9v.26h143V10h-.55v-.96Z" clip-rule="evenodd"/><path fill="#000" d="M1.22 1.72V161.5H161V1.72H1.22Zm151.24 151.24H9.76V10.26h142.7v142.7Z"/></svg>`,
-    white: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="20 30.5 161 161"><g clip-path="url(#a)" filter="url(#b)"><path fill="#ECECEC" d="M21.22 31.72V191.5H181V31.72H21.22Zm151.24 151.24H29.76V40.26h142.7v142.7Z"/></g><defs><clipPath id="a"><path fill="#fff" d="M20 30.5h161v161H20z"/></clipPath><filter id="b" width="249" height="249" x="-11" y="-.5" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feColorMatrix in="SourceAlpha" result="hardAlpha" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"/><feOffset dx="13" dy="13"/><feGaussianBlur stdDeviation="22"/><feComposite in2="hardAlpha" operator="out"/><feColorMatrix values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/><feBlend in2="BackgroundImageFix" result="effect1_dropShadow_806_20103"/><feBlend in="SourceGraphic" in2="effect1_dropShadow_806_20103" result="shape"/></filter></defs></svg>`
+    black: `
+    <svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="10" y="10" width="160" height="160" fill="url(#paint0_linear_3_4)"/>
+      <rect x="10" y="10" width="160" height="160" fill="url(#paint1_linear_3_4)"/>
+      <rect x="10" y="10" width="160" height="160" fill="url(#paint2_linear_3_4)"/>
+      <rect x="170" y="10" width="160" height="160" transform="rotate(90 170 10)" fill="url(#paint3_linear_3_4)"/>
+      <rect x="170" y="10" width="160" height="160" transform="rotate(90 170 10)" fill="url(#paint4_linear_3_4)"/>
+      <rect x="170" y="10" width="160" height="160" transform="rotate(90 170 10)" fill="url(#paint5_linear_3_4)"/>
+      <g filter="url(#filter0_d_3_4)">
+      <rect x="14" y="14" width="152" height="152" stroke="#303030" stroke-width="8" shape-rendering="crispEdges"/>
+      </g>
+      <rect x="10.5" y="10.5" width="159" height="159" stroke="url(#paint6_linear_3_4)"/>
+      <rect x="18.5" y="18.5" width="143" height="143" stroke="url(#paint7_linear_3_4)"/>
+      <defs>
+      <filter id="filter0_d_3_4" x="5" y="5" width="174" height="174" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dx="2" dy="2"/>
+      <feGaussianBlur stdDeviation="3.5"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.66 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_3_4"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_3_4" result="shape"/>
+      </filter>
+      <linearGradient id="paint0_linear_3_4" x1="1.66667" y1="87.2222" x2="17.7778" y2="87.2222" gradientUnits="userSpaceOnUse">
+      <stop/>
+      <stop offset="1" stop-color="#D9D9D9" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="paint1_linear_3_4" x1="1.66667" y1="87.2222" x2="17.7778" y2="87.2222" gradientUnits="userSpaceOnUse">
+      <stop/>
+      <stop offset="1" stop-color="#D9D9D9" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="paint2_linear_3_4" x1="10" y1="87.5" x2="25" y2="87.5" gradientUnits="userSpaceOnUse">
+      <stop/>
+      <stop offset="1" stop-color="#D9D9D9" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="paint3_linear_3_4" x1="161.667" y1="87.2222" x2="177.778" y2="87.2222" gradientUnits="userSpaceOnUse">
+      <stop/>
+      <stop offset="1" stop-color="#D9D9D9" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="paint4_linear_3_4" x1="161.667" y1="87.2222" x2="177.778" y2="87.2222" gradientUnits="userSpaceOnUse">
+      <stop/>
+      <stop offset="1" stop-color="#D9D9D9" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="paint5_linear_3_4" x1="170" y1="87.5" x2="185" y2="87.5" gradientUnits="userSpaceOnUse">
+      <stop/>
+      <stop offset="1" stop-color="#D9D9D9" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="paint6_linear_3_4" x1="10" y1="10" x2="170" y2="170" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F4F4F"/>
+      <stop offset="1" stop-color="white" stop-opacity="0"/>
+      <stop offset="1" stop-color="#3B3B3B"/>
+      </linearGradient>
+      <linearGradient id="paint7_linear_3_4" x1="18" y1="18" x2="162" y2="162" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F4F4F"/>
+      <stop offset="1" stop-color="white" stop-opacity="0"/>
+      <stop offset="1" stop-color="#3B3B3B"/>
+      </linearGradient>
+      </defs>
+    </svg>
+    `,
+    white: `
+    <svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="10" y="10" width="160" height="160" fill="url(#paint0_linear_3_3)"/>
+      <rect x="10" y="10" width="160" height="160" fill="url(#paint1_linear_3_3)"/>
+      <rect x="10" y="10" width="160" height="160" fill="url(#paint2_linear_3_3)"/>
+      <rect x="170" y="10" width="160" height="160" transform="rotate(90 170 10)" fill="url(#paint3_linear_3_3)"/>
+      <rect x="170" y="10" width="160" height="160" transform="rotate(90 170 10)" fill="url(#paint4_linear_3_3)"/>
+      <rect x="170" y="10" width="160" height="160" transform="rotate(90 170 10)" fill="url(#paint5_linear_3_3)"/>
+      <g filter="url(#filter0_d_3_3)">
+      <rect x="14" y="14" width="152" height="152" stroke="#F0F0F0" stroke-width="8" shape-rendering="crispEdges"/>
+      </g>
+      <rect x="10.5" y="10.5" width="159" height="159" stroke="url(#paint6_linear_3_3)"/>
+      <rect x="18.5" y="18.5" width="143" height="143" stroke="url(#paint7_linear_3_3)"/>
+      <defs>
+      <filter id="filter0_d_3_3" x="5" y="5" width="174" height="174" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dx="2" dy="2"/>
+      <feGaussianBlur stdDeviation="3.5"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.66 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_3_3"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_3_3" result="shape"/>
+      </filter>
+      <linearGradient id="paint0_linear_3_3" x1="1.66667" y1="87.2222" x2="17.7778" y2="87.2222" gradientUnits="userSpaceOnUse">
+      <stop/>
+      <stop offset="1" stop-color="#D9D9D9" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="paint1_linear_3_3" x1="1.66667" y1="87.2222" x2="17.7778" y2="87.2222" gradientUnits="userSpaceOnUse">
+      <stop/>
+      <stop offset="1" stop-color="#D9D9D9" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="paint2_linear_3_3" x1="10" y1="87.5" x2="25" y2="87.5" gradientUnits="userSpaceOnUse">
+      <stop/>
+      <stop offset="1" stop-color="#D9D9D9" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="paint3_linear_3_3" x1="161.667" y1="87.2222" x2="177.778" y2="87.2222" gradientUnits="userSpaceOnUse">
+      <stop/>
+      <stop offset="1" stop-color="#D9D9D9" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="paint4_linear_3_3" x1="161.667" y1="87.2222" x2="177.778" y2="87.2222" gradientUnits="userSpaceOnUse">
+      <stop/>
+      <stop offset="1" stop-color="#D9D9D9" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="paint5_linear_3_3" x1="170" y1="87.5" x2="185" y2="87.5" gradientUnits="userSpaceOnUse">
+      <stop/>
+      <stop offset="1" stop-color="#D9D9D9" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="paint6_linear_3_3" x1="10" y1="10" x2="170" y2="170" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E2E2E2"/>
+      <stop offset="1" stop-color="white" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="paint7_linear_3_3" x1="18" y1="18" x2="162" y2="162" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E2E2E2"/>
+      <stop offset="1" stop-color="white" stop-opacity="0"/>
+      </linearGradient>
+      </defs>
+    </svg>
+    `
   }
 
   static get observedAttributes() {
-    return ['frame']
+    return ['frame', 'layout']
   }
 
   constructor() {
@@ -6712,21 +7214,23 @@ class Tiles extends ProductElement {
       case 'frame':
         this.setFrame(newValue);
         break;
+      case 'layout':
+        this.layout = layouts[newValue];
+
+        if (this.layout.id !== oldValue) {
+          this.selectLayout();
+        }
     }
   }
 
   setContent() {
-    const editableQuery = this.editableQuery(this.editablePictures);
-
     const frame = document.createElement('div');
     this.frame = frame;
     frame.classList.add('tile__frame');
 
     this.setFrame(this.getAttribute('frame'));
     
-    const picture = this.getEditable(editableQuery());
-
-    this.append(picture, frame);
+    this.append(frame);
   }
 
   setFrame(frame) {
@@ -6740,7 +7244,17 @@ class Tiles extends ProductElement {
   }
 
   setValue(settings, block) {
-    const { frame } = settings;
+    if (!this.picture) {
+      this.picture = this.getEditable(block.childBlocks.find(child => child.type === 'editable-picture'));
+
+      this.append(this.picture);
+    }
+
+    const { layout, frame } = settings;
+
+    if (layout && this.layout !== layout.layout) {      
+      this.setAttribute('layout', layout.layout);
+    }
 
     if (frame) {
       this.setAttribute('frame', frame.value);
@@ -6750,6 +7264,27 @@ class Tiles extends ProductElement {
       this.editablePictures = block.childBlocks
         .filter(child => child.type === 'editable-picture');
     }
+  }
+
+  selectLayout() {
+    if (!this.layout) {
+      return;
+    }
+
+    if (this.picture) {
+      this.picture.setType(this.layout.id);
+    }
+  }
+
+  clearLayout() {
+    this.querySelectorAll(PhotobookPage.selectors.picture)
+      .forEach(picture => picture.destroy());
+
+    this.querySelectorAll(PhotobookPage.selectors.text)
+      .forEach(text => text.remove());
+
+    this.querySelectorAll(PhotobookPage.selectors.child)
+      .forEach(item => item.remove());
   }
 }
 customElements.define('product-tiles', Tiles);
@@ -6794,6 +7329,7 @@ class ViewControls extends HTMLElement {
     this.element.zoomOut.addEventListener('click', this.zoomOut.bind(this));
 
     this.mouseListener = this.studioDrag.bind(this);
+    this.touchListener = this.studioTouchDrag.bind(this);
 
     this.zoom.studio.addEventListener('mousedown', (event) => {
       if (!JSON.parse(this.zoom.studio.getAttribute('zoomed'))) {
@@ -6808,18 +7344,40 @@ class ViewControls extends HTMLElement {
 
     window.addEventListener('mouseup', () => {
       if (!JSON.parse(this.zoom.studio.getAttribute('zoomed'))) {
-      return;
-    }
+        return;
+      }
 
-    this.zoom.studioPlayground.removeEventListener('mousemove', this.mouseListener);
-    this.zoom.studioContainer.classList.remove('on-drag');
-    })
+      this.zoom.studioPlayground.removeEventListener('mousemove', this.mouseListener);
+      this.zoom.studioContainer.classList.remove('on-drag');
+    });
+
+    this.zoom.studio.addEventListener('touchstart', (event) => {
+      if (!JSON.parse(this.zoom.studio.getAttribute('zoomed'))) {
+        return;
+      }
+
+      this.prevXPosition = event.touches[0].clientX;
+      this.prevYPosition = event.touches[0].clientY;
+
+      this.zoom.studioPlayground.addEventListener('touchmove', this.touchListener);
+    });
+
+    window.addEventListener('touchend', () => {
+      if (!JSON.parse(this.zoom.studio.getAttribute('zoomed'))) {
+        return;
+      }
+
+      this.zoom.studioPlayground.removeEventListener('touchmove', this.touchListener);
+      this.zoom.studioContainer.classList.remove('on-drag');
+    });
   }
 
   studioDrag(event) {
     this.zoom.studioContainer.classList.add('on-drag');
 
-    const scale = JSON.parse(this.zoom.studioPlayground.style.scale);
+    const scale = this.zoom.studioPlayground.style.scale
+      ? JSON.parse(this.zoom.studioPlayground.style.scale)
+      : 1;
 
     const xMove = (event.clientX - this.prevXPosition) / scale;
     const yMove = (event.clientY - this.prevYPosition) / scale;
@@ -6833,9 +7391,31 @@ class ViewControls extends HTMLElement {
     this.prevYPosition = event.clientY;
   }
 
+  studioTouchDrag(event) {
+    this.zoom.studioContainer.classList.add('on-drag');
+
+    const scale = this.zoom.studioPlayground.style.scale
+      ? JSON.parse(this.zoom.studioPlayground.style.scale)
+      : 1;
+
+    const xMove = (event.touches[0].clientX - this.prevXPosition) / scale;
+    const yMove = (event.touches[0].clientY - this.prevYPosition) / scale;
+
+    this.studioPositionX = ((this.studioPositionX * -1) - xMove) * -1;
+    this.studioPositionY =((this.studioPositionY * -1) - yMove) * -1;
+
+    this.zoom.studioContainer.style.translate = `${this.studioPositionX}px ${this.studioPositionY}px`;
+
+    this.prevXPosition = event.touches[0].clientX;
+    this.prevYPosition = event.touches[0].clientY;
+  }
+
   async zoomIn() {
+    if (JSON.parse(this.zoom.studio.getAttribute('zoomed'))) {
+      await this.zoomOut();
+    }
+
     this.zoom.studio.setAttribute('zoomed', true);
-    this.zoom.studioPlayground.style.overflow = 'hidden';
     
     this.zoom.studioPlayground.style.scale = null;
     this.zoom.studioContainer.style.translate = null;
@@ -6859,7 +7439,7 @@ class ViewControls extends HTMLElement {
       offsetScrollTop = selectedElem.offsetTop;
     } else if (selected && selected.id.startsWith('child')) {
       selectedElem = document.querySelector(StudioView.selectors.childBlockById(selected.id));
-      offsetScrollTop = document.querySelector(StudioView.selectors.blockById(blockWithActiveChild.id)).offsetTop;
+      offsetScrollTop = document.querySelector(StudioView.selectors.blockById(blockWithActiveChild.id)).offsetTop + selectedElem.offsetTop;
     } else {
       return;
     }
@@ -6870,7 +7450,10 @@ class ViewControls extends HTMLElement {
     
     const [offsetLeft, offsetTop] = this.getOffset(selectedElem);
     
-    this.toScroll(offsetScrollTop - 35, selectedElem);
+    this.toScroll(offsetScrollTop - 35, selectedElem)
+      .then(_ => {
+        this.zoom.studioPlayground.style.overflow = 'hidden';
+      });
     
     const scale = this.getScale(selectedElem);
     
@@ -6891,7 +7474,7 @@ class ViewControls extends HTMLElement {
   }
 
   toScroll(position, selectedElem) {
-    return new Promise(res => {
+    return new Promise(async res => {
       this.zoom.studioPlayground.scrollTo({
         top: position,
         behavior: 'smooth'
@@ -6932,10 +7515,13 @@ class ViewControls extends HTMLElement {
     this.zoom.studioContainer.style.translate = null;
 
     clearTimeout(this.untransitionTimer);
-    this.untransitionTimer = setTimeout(() => {
-      this.zoom.studioContainer.style.transition = null;
-      this.zoom.studioPlayground.style.transition = null;
-    }, 500);
+    return new Promise(res => {
+      this.untransitionTimer = setTimeout(() => {
+        this.zoom.studioContainer.style.transition = null;
+        this.zoom.studioPlayground.style.transition = null;
+        res();
+      }, 500)
+    });
   }
 
   getOffset(elem) {
@@ -6944,11 +7530,16 @@ class ViewControls extends HTMLElement {
 
     const elemParams = elem.getBoundingClientRect();
 
-    const leftOffset = elemParams.x - studioParams.x - (elemParams.width / 2);
+    const firstElem = this.zoom.studioContainer.querySelector(StudioView.selectors.block);
+    const firstElemParams = firstElem.getBoundingClientRect();
 
-    const left = ((containerParams.width / 2) - (elemParams.width / 2) - leftOffset);
+    const leftOffsetOfFirst = firstElemParams.x - studioParams.x - (Studio.classList.contains('mobile') ? 30 : 0);
+
+    const leftOffset = elemParams.x - studioParams.x - leftOffsetOfFirst;
+
+    const left = ((containerParams.width / 2) - (elemParams.width / 2)) - leftOffset;
     const top = ((containerParams.height / 2) - (elemParams.height / 2));
-  
+
     return [left, top];
   }
 
@@ -6963,13 +7554,17 @@ class ViewControls extends HTMLElement {
 
     const compareSide = Math.max(elemParams.width, elemParams.height);
 
-    const compare = elemParams.width
-    ? +((containerParams.width / compareSide).toFixed(2))
-    : +((containerParams.height / compareSide).toFixed(2));
+    const compare = elemParams.width === compareSide
+      ? +((containerParams.width / compareSide).toFixed(2))
+      : +((containerParams.height / compareSide).toFixed(2));
+
+    if (compare < 1.2) {
+      return 1.5;
+    }
 
     return compare > 4
       ? compare * 0.4
-      : compare;
+      : compare * 0.8;
   }
 }
 customElements.define('view-controls', ViewControls);
@@ -7006,9 +7601,11 @@ class StudioView extends HTMLElement {
 
     this.viewControls = this.querySelector(StudioView.selectors.viewControls);
 
-    // this.addEventListener('click', this.eventSelectedBulk.bind(this));
+    this.addEventListener('click', this.eventSelectedBulk.bind(this));
 
     this.addBlockBtn = this.initAddBlockBtn();
+
+    this.bottomPadding = this.initBottomPadding();
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -7023,6 +7620,7 @@ class StudioView extends HTMLElement {
       } else {
         this.classList.remove('is-zoomed');
       }
+      return;
     }
 
     this.state = currState;
@@ -7038,6 +7636,8 @@ class StudioView extends HTMLElement {
 
     if (!compareObjects(prevState.product, currState.product)) {
       this.init(currState.product);
+
+      this.bottomPadding.toggle(currState.product);
 
       // this.clearViewSync();
 
@@ -7403,7 +8003,6 @@ class StudioView extends HTMLElement {
 
           if (selected) {
             if (!currStateThisBlock || (currStateThisBlock && !currStateThisBlock.selected && !currStateThisBlock.activeChild)) {
-              
               selected.unselect();
             }
       
@@ -7436,7 +8035,7 @@ class StudioView extends HTMLElement {
           );
 
             if (toSelect) {
-              if (!(isActiveChild && !toSelect.activeChild)) {
+              if (!(isActiveChild && !toSelectBlock.activeChild)) {
                 toSelect.select();
               }
     
@@ -7488,29 +8087,6 @@ class StudioView extends HTMLElement {
   }
 
   setBlocksValue(prevBlocks, currBlocks) {
-    const initiateNewChildren = (element, selectedChildrenIds, prevChildrens) => {
-      if (!element) {
-        return;
-      }
-
-      return [...element.querySelectorAll(StudioView.selectors.childBlock)]
-        .map(child => {
-          const childID = child.getAttribute('child-block');
-
-          const currBlock = currBlocks.find(block => block.id === element.getAttribute('block'))
-
-          if (currBlock) {
-            const currChild = currBlock.childBlocks.find(child => child.id === childID);
-
-            if (currChild) {
-              return currChild;
-            }
-          }
-
-          return this.getChildJSON(child, selectedChildrenIds.includes(childID));
-        });
-    }
-
     const countPerBlock = this.getBlocksCount(currBlocks);
 
     const disableDecreaseButton = countPerBlock <= Studio.product.quantity.minimum;
@@ -7543,7 +8119,6 @@ class StudioView extends HTMLElement {
 
         let children = null;
 
-
         if (block.settings.layout && !compareObjects(prevSettings.layout, block.settings.layout)) {
           const blockLayouts = layouts;
 
@@ -7556,8 +8131,39 @@ class StudioView extends HTMLElement {
                 ? pictures.shift()
                 : text.shift();
 
-              return this.getChildsJSON(child, undefined, previousChildState);
+              return this.getChildJSON(child, undefined, previousChildState);
             });
+        } else {
+          children = block.childBlocks.map(child => {
+            switch(child.type) {
+              case 'text':
+                const textElement = this.querySelector(StudioView.selectors.childBlockById(child.id));
+
+                if (textElement) {
+                  textElement.setValue(child.settings);
+                }
+                break;
+              case 'editable-picture':
+                const pictureElement = this.querySelector(StudioView.selectors.childBlockById(child.id));
+
+                if (!pictureElement) {
+                  break;
+                }
+
+                if (!child.imageUrl && pictureElement && pictureElement.hasImage()) {
+                  pictureElement.removeImage();
+                } else if (child.imageUrl && pictureElement && !pictureElement.hasImage()) {
+                  pictureElement.setImage(child.imageUrl);
+                }
+
+                if (pictureElement) {
+                  pictureElement.setValue(child.settings);
+                }
+                break;
+            }
+
+            return child;
+          })
         }
 
         const newBlock = {
@@ -7569,26 +8175,25 @@ class StudioView extends HTMLElement {
           element.setValue(block.settings, newBlock);
         }
 
-
         return newBlock;
       });
 
     const prevChildren = prevBlocks.map(block => block.childBlocks);
     const currChildren = newBlocks.map(block => block.childBlocks);
 
-    let returnedBlocks;
+    let returnedBlocks = newBlocks;
 
-    if (!compareObjects(prevChildren, currChildren)) {
-      returnedBlocks = this.setChildsValue(prevChildren, currChildren, newBlocks);
-    } else {
-      returnedBlocks = newBlocks;
-      // Studio.utils.change({
-      //   view: {
-      //     ...JSON.parse(this.getAttribute('state')),
-      //     blocks: newBlocks
-      //   }
-      // }, 'set block value')
-    }
+    // if (!compareObjects(prevChildren, currChildren)) {
+    //   returnedBlocks = this.setChildsValue(prevChildren, currChildren, newBlocks);
+    // } else {
+    //   returnedBlocks = newBlocks;
+    //   // Studio.utils.change({
+    //   //   view: {
+    //   //     ...JSON.parse(this.getAttribute('state')),
+    //   //     blocks: newBlocks
+    //   //   }
+    //   // }, 'set block value')
+    // }
 
     const prevSelected = prevBlocks.filter(block => block.selected || block.activeChild).map(block => block.id);
     const currSelected = newBlocks.filter(block => block.selected || block.activeChild).map(block => block.id);
@@ -7670,11 +8275,12 @@ class StudioView extends HTMLElement {
   }
 
   setSelectedBlock(block, activeChild, isBulk) {
-    const selectedBlock = this.getBlockJSON(block);
+    const { blocks } = Studio.state.view;
+
+    const selectedBlock = blocks.find(fBlock => fBlock.id === block.getAttribute('block'));
 
     this.lastSelected = selectedBlock;
     this.lastSelectedChild = null;
-    const { blocks } = JSON.parse(this.getAttribute('state'));
 
     const isBlockSelected = blocks.some(block => block.selected);
 
@@ -8203,7 +8809,7 @@ class StudioView extends HTMLElement {
       }, 0) || 0;
   }
 
-  getBlocksJSON(options) {
+  getBlockJSON(options) {
     const product = Studio.product;
 
     const { additionalType } = options || {};
@@ -8226,7 +8832,7 @@ class StudioView extends HTMLElement {
       case 'prints':
         if (product.type.variant === 'polaroid') {
           type = 'polaroid';
-          childList = ['editable-picture', 'text'];
+          childList = ['editable-picture', 'polaroid-text'];
           childOptions.isLine = true;
         } else if (product.type.variant === 'photostrip') {
           type = 'photostrip';
@@ -8251,7 +8857,7 @@ class StudioView extends HTMLElement {
       case 'boxes':
         if (product.type.variant === 'polaroid') {
           type = 'polaroid';
-          childList = ['editable-picture', 'text'];
+          childList = ['editable-picture', 'polaroid-text'];
         } else {
           type = 'prints';
           childList = ['editable-picture'];
@@ -8281,6 +8887,10 @@ class StudioView extends HTMLElement {
               obj.layout = {
                 layout: 'wholeTextCover'
               };
+            } else if (type === 'tiles') {
+              obj.layout = {
+                layout: 'squareTile'
+              }
             }
             break;
           case 'hasBackground':
@@ -8299,7 +8909,7 @@ class StudioView extends HTMLElement {
       }, {});
 
     const childrenJSON = childList
-      .map(child => this.getChildsJSON(child, childOptions));
+      .map(child => this.getChildJSON(child, childOptions));
 
     return {
       id: uniqueID.block(),
@@ -8314,7 +8924,7 @@ class StudioView extends HTMLElement {
     };
   }
 
-  getChildsJSON(type, options = {}, state) {
+  getChildJSON(type, options = {}, state) {
     if (state) {
       return state;
     }
@@ -8347,20 +8957,84 @@ class StudioView extends HTMLElement {
           settings: EditableText.defaultValue
         }
       case 'line':
+        let maxSize = 20;
+
+        if (Studio.state.product && Studio.state.product.type.variant === 'polaroid') {
+          maxSize = 12;
+        }
+
         return {
           type: 'text',
           id,
           isLine: true,
           selected: false,
           tools: EditableText.ToolList,
-          settings: EditableText.defaultValue
+          settings: EditableText.defaultValue,
+          line: 1,
+          maxSize
         }
+      case 'polaroid-text':  
+          return {
+            type: 'text',
+            id,
+            isLine: true,
+            selected: false,
+            tools: EditableText.ToolList,
+            settings: EditableText.defaultValue,
+            lines: 4,
+            maxSize: 12
+          }
       default:
         return {
           type: 'default',
           id,
           settings: {}
         }
+    }
+  }
+
+  createBlock(block) {
+    const { product } = JSON.parse(this.getAttribute('state'));
+
+    if (!product) {
+      return;
+    }
+
+    switch(block.type) {
+      case 'photobook-page':
+        this.createPhotobookPage(block, product.type.variant);
+        break;
+      case 'photobook-cover':
+        this.createPhotobookCover(block, product.type.variant);
+        break;
+      case 'prints':
+        this.createPrint(block, product.type.variant);
+        break;
+      case 'polaroid':
+        this.createPolaroidPrints(block);
+        break;
+      case 'puzzle':
+        this.createPuzzle(block, product.type.variant);
+        break;
+      case 'canvas':
+        this.createCanvas(block, product.type.variant);
+        break;
+      case 'magnet':
+        this.createMagnets(block, product.type.variant);
+        break;
+      case 'boxes':
+        if (product.type.variant === 'polaroid') {
+          this.createPolaroidPrints();
+        } else if (product.type.variant === '10-15') {
+          this.createPrint(block, '10-15');
+        }
+        break;
+      case 'tiles':
+        this.createTiles(block);
+        break;
+      default:
+        this.createDefaultProductElement();
+        break;
     }
   }
 
@@ -8373,49 +9047,6 @@ class StudioView extends HTMLElement {
 
     if (!product) {
       return;
-    }
-
-    const productHandle = product.handle;
-
-    const waitToClear = [];
-
-    const createBlock = (block) => {
-      switch(block.type) {
-        case 'photobook-page':
-          this.createPhotobookPage(block, product.type.variant);
-          break;
-        case 'photobook-cover':
-          this.createPhotobookCover(block, product.type.variant);
-          break;
-        case 'prints':
-          this.createPrint(block, product.type.variant);
-          break;
-        case 'polaroid':
-          this.createPolaroidPrints(block);
-          break;
-        case 'puzzle':
-          this.createPuzzle(block, product.type.variant);
-          break;
-        case 'canvas':
-          this.createCanvas(block, product.type.variant);
-          break;
-        case 'magnet':
-          this.createMagnets(block, product.type.variant);
-          break;
-        case 'boxes':
-          if (product.type.variant === 'polaroid') {
-            this.createPolaroidPrints();
-          } else if (product.type.variant === '10-15') {
-            this.createPrint(block, '10-15');
-          }
-          break;
-        case 'tiles':
-          this.createTiles(block);
-          break;
-        default:
-          this.createDefaultProductElement();
-          break;
-      }
     }
 
     let toUpdate = false, newBlocks = [ ...blocks ];
@@ -8436,7 +9067,7 @@ class StudioView extends HTMLElement {
     this.clearViewSync(null, elemsToRemove);
 
     if (product.type.id === 'photobook' && !newBlocks.find(block => block.type === 'photobook-cover')) {
-      newBlocks.push(this.getBlocksJSON({ additionalType: 'photobook-cover' }));
+      newBlocks.push(this.getBlockJSON({ additionalType: 'photobook-cover' }));
     }
 
     if (!options.clearAll && size) {
@@ -8444,7 +9075,7 @@ class StudioView extends HTMLElement {
         toUpdate = true;
 
         for (let i = 0; i < size; i++) {
-          newBlocks.push(this.getBlocksJSON());
+          newBlocks.push(this.getBlockJSON());
         }
       } 
     } else if (options.clearAll) {
@@ -8454,7 +9085,7 @@ class StudioView extends HTMLElement {
       // waitToClear.push(this.clearView());
 
       for (let i = 0; i < size; i++) {
-        newBlocks.push(this.getBlocksJSON());
+        newBlocks.push(this.getBlockJSON());
       }
     }
 
@@ -8472,7 +9103,11 @@ class StudioView extends HTMLElement {
       return;
     }
 
-    blocksToCreate.forEach(block => createBlock(block));
+    blocksToCreate.forEach(block => {
+      if (!this.querySelector(StudioView.selectors.blockById(block.id))) {
+        this.createBlock(block);
+      }
+    });
 
     const block = this.querySelector(StudioView.selectors.block);
 
@@ -8484,96 +9119,6 @@ class StudioView extends HTMLElement {
     }
 
     return newBlocks;
-
-    Promise.all(waitToClear).then(_ => {
-      // do something on async block delete
-    });
-  }
-
-  getBlockJSON(block, state) {
-    const id = block.getAttribute('block');
-
-    if (state && id === state.id) {
-      return state;
-    }
-
-    const childBlocks = [...block.querySelectorAll(StudioView.selectors.childBlock)];
-
-    const { settings } = Studio.product;
-
-    const { tools } = Studio.state.panel;
-
-    const blockSettings = Object.keys(settings)
-      .reduce((obj, tool) => {
-        switch(tool) {
-          case 'hasLayout':
-            if (settings[tool]) {
-              obj.layout = LayoutTool.defaultValue;
-            }
-            break;
-          case 'hasBackground':
-            if (settings[tool]) {
-              obj.backgroundColor = BackgroundColorTool.defaultValue;
-            }
-            break;
-          case 'hasFrame':
-            if (settings[tool]) {
-              obj.frame = FrameTool.defaultValue
-            }
-            break;
-        }
-
-        return obj;
-      }, {});
-
-    const childrenJSON = childBlocks
-      .map(child => this.getChildJSON(child));
-
-    const blockJSON = {
-      id,
-      type: block.getAttribute('block-type'),
-      selected: block.classList.contains('is-selected'),
-      activeChild: childrenJSON.some(child => child.selected),
-      childBlocks: [
-        ...childrenJSON
-      ],
-      settings: blockSettings,
-      count: 1
-    }
-
-    return blockJSON
-  }
-
-  getChildJSON(child, isSelected = false) {
-    const key = child.getAttribute('child-block');
-    const type = child.hasAttribute('editable-picture') ? 'editable-picture' : 'text';
-
-    if (type === 'editable-picture') {
-      return {
-        type,
-        id: key,
-        selected: isSelected,
-        tools: child.getToolsList(),
-        settings: child.getValue()
-      }
-    } else if (type === 'text') {
-      return {
-        type,
-        id: key,
-        isLine: child.hasAttribute('line'),
-        selected: isSelected,
-        tools: child.getToolsList(),
-        settings: child.getValue()
-      }
-    }
-
-    return {
-      type,
-      id: key,
-      selected: isSelected,
-      tools: child.getToolsList(),
-      settings: child.getValue()
-    }
   }
 
   getImages() {
@@ -8642,7 +9187,7 @@ class StudioView extends HTMLElement {
       return;
     }
 
-    const newBlock = this.getBlocksJSON();
+    const newBlock = this.getBlockJSON();
 
     Studio.utils.change({
       view: {
@@ -8663,6 +9208,52 @@ class StudioView extends HTMLElement {
         'quantity': quantity
       })
     }).then(res => res.json());
+  }
+
+  initBottomPadding() {
+    const container = document.createElement('div');
+    container.classList.add('studio-view__bottom-padding');
+
+    container.show = () => {
+      if (this.contains(container)) {
+        return;
+      }
+
+      this.elements.container.append(container);
+    }
+
+    container.hide = () => {
+      container.remove();
+    }
+
+    container.toggle = (product) => {
+      if (!product) {
+        container.hide();
+        return;
+      }
+      
+      const { quantity, type } = product;
+
+      switch (quantity.type) {
+        case 'multiply':
+          container.show();
+          break;
+        case 'set-of':
+          container.show();
+        case 'single':
+          if (type.id === 'photobook') {
+            container.show();
+          } else {
+            container.hide();
+          }
+          break;
+        default: 
+          container.hide();
+          break;
+      }
+    }
+
+    return container;
   }
 }
 customElements.define('studio-view', StudioView);
@@ -8787,6 +9378,7 @@ class ImageChooser extends HTMLElement {
         if (!window.oauthInstagram) {
           this.instLogin.create();
         } else {
+          this.instLogin.remove();
           this.getInstagramPhotos();
         }
         break;
@@ -8833,7 +9425,7 @@ class ImageChooser extends HTMLElement {
 
     container.append(selectTag);
 
-    const image = new Image;
+    const image = new Image();
     image.style.opacity = 0;
     image.classList.add('image');
     image.draggable = false;
@@ -8931,10 +9523,19 @@ class ImageChooser extends HTMLElement {
 
     const state = JSON.stringify({
       shop: location.origin,
-      customerId: window.customerId
+      customerId: window.customerId || Studio.anonimCustomerId
     });
 
-    const url = `https://api.instagram.com/oauth/authorize?client_id=${223768276958680}&redirect_uri=${baseURL}/api/instagram/oauth&scope=user_profile,user_media&response_type=code&state=${state}`;
+    const { credentials } = Studio;
+
+    if (!credentials.instagram) {
+      Studio.errorToast.error({
+        text: 'No instagram credentials (400 status)'
+      })
+      return;
+    }
+
+    const url = `https://api.instagram.com/oauth/authorize?client_id=${credentials.instagram.id}&redirect_uri=${baseURL}/api/instagram/oauth&scope=user_profile,user_media&response_type=code&state=${state}`;
 
     window.location = url;
   }

@@ -12,7 +12,7 @@ const textOptions = ['bold', 'align', 'font', 'italic', 'underline', 'text', 'co
 const options = [
   'rotate', 'flip', 'flop', 'crop',
   'resize', 'filter', 'thumbnail', 'format',
-  'container', 'background', 'type',
+  'container', 'background', 'type', 'borderRadius', 'layout',
   ...textOptions
 ];
 
@@ -142,8 +142,18 @@ export const sharpImage = async (req, res) => {
           return obj;
         }
 
-        if (key === 'type') {
+        if (['type', 'format', 'layout'].includes(key)) {
           obj[key] = req.query[key];
+          return obj;
+        }
+
+        if (key === 'borderRadius') {
+          if (req.query[key].endsWith('%')) {
+            obj[key] = req.query[key];
+          } else {
+            obj[key] = JSON.parse(req.query[key]);
+          }
+
           return obj;
         }
 
@@ -165,7 +175,11 @@ export const sharpImage = async (req, res) => {
       }
 
       return obj;
-    }, {})
+    }, {});
+
+  if (textConfig.text) {
+    textConfig.text = textConfig.text.split('0x0A').join('\n');
+  }
  
   if (!(await existsFile(path))) {
     res.sendStatus(400);
@@ -195,7 +209,9 @@ export const sharpImage = async (req, res) => {
     format = 'jpeg',
     container,
     background = { r: 255, g: 255, b: 255, alpha: 1 },
-    type = 'print'
+    type = 'print',
+    borderRadius = 0,
+    layout
   } = config;
 
   if (thumbnail && typeof thumbnail !== 'boolean') { 
@@ -210,34 +226,47 @@ export const sharpImage = async (req, res) => {
     return;
   }
 
-  if (!thumbnail) {
-    file = await resizeImage(file, resize, width, height, rotate, background); 
-  } else { 
-    const [resizeWidth, resizeHeight] = resize;
-
-    file = file.resize({
-      width: parseInt(resizeWidth.toFixed(0)),
-      height: parseInt(resizeHeight.toFixed(0)),
-    });
+  if (thumbnail) {
+    file = await createThumbnail(file, resize);
 
     res.setHeader('Content-Type', 'image/webp'); 
 
-    const readyFile = await file
-    .withMetadata()
-    .webp() 
-    .toBuffer();
- 
-    res.send(readyFile);  
+    res.send(file);
     return;
   }
 
+  file = await resizeImage(file, resize, width, height, rotate, background); 
+
   file = await cropImage(file, crop, background); 
 
+  if (borderRadius && borderRadius !== 0) {
+    const [resizeWidth, resizeHeight] = resize;
+    const mask = borderRadiusMask({
+      width: parseInt(resizeWidth.toFixed(0)),
+      height: parseInt(resizeHeight.toFixed(0)),
+      borderRadius
+    });
+
+    file = file.composite([{
+        input: mask,
+        blend: 'dest-in',
+      }])
+      .png();
+  }
+  
   switch (format) {
     case 'webp':
       res.setHeader('Content-Type', 'image/webp'); 
 
-      file = file.webp() 
+      file = file.webp(); 
+      break;
+    case 'png':
+      res.setHeader('Content-Type', 'image/png');
+
+      file = file
+        .withMetadata()
+        .png();
+
       break;
     case 'jpeg':
     default:
@@ -264,21 +293,22 @@ export const sharpImage = async (req, res) => {
     }
   }
 
-  const readyFile = await file.toBuffer();
+  file = await file.toBuffer();
 
   if (type === 'polaroid') {
-    file = await createPolaroid(readyFile, textConfig, {
+    file = await createPolaroid(file, textConfig, {
       background
     });
+  } else if (type.endsWith('Tile')) {
+    file = await createTile(file, type, background);
+  }
 
-    res.setHeader('Content-Type', 'image/jpeg'); 
-
-    res.send(file);
-    return;
+  if (layout === 'tile') {
+    file = await createTileLayout(file);
   }
 
  
-  res.send(readyFile);
+  res.send(file);
 }
 
 const rotateImage = (file, flip, flop, rotate, background) => {
@@ -403,6 +433,141 @@ const cropImage = async (file, crop, background) => {
   return file;
 }
 
+const borderRadiusMask = ({
+  width = 200,
+  height = 200,
+  borderRadius = 0
+}) => {
+  const svg = `
+    <svg>
+      <rect x="0" y="0" width="${width}" height="${height}" rx="${borderRadius}" ry="${borderRadius}" />
+    </svg>
+  `;
+
+  return Buffer.from(svg);
+}
+
+const createThumbnail = async (file, resize = [100, 100]) => {
+  const [resizeWidth, resizeHeight] = resize;
+
+  let thumbnail = file;
+
+  thumbnail = thumbnail.resize({
+    width: parseInt(resizeWidth.toFixed(0)),
+    height: parseInt(resizeHeight.toFixed(0)),
+  });
+
+  thumbnail = await thumbnail
+    .withMetadata()
+    .webp() 
+    .toBuffer();
+
+  return thumbnail;
+}
+
+const createTile = async (img, layout, background) => {
+  const tileSide = 2364;
+
+  let tile = sharp({
+    create: {
+      width: tileSide,
+      height: tileSide,
+      channels: 4,
+      background
+    }
+  });
+
+  let mask;
+
+  switch(layout) {
+    case 'roundTile':
+      mask = borderRadiusMask({
+        width: 2000,
+        height: 2000,
+        borderRadius: '50%'
+      });
+      break;
+    case 'squareTile':
+      mask = borderRadiusMask({
+        width: 2000,
+        height: 2000,
+        borderRadius: 80,
+      });
+      break;
+  }
+
+  let picture = sharp(img);
+
+  if (layout !== 'squareFramelessTile') {
+    picture = picture.resize({
+        width: 2000,
+        height: 2000
+      });
+  } else {
+    picture = picture.resize({
+      width: tileSide,
+      height: tileSide
+    });
+  }
+
+  if (mask) {
+    picture = picture.composite([
+      {
+        input: mask,
+        blend: 'dest-in'
+      }
+    ])
+  }
+
+  picture = await picture.png().toBuffer();
+
+  if (layout !== 'squareFramelessTile') {
+    tile = tile.composite([
+      {
+        input: picture,
+        top: 182,
+        left: 182
+      }
+    ]);
+  } else {
+    tile = tile.composite([
+      {
+        input: picture,
+        top: 0,
+        left: 0
+      }
+    ]);
+  }
+  
+
+  tile = await tile.jpeg().toBuffer();
+
+  return tile;
+}
+
+const createTileLayout = async (tile) => {
+  let layout = sharp({
+    create: {
+      width: 2398,
+      height: 3602,
+      channels: 4,
+      background: { r: 200, g: 200, b: 200, alpha: 1 }
+    }
+  });
+
+  layout = layout.composite([
+    {
+      input: tile,
+      top: 0,
+      left: 0
+    }
+  ])
+
+  layout = await layout.jpeg().toBuffer();
+
+  return layout;
+}
+
 const createPolaroid = async (img, textConfig, {
   background
 }) => {
@@ -434,8 +599,8 @@ const createPolaroid = async (img, textConfig, {
       },
       {
         input: Text,
-        top: 1300,
-        left: 98,        
+        top: 1240,
+        left: 98,
       }
     ]);
 
@@ -454,7 +619,9 @@ async function createText(config) {
     text = 'no text',
     background,
     color,
-    fontSize = 20
+    fontSize = 110,
+    width = 1004,
+    height = 500
   } = config;
 
   const textSVG = await fetch(`${process.env.HOST}/product-builder/text`, {
@@ -480,8 +647,8 @@ async function createText(config) {
 
   const textSharp = await sharp(textBuffer)
     .resize({
-      width: 1004,
-      height: 300,
+      width,
+      height,
       background: { r: 0, b: 0, g: 0, alpha: 0 }
     }).png().toBuffer();
 
@@ -500,14 +667,47 @@ export const getText = async (req, res) => {
     return;
   }
 
-  const { align, font, fontStyle, text, color, fontSize } = textSettings;
+  const {
+    align,
+    font,
+    fontStyle,
+    text,
+    color = 'rgb(0,0,0)',
+    fontSize = 100,
+    width = 1004,
+    height = 500
+  } = textSettings;
 
   const { bold, italic, underline } = fontStyle;
 
+  const lines = text.split('\n');
+
+  const textSize = fontSize * (lines.length - 1);
+
+  const verticalPadding = (100 * ((height - textSize) / 2)) / height;
+
+  const linePart = (100 * fontSize) / height;
+
+  const textTags = text.split('\n')
+    .map((line, idx) => {
+      const yPosition = (linePart * idx) + verticalPadding;
+
+      return `
+        <text
+          x="50%"
+          y="${yPosition}%"
+          dominant-baseline="middle"
+          text-anchor="middle"
+        >${line}</text>
+      `
+    })
+    .join('');
+
   const svg = `
     <svg
-      viewBox="0 0 200 100"
+      viewBox="0 0 ${width} ${height}"
       xmlns="http://www.w3.org/2000/svg"
+      fill="#343434"
     >
     <style>
       text {
@@ -522,13 +722,7 @@ export const getText = async (req, res) => {
         ${italic ? 'font-style: italic;' : ''}
       }
     </style>
-
-      <text
-        x="50%"
-        y="50%"
-        dominant-baseline="middle"
-        text-anchor="middle"
-      >${text || 'no text'}</text>
+      ${textTags}
     </svg>
   `;
 

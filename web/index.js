@@ -144,12 +144,6 @@ app.get('/api/customers/all', async(req, res) => {
   res.send(customers); 
 })
 
-app.get('/api/customers/deleteAll', async(req, res) => {
-  await Customer.deleteMany();
-
-  res.sendStatus(200); 
-})
-
 app.post('/api/customers/delete', express.json(), async (req, res) => {
   const { email, id } = req.body;
   
@@ -169,6 +163,10 @@ app.get('/api/social/credentials', (req, res) => {
     },
     facebook: {
       id: process.env.FACEBOOK_APP_ID
+    },
+    instagram: {
+      id: process.env.INSTAGRAM_APP_ID,
+      secret: process.env.INSTAGRAM_APP_SECRET
     }
   })
 })
@@ -379,22 +377,26 @@ app.use('/api/googleOAth', async (req, res) => {
   res.sendStatus(400); 
 });
 
-app.use('/api/instagram/oauth', express.json(), async (req, res) => {
+app.get('/api/instagram/oauth', async (req, res) => {
   const { code, state } = req.query;
 
-  const { shop, customerId } = JSON.parse(state);
+  const { shop, customerId } = state ? JSON.parse(state) : {
+    shop: undefined,
+    customerId: undefined
+  };
+
+  console.log('here', code?.slice(0, 5));
 
   if (code) {
     const { client_id, client_secret } = metaKeys.instagram;
     
     const formdata = new FormData();
-
     
     if (client_id && client_secret && typeof code === 'string') {
       formdata.append('client_id', client_id);
       formdata.append('client_secret', client_secret);
       formdata.append('grant_type', 'authorization_code');
-      formdata.append('redirect_uri', 'https://product-builder.dev-test.pro/api/instagram/oauth');
+      formdata.append('redirect_uri', `${process.env.HOST}/api/instagram/oauth`);
       formdata.append('code', code);
     }
 
@@ -403,10 +405,23 @@ app.use('/api/instagram/oauth', express.json(), async (req, res) => {
       body: formdata
     }).then(res => res.json());
 
+    
     const { user_id, access_token } = response;
+    
+    console.log(response);
 
-    if (access_token) {
+    if (response.code === 400) {
+      res.redirect(`${shop}/apps/product-builder`);
+      return;
+    }
+    
+
+    if (access_token && shop) {
       res.redirect(`${shop}/apps/product-builder?access_token=${access_token}&user_id=${user_id}`);
+    } else if (access_token && !shop) {
+      res.send({
+        error: 'shop not provided' 
+      });
     }
 
     return;
@@ -529,6 +544,8 @@ app.get('/api/shop', async (req, res) => {
 
   const [shop] = await shopify.api.rest.Shop.all({ session });
 
+  console.log(shop)
+
   if (shop && shop.currency) {
     res.send({
       currency: shop.currency
@@ -537,7 +554,7 @@ app.get('/api/shop', async (req, res) => {
   }
 
   res.status(404).send({
-    error: 'no shop provided'
+    currency: 'RON'
   });
 })
 
@@ -764,9 +781,9 @@ app.post('/api/products/update', async (req, res) => {
   const { id } = req.query;
 
   const currType = productTypes[state.type];
-
+ 
   if (!currType) { 
-    res.sendStatus(400);
+    res.sendStatus(400); 
     return;
   }
 

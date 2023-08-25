@@ -423,6 +423,7 @@ adaptive-content[panel-related] {
 }
 
 .tools__tab {
+  user-select: none;
   outline: none;
   background-color: transparent;
   border: 0;
@@ -691,6 +692,7 @@ adaptive-content[panel-related] {
   grid-template-columns: repeat(3, 1fr);
   align-content: flex-start;
   gap: 15px;
+  padding-bottom: 15px;
 }
 
 .page__images-container {
@@ -1039,6 +1041,18 @@ adaptive-content[panel-related] {
   border-radius: 10px;
   flex-direction: column;
   border: 1px solid #e4e4e4;
+}
+
+.tool.center .text-tool__text {
+  text-align: center;
+}
+
+.tool.left .text-tool__text {
+  text-align: left;
+}
+
+.tool.right .text-tool__text {
+  text-align: right;
 }
 
 .text-tool__header {
@@ -1416,7 +1430,7 @@ product-option-selector {
   background-color: transparent;
 }
 
-/* Playground */
+/* Studio View */
 .studio-view {
   border-radius: 20px;
   background-color: #fff;
@@ -1503,6 +1517,12 @@ product-option-selector {
   opacity: 1;
 }
 
+.studio-view .studio-view__bottom-padding {
+  order: 2;
+  width: 100%;
+  height: 50vh;
+}
+
 @media (max-width: 749px) {
   .studio-view {
     background-color: transparent;
@@ -1520,6 +1540,10 @@ product-option-selector {
     left: 0px;
     bottom: 0px;
     padding: 15px;
+  }
+
+  .studio-view .studio-view__bottom-padding {
+    height: 70vh;
   }
 }
 
@@ -1603,6 +1627,25 @@ editable-picture {
   background-color: #fff;
 }
 
+.editable-picture.is-loading::before {
+  content: '';
+  height: 0;
+  width: 0;
+  padding: 15px;
+  border: 6px solid #f8f8f8;
+  border-right-color: #888;
+  border-radius: 22px;
+  animation: rotate 1s infinite linear;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+}
+
+.editable-picture.is-loading img {
+  opacity: 0;
+}
+
 .editable-picture.is-empty .editable-picture__empty-state.empty-state--big {
   display: flex;
   gap: 5px;
@@ -1637,6 +1680,27 @@ editable-picture {
   opacity: 1;
   transition: opacity .3s;
 }
+
+.editable-picture .editable-picture__mask {
+  position: absolute;
+  inset: 0;
+  opacity: 1;
+  transition: opacity .3s;
+}
+
+.editable-picture .editable-picture__mask svg {
+  position: absolute;
+  inset: 0;
+  object-fit: contain;
+}
+
+/* .editable-picture .editable-picture__image:not(.editable-picture__preview-image) {
+  opacity: 0 !important;
+}
+
+.editable-picture .editable-picture__preview-image {
+  opacity: 1 !important;
+} */
 
 .editable-picture:not(.is-empty).is-selected .editable-picture__preview-image {
   opacity: 0.85;
@@ -1738,13 +1802,6 @@ product-controls {
   background-color: #e4e4e4;
 }
 
-@media (max-width: 749px) {
-  .studio-view__container:not(:has(.studio-view__button-add-wrapper)) .studio-view__block:last-child,
-  .studio-view__container .studio-view__button-add-wrapper{
-    padding-bottom: 70vh;
-  }
-}
-
 /* Error Toast */
 error-toast {
   display: flex;
@@ -1779,6 +1836,10 @@ error-toast {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+.error-toast__errors span {
+  text-align: center;
 }
 
 /* Image chooser */
@@ -2164,8 +2225,13 @@ editable-text .textarea {
   transition: border-color .3s;
 }
 
+.textarea p {
+  margin: 0;
+  pointer-events: none;
+}
+
 editable-text.is-selected .textarea {
-  border-color: #ff8714
+  border-color: #ff8714;
 }
 
 .photobook-page .textarea-container {
@@ -2461,11 +2527,15 @@ polaroid-prints {
   display: flex;
 }
 
+.polaroid {
+  aspect-ratio: 2 / 3;
+  width: 165px;
+}
+
 .prints.prints__polaroid {
   display: flex;
   flex-direction: column;
   padding: 10px;
-  padding-bottom: 20px;
   align-items: center;
   gap: 10px;
   background-color: #fff;
@@ -2474,8 +2544,24 @@ polaroid-prints {
 }
 
 .prints.prints__polaroid .editable-picture {
-  width: 140px;
-  height: 140px;
+  aspect-ratio: 1 / 1;
+  height: auto;
+}
+
+.polaroid .polaroid__text-wrapper {
+  display: flex;
+  flex-grow: 1;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.polaroid .polaroid__text-wrapper .textarea-container {
+  width: 100%;
+}
+
+.polaroid .polaroid__text-wrapper .textarea-container .textarea {
+  width: 100%;
 }
 
 /* Puzzle */
@@ -2585,18 +2671,22 @@ product-tile {
 
 .tile {
   width: 160px;
-  padding: 20px;
+  padding: 0px;
   aspect-ratio: 1;
   background-color: #fff;
+}
+
+.studio-view__block:has(.tile) {
+  gap: 35px;
 }
 
 .tile__frame {
   pointer-events: none;
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  top: -20px;
+  left: -20px;
+  right: -20px;
+  bottom: -20px;
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
