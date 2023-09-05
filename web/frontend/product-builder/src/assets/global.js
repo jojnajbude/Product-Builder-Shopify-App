@@ -1,6 +1,7 @@
 'use strict';
 
 const baseURL = 'https://product-builder.dev-test.pro';
+const cdnBaseURL = 'https://product-builder-cdn.dev-test.pro';
 
 const cookiesTime = {
   anonimUser: 10
@@ -32,18 +33,36 @@ const backButton = (function backButtonInit() {
 const checkoutButton = (function checkoutButtonInit() {
   const button = document.querySelector('[data-checkout-button]');
 
+  button.disable = () => {
+    if (!button.hasAttribute('disabled')) {
+      button.toggleAttribute('disabled');
+    }
+  }
+
+  button.enable = () => {
+    button.removeAttribute('disabled');
+  }
+
   if (!button) {
     return;
   }
 
   button.addEventListener('click', async () => {
     const projectId = productParams.get('project-id');
+    button.disable();
 
     if (!Studio.state.product) {
+      button.enable();
       return;
     }
 
     const blocksCount = Studio.studioView.getBlocksCount(Studio.state.view.blocks);
+    const blocksWithImage = Studio.state.view.blocks
+      .filter(block => block.childBlocks
+        .filter(child => child.type === 'editable-picture')
+        .every(child => child.imageUrl)
+      );
+
     const minimum = Studio.product.quantity.minimum;
 
     const blockDiff = minimum - blocksCount;
@@ -53,13 +72,23 @@ const checkoutButton = (function checkoutButtonInit() {
       && blocksCount < minimum) {
       Studio.errorToast.error({
         text: `Not enough products quantity. Add ${blockDiff} more ${blockDiff === 1 ? 'block' : 'blocks' } to add project to the cart`
-      })
+      });
+      button.enable();
+      return;
+    } else if (
+      blocksWithImage.length < Studio.state.view.blocks.length
+    ) {
+      Studio.errorToast.error({
+        text: `To checkout project - each picture must have an image`
+      });
+      button.enable();
       return;
     }
 
     const relatedProduct = await Studio.relatedProducts.getRelatedProducts();
 
     if (relatedProduct.rejected) {
+      button.enable();
       return;
     }
 
@@ -131,14 +160,22 @@ const checkoutButton = (function checkoutButtonInit() {
               link.href = location.origin + '/cart';
               link.click();
             }
-          })
+          });
+        return;
       } else {
+        console.log(addedToCart);
         Studio.errorToast.error({
           text: addedToCart.description,
           type: addedToCart.message
         })
       }
+    } else {
+      Studio.errorToast.error({
+        text: "No project id provided"
+      });
     }
+
+    button.enable();
   });
 
   return button;
@@ -236,8 +273,9 @@ const subscribeToActionController = ActiveActionsController();
 
 const defaultDPI = 300;
 
-function getPixels(cm, dpi) {
-  return Math.floor(cm / 2.54 * dpi);
+function getPixels(cm, dpi = 300) {
+  const pixels = Math.floor(cm / 2.54 * dpi);
+  return pixels % 2 === 0 ? pixels : pixels + 1;
 }
 
 function getResolution(width, height) {
@@ -692,7 +730,9 @@ class ProductBuilder extends HTMLElement {
           this.classList.add('mobile')
           this.classList.remove('desktop');
       }
-    })
+    });
+
+    this.asyncExpectants = [];
 
     const instToRedirect = localStorage.getItem('instToRedirect');
 
@@ -1082,9 +1122,26 @@ class ProductBuilder extends HTMLElement {
       //   this.studioView.setState({ blocks: newBlocks });
       // }
     }
+
+    this.asyncExpectants = this.asyncExpectants.filter(callback => {
+      if (typeof callback === 'function') {
+        callback();
+      }
+
+      return false;
+    }) 
   }
 
   onViewChange(prevState, currState) {
+
+    if (currState.product && currState.product.quantity.type === 'set-of') {
+      Studio.panel.productInfo.elements.selector.select({
+        text: `Set of ${currState.view.blocks.length}`,
+        quantity: currState.view.blocks.length,
+        noToggle: true
+      })
+    }
+
     if (this.product && !compareObjects(prevState.view.blocks, currState.view.blocks)) {
       const { blocks } =  currState.view;
 
@@ -1359,29 +1416,27 @@ class ProductBuilder extends HTMLElement {
   redirectFromInst(instToRedirect) {
     const newQuery = JSON.parse(instToRedirect);
 
-      localStorage.removeItem('instToRedirect');
+    localStorage.removeItem('instToRedirect');
 
-      const redirectParams = new URLSearchParams(location.search);
-      const access_token = redirectParams.get('access_token');
-      const user_id = redirectParams.get('user_id');
+    const redirectParams = new URLSearchParams(location.search);
+    const access_token = redirectParams.get('access_token');
+    const user_id = redirectParams.get('user_id');
 
-      localStorage.setItem('oauthInstagram', JSON.stringify({
-        access_token,
-        user_id
-      }));
+    localStorage.setItem('oauthInstagram', JSON.stringify({
+      access_token,
+      user_id
+    }));
 
-      const url = new URL(location.pathname, location.origin);
-      for (const key in newQuery) {
-        if (newQuery[key]) {
-          url.searchParams.append(key, newQuery[key]);
-        }
+    const url = new URL(location.pathname, location.origin);
+    for (const key in newQuery) {
+      if (newQuery[key]) {
+        url.searchParams.append(key, newQuery[key]);
       }
+    }
 
-      const link = document.createElement('a');
+    url.searchParams.append('from_redirect', 'instagram');
 
-      link.href = url.href;
-
-      link.click();
+    location.replace(url.href);
   }
 
   setState(state) {
@@ -1397,7 +1452,11 @@ class ProductBuilder extends HTMLElement {
     this.setState(globalState);
 
     this.addEventListener('studio:change', (event) => {
-      const { state } = event.detail;
+      const { state, callback } = event.detail;
+
+      if (callback) {
+        this.asyncExpectants.push(callback);
+      }
 
       const currState = JSON.parse(this.getAttribute('state'));
 
@@ -1635,7 +1694,7 @@ class ProductBuilder extends HTMLElement {
       .then(res => res.json())
       .then(data => {
         return Array.isArray(data) ? data.map(imageURL => ({
-          original: baseURL + '/' + imageURL,
+          original: cdnBaseURL + '/' + imageURL,
           thumbnail: imageURL + `?resize=[${devicePixelRatio * 125},${devicePixelRatio * 125}]&thumbnail=true`
         })) : []
       });
@@ -1651,12 +1710,13 @@ class ProductBuilder extends HTMLElement {
 customElements.define('product-builder', ProductBuilder);
 
 const utils = {
-  change: (state, initiator) => {
+  change: (state, initiator, callback) => {
     // console.log(initiator, state);
 
     const changeEvent = new CustomEvent('studio:change', {
       detail: {
-        state
+        state,
+        callback
       }
     });
 
@@ -1712,6 +1772,7 @@ const utils = {
       localStorage.setItem('product-builder-history', JSON.stringify(history));
 
       if (((Studio.customer && !Studio.anonimCustomerId) || (!Studio.customer && Studio.anonimCustomerId)) && Studio.projectId && Studio.inited && history.length > 1) {
+        console.log('update order');
         Studio.updateOrder(Studio.projectId);
       }
     },
@@ -1969,6 +2030,13 @@ class RangeSlider {
 
       Studio.utils.rangeActivated = false;
       window.dispatchEvent(new CustomEvent('range:mouseup'));
+    });
+
+    Studio.addEventListener('tab:change', (event) => {
+      const { selected: tab } = event.detail.tabs;
+      if (tab.dataset.tab === 'edit') {
+        showSliderValue();
+      }
     })
   }
 
@@ -2095,20 +2163,38 @@ class OptionSelector extends HTMLElement {
     this.elements.optionsWrapper.classList.add('is-open');
   }
 
-  select(event) {
-    this.elements.selected.textContent = event.currentTarget.textContent;
-    this.elements.selected.dataset.settedValue = event.currentTarget.dataset.value;
-    this.toggle();
+  select(parameter) {
+    let quantity, text;
+
+    if (parameter.quantity === 0) {
+      return;
+    }
+    
+    if (parameter instanceof Event) {
+      text = parameter.currentTarget.textContent
+      quantity = Number(parameter.currentTarget.dataset.value);
+    } else {
+      quantity = Number(parameter.quantity);
+      text = parameter.text;
+    }
+
+    this.elements.selected.textContent = text;
+    this.elements.selected.dataset.settedValue = quantity;
+    
+    if (!parameter.noToggle) {
+      this.toggle();
+    }
+    
 
     this.dispatchEvent(new CustomEvent('product-option:changed', {
       detail: {
         value: this.getValue()
       }
-    }))
+    }));
   }
 
   getValue() {
-    return +this.elements.selected.dataset.settedValue;
+    return Number(this.elements.selected.dataset.settedValue);
   }
 
   optionTemplate = (variant) => {
@@ -2600,14 +2686,11 @@ class Tool {
 
   _defaultCreate(state) {
     this.container.style.opacity = 0;
-    this.setOnCreate(state);
-
+    this.editList.append(this.container);     
+    
     setTimeout(() => {
-      this.editList.append(this.container);     
-
-      setTimeout(() => {
-        this.container.style.opacity = null;
-      }, 10);
+      this.container.style.opacity = null;
+      this.setOnCreate(state);
     }, 300);
   }
 
@@ -3569,8 +3652,6 @@ class CropTool extends Tool {
     const { value } = state;
 
     this.slider.setValue(value);
-    setTimeout(() => {
-    }, 10)
   }
 }
 
@@ -3915,7 +3996,8 @@ class Tools extends HTMLElement {
         wrapper: '[data-product-container]',
         product: '[data-product]',
         switch: '[data-product-switch-grid]',
-        openProduct: '[data-product-button]'
+        openProduct: '[data-product-button]',
+        searchBar: '[data-search-query]'
       },
       images: {
         imageHide: '[data-image-hide]',
@@ -4063,7 +4145,7 @@ class Tools extends HTMLElement {
       }
     }, 300);
 
-    Studio.dispatchEvent(new CustomEvent('change', {
+    Studio.dispatchEvent(new CustomEvent('tab:change', {
       detail: {
         tabs: {
           selected: this.tabs.selected
@@ -4096,9 +4178,21 @@ class Tools extends HTMLElement {
     this.pages.products.selected.classList.add('is-selected');
   };
 
+  initSearchBar() {
+    const search = this.querySelector(Tools.selectors.pages.products.searchBar);
+
+    search.addEventListener('input', (event) => {
+      this.filterProducts(event.target.value);
+    });
+
+    return search;
+  }
+
   async initProductPage() {
     const productsContainer = this.querySelector(Tools.selectors.pages.products.container)
     const productWrapper = this.querySelector(Tools.selectors.pages.products.wrapper);
+
+    const productElements = [];
 
     const gridSwitch = this.querySelector(Tools.selectors.pages.products.switch);
     this.classList.add('product-grid--' + gridSwitch.getValue());
@@ -4117,7 +4211,11 @@ class Tools extends HTMLElement {
 
     const products = productsData
       .map(item => {
-        productsContainer.appendChild(this.productTemplate.call(this, item));
+        const productElement = this.productTemplate.call(this, item);
+
+        productsContainer.appendChild(productElement);
+
+        productElements.push(productElement);
 
         return item;
       });
@@ -4164,8 +4262,21 @@ class Tools extends HTMLElement {
       grid: {
         switch: gridSwitch,
         value: gridSwitch.getValue
-      }
+      },
+      productElements,
+      search: this.initSearchBar()
     }
+  }
+
+  filterProducts(query) {
+    this.pages.products.productElements
+      .forEach(elem => {
+        if (!elem.title.toLowerCase().includes(query.toLowerCase())) {
+          elem.style.display = 'none';
+        } else {
+          elem.style.display = null;
+        }
+      });
   }
 
   productTemplate(product) {
@@ -4194,6 +4305,8 @@ class Tools extends HTMLElement {
 
     container.innerHTML = productInner;
     container.addEventListener('click', this.selectProduct.bind(this));
+
+    container.title = product.title;
 
     return container;
   }
@@ -4264,7 +4377,6 @@ class Tools extends HTMLElement {
       uploadButton.toggleAttribute('data-upload-image');
 
       uploadButton.innerHTML = `
-      
         <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M13.0142 5.16797L9.30547 1.27213L5.59678 5.16797" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           <line x1="1" y1="-1" x2="8.75" y2="-1" transform="matrix(0 1 1 0 10.0237 1.19531)" stroke="white" stroke-width="2" stroke-linecap="round"/>
@@ -4323,14 +4435,16 @@ class Tools extends HTMLElement {
       }
     });
 
-    uploadButton.addEventListener('click', () => {
+    uploadButton.addEventListener('click', (event) => {
       uploadSelector.classList.toggle('is-open');
+      console.log(event);
 
       if (uploadSelector.classList.contains('is-open')) {
         subscribeToActionController({
           target: uploadSelector,
           opener: uploadButton,
           callback: () => {
+            console.log('close');
             uploadSelector.classList.remove('is-open');
             uploadSelector.style.height = null;
           }
@@ -4445,7 +4559,7 @@ class Tools extends HTMLElement {
 
     if (typeof imageFile === 'object') {
       const setImage = (imageName) => {
-        image.src = baseURL + '/product-builder/' + imageName;
+        image.src = cdnBaseURL + '/product-builder/' + imageName;
   
         image.onload = () => {
           imageWrapper.classList.remove('is-loading');
@@ -4453,7 +4567,7 @@ class Tools extends HTMLElement {
 
         const url = new URL(image.src);
 
-        const original = baseURL + url.pathname;
+        const original = cdnBaseURL + url.pathname;
 
         const isExist = Studio.uploaded.some(upload => upload.thumbnail === imageName);
 
@@ -4545,7 +4659,6 @@ class Tools extends HTMLElement {
           }
         }
   
-        this.pages.images.uploadButton.dispatchEvent(new Event('click'));
         image.style.opacity = null;
       }
   
@@ -4553,7 +4666,7 @@ class Tools extends HTMLElement {
   
       image.style.opacity = 0;
     } else if (typeof imageFile === 'string') {
-      image.src = baseURL + "/" + imageFile;
+      image.src = cdnBaseURL + "/" + imageFile;
 
       image.onload = () => {
         imageWrapper.classList.remove('is-loading');
@@ -4734,7 +4847,6 @@ class Panel extends HTMLElement {
     this.mobileTrigger.addEventListener('touchend', this.event.mobileTouchEnd);
     window.addEventListener('touchend', this.event.windowTouchUp);
 
-
     this.setAttribute('state', JSON.stringify(globalState.panel));
 
     adaptiveActions.subscribe(this, this.onWindowResize.bind(this));
@@ -4804,6 +4916,8 @@ class Panel extends HTMLElement {
     } else {
       document.querySelectorAll(Panel.selectors.mobileAdaptiveButtons)
         .forEach(btn => btn.classList.add('unshow'));
+
+      this.openOnTab(20);
     }
 
     this.pagesHeight();
@@ -4860,7 +4974,10 @@ class Panel extends HTMLElement {
       document.querySelectorAll(Panel.selectors.mobileAdaptiveButtons)
         .forEach(btn => btn.classList.remove('unshow'));
     }
-    this.pagesHeight();
+
+    setTimeout(() => {
+      this.pagesHeight();
+    }, 300);
   }
 
   mobileMouseDown(event) {
@@ -5234,7 +5351,20 @@ class EditablePicture extends HTMLElement {
     Promise.all([
       new Promise(res => this.image.addEventListener('load', () => res())),
       new Promise(res => this.previewImage.addEventListener('load', res())),
-    ]).then(_ => this.classList.remove('is-loading'));
+    ]).then(async _ => {
+
+      const currChild = Studio.state.view.blocks
+        .reduce((children, block) => [...children, ...block.childBlocks], [])
+        .find(child => child.id === this.getAttribute('child-block'));
+
+      if (Studio.state.product.type.id === 'tiles' && (currChild && currChild.settings.crop.value === 0 && !currChild.fitted || this.oldImage)) {
+        await this.fillImage(this.defaultImageUrl);
+
+        this.classList.remove('is-loading');
+      } else {
+        this.classList.remove('is-loading');
+      }
+    });
 
     const getParams = () => {
       const size = this.pageConfig;
@@ -5274,6 +5404,70 @@ class EditablePicture extends HTMLElement {
     }
   }
 
+  fillImage(imageUrl) {
+    return new Promise(async (res, rej) => {
+      const url = new URL(imageUrl);
+
+      const image = new Image();
+      
+      const [ naturalWidth, naturalHeight] = await new Promise(res => {
+        image.onload = () => {
+          res([image.naturalWidth, image.naturalHeight]);
+        }
+
+        image.src = url.origin + url.pathname;
+      });
+
+      const minSide = Math.min(naturalWidth, naturalHeight);
+
+      const requiredSide = Tiles.printSizes[this.getAttribute('picture-type')];
+
+      let multiply;
+
+      if (minSide <= requiredSide) {
+        multiply = 100 - (minSide * 100) / requiredSide
+      } else {
+        multiply = 100 - (requiredSide * 100) / minSide;
+      }
+
+      const newBlocks = Studio.state.view.blocks.map(block => {
+        const newChildren = block.childBlocks
+          .map(child => {
+            if (child.id === this.getAttribute('child-block')) {
+
+              child.settings.crop = {
+                value: +(multiply.toFixed(0))
+              }
+
+              return {
+                ...child,
+                fitted: true
+              };
+            }
+
+            return child;
+          });
+
+        return {
+          ...block,
+          childBlocks: newChildren
+        }
+      });
+
+      Studio.utils.change({ view: {
+        ...Studio.state.view,
+        blocks: newBlocks
+      }}, 'fit image - set image');
+
+      const onLoad = () => {
+        res();
+        this.image.removeEventListener('load', onLoad);
+      }
+
+      this.image.addEventListener('load', onLoad);
+    });
+  }
+
   setBackground(background) {
     this.setAttribute('background-color', background);
   }
@@ -5310,6 +5504,8 @@ class EditablePicture extends HTMLElement {
     this.image.remove();
     this.previewImage.remove();
 
+    this.mask.remove();
+
     this.classList.add('is-empty');
   }
 
@@ -5323,10 +5519,6 @@ class EditablePicture extends HTMLElement {
 
   setValue(settings) {
     clearTimeout(this.timer);
-
-    const type = this.getAttribute('picture-type')
-      ? `&type=${this.getAttribute('picture-type')}`
-      : '';
 
     const [
       prevCrop,
@@ -5397,7 +5589,6 @@ class EditablePicture extends HTMLElement {
     if (this.image && rotate && toChange || (this.image && backgroundColor)) {
       this.image.onload = () => {
         this.image.style.opacity = 1;
-
         setTimeout(() => {
           this.previewImage.style.opacity = 0;
         }, 300);
@@ -5700,6 +5891,8 @@ class ProductControls extends HTMLElement {
 
     if (blockElem && blockElem.getAttribute('block-type').startsWith('photobook') || Studio.product.quantity.type === 'single') {
       productControls.append(editBtn);
+    } else if (blockElem && blockElem.getAttribute('block-type') === 'tiles') {
+      productControls.append(removeBtn, editBtn);
     } else {
       productControls.toggleAttribute('is-quantitative');
       productControls.append(removeBtn, controlsQuantity, editBtn);
@@ -5830,74 +6023,75 @@ class ProductControls extends HTMLElement {
   }
 
   removeBlock() {
-    // const newBlocks = Studio.state.view.blocks
-    //   .map(block => {
-    //     if (block.id === this.getAttribute('block-controls')) {
-    //       const newChildren = block.childBlocks
-    //         .map(child => {
-    //           if (child.type === 'editable-picture') {
-    //             return {
-    //               ...child,
-    //               imageUrl: null
-    //             }
-    //           }
+    const newBlocks = Studio.state.view.blocks
+      .map(block => {
+        if (block.id === this.getAttribute('block-controls')) {
+          const newChildren = block.childBlocks
+            .map(child => {
+              if (child.type === 'editable-picture') {
+                return {
+                  ...child,
+                  imageUrl: null,
+                  fitted: false
+                }
+              }
 
-    //           return child;
-    //         })
+              return child;
+            })
 
-    //       return {
-    //         ...block,
-    //         childBlocks: newChildren
-    //       }
-    //     }
-
-    //     return block;
-    //   });
-
-    // Studio.utils.change({
-    //   view: {
-    //     ...Studio.state.view,
-    //     blocks: newBlocks
-    //   }
-    // }, 'controls - remove block')
-
-    const { blocks } = Studio.state.view;
-    const { product } = Studio.state;
-
-    const minCount = 0;
-    let currCount;
-
-    const minimum = product.quantity.minimum;
-
-    const blocksCount = Studio.studioView.getBlocksCount(blocks);
-
-    const newBlocks = blocks.map(block => {
-      // const allowToDelete = blocksCount - block.count >= minimum;
-      const allowToDelete = true;
-
-      if (block.id === this.productId && allowToDelete) {
-        currCount = 0;
-
-        return {
-          ...block,
-          count: currCount
+          return {
+            ...block,
+            childBlocks: newChildren
+          }
         }
-      }
 
-      return block;
-    });
+        return block;
+      });
 
     Studio.utils.change({
-      panel: {
-        ...Studio.state.panel,
-        blockCount: Studio.state.panel.blockCount - 1
-      },
       view: {
         ...Studio.state.view,
-        blocks: newBlocks,
-        blockCount: Studio.state.panel.blockCount - 1
+        blocks: newBlocks
       }
-    }, 'controls - decrease');
+    }, 'controls - remove block')
+
+    // const { blocks } = Studio.state.view;
+    // const { product } = Studio.state;
+
+    // const minCount = 0;
+    // let currCount;
+
+    // const minimum = product.quantity.minimum;
+
+    // const blocksCount = Studio.studioView.getBlocksCount(blocks);
+
+    // const newBlocks = blocks.map(block => {
+    //   // const allowToDelete = blocksCount - block.count >= minimum;
+    //   const allowToDelete = true;
+
+    //   if (block.id === this.productId && allowToDelete) {
+    //     currCount = 0;
+
+    //     return {
+    //       ...block,
+    //       count: currCount
+    //     }
+    //   }
+
+    //   return block;
+    // });
+
+    // Studio.utils.change({
+    //   panel: {
+    //     ...Studio.state.panel,
+    //     blockCount: Studio.state.panel.blockCount - 1
+    //   },
+    //   view: {
+    //     ...Studio.state.view,
+    //     blocks: newBlocks,
+    //     blockCount: Studio.state.panel.blockCount - 1
+    //   }
+    // }, 'controls - decrease');
   }
 
   removePicture() {
@@ -7177,6 +7371,12 @@ class Tiles extends ProductElement {
       </defs>
     </svg>
     `
+  }
+
+  static printSizes = {
+    squareTile: getPixels(17),
+    squareFramelessTile: getPixels(19),
+    roundTile: getPixels(17)
   }
 
   static get observedAttributes() {
@@ -9303,6 +9503,18 @@ class ImageChooser extends HTMLElement {
     this.instLogin = this.initInstLogin();
     this.metaLogin = this.initMetaButton();
     this.logoutBtn = this.initLogoutButton();
+
+    Studio.addEventListener('studio:inited', () => {
+      if (productParams.get('from_redirect')) {
+        this.open('instagram');
+
+
+        const newURL = new URL(location.href);
+        newURL.searchParams.delete('from_redirect');
+
+        window.history.replaceState({}, '', newURL);
+      }
+    });
   }
 
   close() {

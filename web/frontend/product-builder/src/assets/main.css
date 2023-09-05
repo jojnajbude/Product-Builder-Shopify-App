@@ -771,6 +771,17 @@ adaptive-content[panel-related] {
   transition: opacity .3s;
 }
 
+@media (max-width: 750px) {
+  .page__image-wrapper:not(.is-selected) .page__image-deleter {
+    pointer-events: all;
+    position: absolute;
+    padding: 5px;
+    z-index: 5;
+    opacity: 1;
+    transition: opacity .3s;
+  }
+}
+
 .page__image-wrapper .page__image-deleter {
   position: absolute;
   right: 0px;
@@ -839,7 +850,6 @@ adaptive-content[panel-related] {
   right: 0;
   transition: height .3s;
   border-top-left-radius: 20px;
-  padding-bottom: 30px;
   border-top-right-radius: 20px;
   height: 0;
   overflow: hidden;
@@ -852,6 +862,7 @@ adaptive-content[panel-related] {
 
 .page__upload .upload__wrapper.is-open {
   pointer-events: all;
+  padding-bottom: 30px;
   background-color: #fff;
   box-shadow: -1px 0 5px var(--text-color);
   z-index: 1;
@@ -1258,6 +1269,7 @@ adaptive-content[panel-related] {
 .upload__wrapper .upload__variant {
   position: relative;
   color: var(--text-color);
+  background-color: #fff;
   transition: background-color .3s;
 }
 
@@ -1690,6 +1702,8 @@ editable-picture {
 
 .editable-picture .editable-picture__mask svg {
   position: absolute;
+  width: 100%;
+  height: 100%;
   inset: 0;
   object-fit: contain;
 }
@@ -2665,12 +2679,29 @@ product-magnet {
   aspect-ratio: 1 / 1;
 }
 /* Tile */
+.studio-view__container:has(.tile) {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (min-width: 750px) and (max-width: 855px) {
+  .studio-view__container:has(.tile) {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 500px) {
+  .studio-view__container:has(.tile) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 product-tile {
   display: block;
 }
 
 .tile {
-  width: 160px;
+  width: 90%;
   padding: 0px;
   aspect-ratio: 1;
   background-color: #fff;
@@ -2683,13 +2714,11 @@ product-tile {
 .tile__frame {
   pointer-events: none;
   position: absolute;
-  top: -20px;
-  left: -20px;
-  right: -20px;
-  bottom: -20px;
+  inset: -12.5%;
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
+  z-index: 10;
 }
 
 /* Add block button */

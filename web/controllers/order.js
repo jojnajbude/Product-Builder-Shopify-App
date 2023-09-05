@@ -308,18 +308,12 @@ async function UploadImagesFromBlock(state, uploadPath) {
               ? [width, height]
               : null; 
   
-            const type = block.type === 'polaroid'
-              ? '&type=polaroid'
-              : '';
-  
             let editedUrl;
   
             switch(block.type) {
               case 'polaroid':
                 const textBlock = block.childBlocks.find(child => child.type === 'text');
-  
-                // console.log(textBlock.settings);
-  
+    
                 const textSettings = Object.assign({
                   align: 'center',
                   font: 'Times New Roman',
@@ -349,7 +343,7 @@ async function UploadImagesFromBlock(state, uploadPath) {
                     ? `resize=${JSON.stringify(resize)}&`
                     : ''
                   }crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}
-                  &type=${layout.layout}
+                  &type=${layout.layout}&layout=tile
                 `
                 break;
               default:

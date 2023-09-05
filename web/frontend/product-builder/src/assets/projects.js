@@ -112,6 +112,11 @@ const onImageLoad = async (picture, src) => {
   })
 }
 
+const userEmptyState = () => {
+  draftsList.querySelectorAll('li.order').forEach(order => order.remove());
+  draftsList.classList.remove('is-loading');
+}
+
 const orderItem = (draft) => {
   return new Promise(async (res, rej) => {
     const { projectId: id, product, updatedAt, status } = draft;
@@ -260,12 +265,18 @@ const initOrders = () => {
   fetch(ordersLink)
     .then(res => res.json())
     .then(orders => {
+      console.log(orders);
+
       if (Array.isArray(orders) && orders.every(order => !order.error)) {
         setOrders(orders);
+      } else if (orders.error) {
+        userEmptyState();
       }
     });
 }
 
 if (customerId) {
   initOrders();
+} else {
+  userEmptyState();
 }

@@ -274,7 +274,8 @@
           block="block-28"
           block-type="tiles"
           frame="black"
-          class="tile product-element"
+          class="tile product-element in-view"
+
         >
           <div
             class="product-element__picture editable-picture {{#unless block.childBlocks.0.imageUrl}}is-empty{{/unless}}"
@@ -298,7 +299,7 @@
                 class="editable-picture__image"
                 draggable="false"
                 crossorigin=""
-                src="{{ block.childBlocks.0.imageUrl }}?resize=[2362,2362]&rotate={{ block.childBlocks.0.settings.rotate.value }}&crop={{ imageCrop block.childBlocks.0.settings.crop.value }}&background=rgb(255,255,255)"
+                src="{{ block.childBlocks.0.imageUrl }}?resize=[2362,2362]&rotate={{ block.childBlocks.0.settings.rotate.value }}&crop={{ imageCrop block.childBlocks.0.settings.crop.value }}&background=rgb(255,255,255)&type={{ block.settings.layout.layout }}"
                 style="opacity: 1;"
               >
             {{/if}}

@@ -4,6 +4,10 @@ body {
   padding: 25px;
 }
 
+body:has(.tile) {
+  background-color: #03ca82;
+}
+
 body > .studio-view {
   border-radius: 30px;
   background-color: #fff;
@@ -23,6 +27,10 @@ body > .studio-view {
   justify-items: center;
   flex-wrap: wrap;
   overflow: visible
+}
+
+.studio-view__container:has(.tile) {
+  gap: 50px;
 }
 
 .studio-view__container.pdf {
@@ -86,4 +94,8 @@ body > .studio-view {
 
 .textarea-container[text-align="right"] {
   text-align: right;
+}
+
+.tile.in-view .tile__frame {
+  inset: -11px -9px -9px -11px;
 }

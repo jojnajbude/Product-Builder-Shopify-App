@@ -6,11 +6,9 @@ import Customer from '../models/Customer.js';
 
 
 import { join } from 'path';
-import { createLayout, getCustomerUploads, getText, getUploadPath, removeImage, sharpImage } from '../controllers/product-builder.js';
-import { createDir, downloadFile, existsFile, readDirectory, uploadFile } from '../utils/cdnApi.js';
+import { getCustomerUploads, removeImage } from '../controllers/product-builder.js';
 import Shop from '../models/Shop.js';
 import shopify from '../shopify.js';
-import sharp from 'sharp';
 
 const PROXY_PATH = `${process.cwd()}/frontend/product-builder/src`;
 
@@ -174,12 +172,6 @@ productBuilder.get('/uploads/list', getCustomerUploads);
 
 productBuilder.post('/uploads/remove', express.json(), removeImage);
 
-productBuilder.post('/text', express.json(), getText);
-
-productBuilder.post('/photobook', express.json(), createLayout);
-
 productBuilder.use('/', express.static(PROXY_PATH));
-
-productBuilder.get('/*', sharpImage); 
 
 export default productBuilder; 
