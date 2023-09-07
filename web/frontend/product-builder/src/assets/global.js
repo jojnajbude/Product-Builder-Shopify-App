@@ -17,6 +17,10 @@ function moneyFormat(price, currency) {
 };
 
 const backButton = (function backButtonInit() {
+  const previousUrl = document.referrer !== '' && new URL(document.referrer).pathname.endsWith('/apps/product-builder')
+    ? new URL(document.referrer)
+    : new URL(location.origin + localization.fallbackURL);
+
   const button = document.querySelector('[data-back-button]');
 
   if (!button) {
@@ -24,7 +28,7 @@ const backButton = (function backButtonInit() {
   }
 
   button.addEventListener('click', () => {
-    window.history.go(-1);
+    location.replace(previousUrl.href);
   });
 
   return button;
@@ -697,6 +701,8 @@ const globalState = {
   },
 }
 
+console.log(localization);
+
 const compareObjects = (obj1, obj2) => {
   return JSON.stringify(obj1) === JSON.stringify(obj2);
 }
@@ -774,6 +780,16 @@ class ProductBuilder extends HTMLElement {
     }
 
     if (prevState.productId !== currState.productId && !currState.product) {
+      const currentUrl = new URL(location.href);
+
+      if (currentUrl.searchParams.get('id') !== currState.productId) {
+        currentUrl.searchParams.delete('id');
+
+        currentUrl.searchParams.append('id', currState.productId);
+  
+        history.replaceState({}, '', currentUrl);
+      }
+
       this.getProduct(currState.productId)
         .then(product => {
           this.product = product;
@@ -1569,8 +1585,6 @@ class ProductBuilder extends HTMLElement {
   }
 
   setOrderPath() {
-    // const size = (this.state);
-
     const nextURL = location.origin + location.pathname + `?project-id=${this.projectId}`;
     const nextTitle = document.title;
     const nextState = { additionalInformation: 'Product builder with order history' };
@@ -1896,9 +1910,13 @@ class ErrorToast extends HTMLElement {
       this.toggleAttribute('show');
     }
 
+    const alternateText = localization
+      ? localization.error.type
+      : "Error type"
+
     this.createError(text
       ? text
-      : `Error type: ${type}.`);
+      : `${localization.error.type}: ${type}.`);
 
     clearTimeout(this.timeout);
 
@@ -2723,7 +2741,7 @@ class LayoutTool extends Tool {
 
     this.collapsible.inner.classList.add('tool__layout-grid');
 
-    this.label.setLabel('Layout');
+    this.label.setLabel(localization.tools.layout.title);
 
     const icon = `
       <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -2939,7 +2957,7 @@ class TextTool extends Tool {
 
     this.container.classList.add('center');
 
-    this.label.setLabel('Text');
+    this.label.setLabel(localization.tools.text.title);
 
     const icon = `
       <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -3422,7 +3440,7 @@ class RotateTool extends Tool {
   constructor() {
     super();
 
-    this.label.setLabel('Rotate');
+    this.label.setLabel(localization.tools.rotate.title);
 
     const icon = `
       <svg width="15" height="13" viewBox="0 0 15 13" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -3545,7 +3563,7 @@ class CropTool extends Tool {
   constructor() {
     super();
 
-    this.label.setLabel('Crop');
+    this.label.setLabel(localization.tools.crop.title);
 
     const icon = `
       <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -3711,7 +3729,7 @@ class BackgroundColorTool extends Tool {
   constructor() {
     super();
 
-    this.label.setLabel('Background color')
+    this.label.setLabel(localization.tools.background.title)
 
     const icon = `
       <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -3865,7 +3883,7 @@ class FrameTool extends Tool {
       </svg>
     `;
 
-    this.label.setLabel('Frame');
+    this.label.setLabel(localization.tools.frame.title);
 
     this.icon.setIcon(icon);
   }
@@ -4226,7 +4244,7 @@ class Tools extends HTMLElement {
       btn.toggleAttribute('data-product-button');
       btn.toggleAttribute('panel-related');
 
-      btn.textContent = 'Open product';
+      btn.textContent = localization.tabs.products.openProduct;
 
       btn.setPoints({
         mobile: {
@@ -4383,7 +4401,7 @@ class Tools extends HTMLElement {
           <path d="M3.03125 10V12.5C3.03125 15.2614 5.26983 17.5 8.03125 17.5H10.25C13.0114 17.5 15.25 15.2614 15.25 12.5V10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
           
-        <span>Upload Photos</span>
+        <span>${localization.tabs.images.uploadImages}</span>
       `;
 
       const uploadSelector = document.createElement('div');
@@ -4401,14 +4419,14 @@ class Tools extends HTMLElement {
             data-import-from-pc
           >
           <label for="image-from-pc">
-            From My Device
+            ${localization.tabs.images.fromDevice}
           </label>
         </div>
         <div class="upload__variant" data-from-instagram>
-          <span>From Instagram</span>
+          <span>${localization.tabs.images.fromInstagram}</span>
         </div>
         <div class="upload__variant" data-from-facebook>
-          <span>From Facebook</span>
+          <span>${localization.tabs.images.fromFacebook}</span>
         </div>
       `;
 
@@ -5504,7 +5522,7 @@ class EditablePicture extends HTMLElement {
     this.image.remove();
     this.previewImage.remove();
 
-    this.mask.remove();
+    this.mask && this.mask.remove();
 
     this.classList.add('is-empty');
   }
@@ -5739,7 +5757,7 @@ class EditableText extends HTMLElement {
     if (text) {
       this.editableArea.innerHTML = this.formatText(text);
     } else {
-      this.editableArea.innerHTML = this.formatText('Add text here');
+      this.editableArea.innerHTML = this.formatText(localization.tools.text.defaultValue);
     }
 
     if (maxSize) {
@@ -7037,7 +7055,7 @@ class PolaroidPrints extends Prints {
 
     const text = this.getText(editableQueryText(), {
       line: true,
-      defaultText: 'Add text here',
+      defaultText: localization.tools.text.defaultValue,
       maxSize: 20
     });
 
@@ -9665,7 +9683,7 @@ class ImageChooser extends HTMLElement {
     const button = document.createElement('button');
     button.classList.add('instagram-login__button', 'button', 'button--primary-action');
     button.addEventListener('click', this.loginInst.bind(this));
-    button.textContent = 'Sign up with Instagram';
+    button.textContent = `${localization.imageChooser.signUp} ${localization.imageChooser.instagram}`;
 
     container.append(button);
 
@@ -9698,7 +9716,7 @@ class ImageChooser extends HTMLElement {
     button.innerHTML += icon;
 
     const text = document.createElement('span');
-    text.textContent = 'Log in with Facebook';
+    text.textContent = `${localization.imageChooser.signUp} ${localization.imageChooser.facebook}`;
     button.appendChild(text);
 
     button.addEventListener('click', () => {
@@ -9780,7 +9798,7 @@ class ImageChooser extends HTMLElement {
     }
 
     const create = (from) => {    
-      button.textContent = 'Logout from ' + from;
+      button.textContent = `${localization.imageChooser.logout} ${localization.imageChooser[from]}`;
 
       if (from === 'facebook') {
         button.removeEventListener('click', instagramLogout);

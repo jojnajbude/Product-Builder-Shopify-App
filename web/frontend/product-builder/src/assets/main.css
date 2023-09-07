@@ -99,6 +99,15 @@ img[src=""], img:not([src]) {
     display: none;
   }
 
+  .header__checkout-button .mobile {
+    color: #FF0079;
+    transition: color .3s;
+  }
+
+  .header__checkout-button:disabled .mobile {
+    color: #999;
+  }
+
   .mobile {
     display: inherit
   }
@@ -304,6 +313,10 @@ adaptive-content[panel-related] {
   gap: 15px;
 }
 
+.customization-panel__product:has(.product-info__title:empty) .customization-panel__product-quantity {
+  display: none;
+}
+
 .customization-panel__product.customization-panel__product .product-info__image {
   border-radius: 5px;
   object-fit: cover;
@@ -341,7 +354,7 @@ adaptive-content[panel-related] {
 }
 
 .customization-panel__product-quantity > span {
-  text-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .customization-panel__mobile-gradient {
@@ -1946,6 +1959,7 @@ image-chooser {
   opacity: 1;
   border-radius: 20px;
   transition: opacity .3s;
+  object-fit: cover;
 }
 
 .image-chooser .image-container.is-selected {
@@ -2543,7 +2557,13 @@ polaroid-prints {
 
 .polaroid {
   aspect-ratio: 2 / 3;
-  width: 165px;
+  width: 300px;
+}
+
+@media (max-width: 400px) {
+  .polaroid {
+    width: 250px;
+  }
 }
 
 .prints.prints__polaroid {
@@ -2575,6 +2595,7 @@ polaroid-prints {
 }
 
 .polaroid .polaroid__text-wrapper .textarea-container .textarea {
+  font-size: 16px;
   width: 100%;
 }
 

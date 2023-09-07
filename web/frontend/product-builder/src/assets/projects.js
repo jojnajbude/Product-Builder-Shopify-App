@@ -119,7 +119,7 @@ const userEmptyState = () => {
 
 const orderItem = (draft) => {
   return new Promise(async (res, rej) => {
-    const { projectId: id, product, updatedAt, status } = draft;
+    const { projectId: id, product: draftProduct = {}, updatedAt, status } = draft;
 
     const li = document.createElement('li');
     li.classList.add('order', 'is-loading');
@@ -130,8 +130,8 @@ const orderItem = (draft) => {
     picture.height = 100;
     picture.classList.add('order__image');
 
-    if (product.imageUrl) {
-      await onImageLoad(picture, product.imageUrl);
+    if (draftProduct.imageUrl) {
+      await onImageLoad(picture, draftProduct.imageUrl);
     }
 
     const title = document.createElement('div');
@@ -153,7 +153,7 @@ const orderItem = (draft) => {
         break;
     }
 
-    title.textContent = product.title + additionalInfo;
+    title.textContent = draftProduct.title + additionalInfo;
 
     const lastUpdated = document.createElement('div');
 
@@ -180,7 +180,7 @@ const orderItem = (draft) => {
     const editBtn = document.createElement('a');
     editBtn.textContent = 'Edit';
     editBtn.classList.add('button', 'button--primary');
-    editBtn.href = location.origin + `/apps/product-builder?project-id=${id}`;
+    editBtn.href = location.origin + `${Shopify.routes.root}apps/product-builder?project-id=${id}`;
     editBtn.disabled = status !== 'draft' && status !== 'active';
     if (status !== 'draft' && status !== 'active') {
       editBtn.href = '';
@@ -259,7 +259,7 @@ const setOrders = (orders) => {
   });
 }
 
-const ordersLink = location.origin + '/apps/product-builder/orders/list/' + customerId;
+const ordersLink = location.origin + `/apps/product-builder/orders/list/` + customerId;
 
 const initOrders = () => {
   fetch(ordersLink)

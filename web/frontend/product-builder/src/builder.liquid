@@ -28,6 +28,51 @@
     window.money_format = {{ shop.money_format | json }};
     window.currency = {{ shop.currency | json }};
 
+    window.localization = {
+      fallbackURL: "{{ routes.root_url }}",
+      tabs: {
+        products: {
+          openProduct: "{{ 'builder.buttons.open_product' | t }}",
+        },
+        images: {
+          uploadImages: "{{ 'builder.buttons.upload' | t }}",
+          fromDevice: "{{ 'builder.images.from_device' | t }}",
+          fromFacebook: "{{ 'builder.images.from_facebook' | t }}",
+          fromInstagram: "{{ 'builder.images.from_instagram' | t }}",
+        }
+      },
+      tools: {
+        layout: {
+          title: "{{ 'builder.edit.layout.title' | t }}"
+        },
+        text: {
+          title: "{{ 'builder.edit.text.title' | t }}",
+          defaultValue: "{{ 'builder.edit.text.default_value' | t }}"
+        },
+        background: {
+          title: "{{ 'builder.edit.background.title' | t }}"
+        },
+        crop: {
+          title: "{{ 'builder.edit.crop.title' | t }}"
+        },
+        rotate: {
+          title: "{{ 'builder.edit.rotate.title' | t }}"
+        },
+        frame: {
+          title: "{{ 'builder.edit.frame.title' | t }}"
+        },
+      },
+      error: {
+        type: "{{ 'builder.error.type' | t }}"
+      },
+      imageChooser: {
+        signUp: "{{ 'builder.image_chooser.sign_up' | t }}",
+        logout: "{{ 'builder.image_chooser.log_out' | t }}",
+        instagram: "{{ 'general.social.links.instagram' | t }}",
+        facebook: "{{ 'general.social.links.facebook' | t }}"
+      }
+    }
+
     window.host = '<%= host %>';
   </script>
 
@@ -50,7 +95,7 @@
 
       </button>
 
-      <a href="/" class="header__logo">
+      <a href="{{ routes.root_url }}" class="header__logo">
         <svg width="115" height="30" viewBox="0 0 115 30" fill="none" xmlns="http://www.w3.org/2000/svg">
           <g clip-path="url(#clip0_72_5479)">
             <path d="M0.624023 10.7261C0.624023 4.81099 5.39009 0.0449219 11.2634 0.0449219C15.093 0.0449219 18.6262 2.08752 20.541 5.36406C21.137 6.38535 20.7536 7.66225 19.7753 8.2572C18.754 8.81027 17.4771 8.46984 16.8821 7.49149C15.733 5.49185 13.6056 4.25684 11.2644 4.25684C7.73231 4.25684 4.79621 7.14999 4.79621 10.7251C4.79621 14.3002 7.73231 17.1933 11.2644 17.1933C13.4778 17.1933 15.5204 16.0872 16.7114 14.2142C17.3493 13.2359 18.6691 12.9803 19.6475 13.5753C20.6258 14.2142 20.8814 15.533 20.2435 16.5114C18.2857 19.5753 14.9244 21.4052 11.2644 21.4052C5.39009 21.4074 0.624023 16.5984 0.624023 10.7261Z" fill="url(#paint0_linear_72_5479)"/>
@@ -88,7 +133,7 @@
       </a>
 
       <button data-checkout-button disabled class="header__checkout-button button button--primary-action">
-        <span>Checkout</span>
+        <span>{{ 'builder.buttons.checkout' | t }}</span>
 
         <svg class="button__icon" width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M10.712 14.25L15.7498 9L10.712 3.75" stroke="#FF811A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -96,9 +141,9 @@
         </svg>
 
         <svg class="mobile" width="24" height="25" viewBox="0 0 24 25" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M1 2.5H3.39566C4.33305 2.5 5.14468 3.15106 5.34803 4.06614L6 7M6 7L7.10424 13.0733C7.62296 15.9263 10.1077 18 13.0075 18H15.7106C18.512 18 20.9406 16.0615 21.5614 13.3297L22.5835 8.83243C22.7969 7.89379 22.0834 7 21.1208 7H6Z" stroke="#FF0079" stroke-width="2" stroke-linecap="round"/>
-          <circle cx="8.5" cy="21.5" r="1" stroke="#FF0079" stroke-width="2"/>
-          <circle cx="20.5" cy="21.5" r="1" stroke="#FF0079" stroke-width="2"/>
+          <path d="M1 2.5H3.39566C4.33305 2.5 5.14468 3.15106 5.34803 4.06614L6 7M6 7L7.10424 13.0733C7.62296 15.9263 10.1077 18 13.0075 18H15.7106C18.512 18 20.9406 16.0615 21.5614 13.3297L22.5835 8.83243C22.7969 7.89379 22.0834 7 21.1208 7H6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="8.5" cy="21.5" r="1" stroke="currentColor" stroke-width="2"/>
+          <circle cx="20.5" cy="21.5" r="1" stroke="currentColor" stroke-width="2"/>
         </svg>
 
       </button>
@@ -153,7 +198,7 @@
             data-product-quantity
           >
             <span data-product-curr-quantity>0</span>
-            <span> out of </span>
+            <span>{{ 'builder.out_of' | t }}</span>
             <span data-product-req-quantity>
               0
             </span>
@@ -174,15 +219,15 @@
 
           <div class="tools__tabs" data-tabs>
             <button class="tools__tab" data-tab="products">
-              Products
+              {{ 'builder.tabs.products' | t }}
             </button>
 
             <button class="tools__tab is-selected" data-tab="images">
-              Images
+              {{ 'builder.tabs.images' | t }}
             </button>
 
             <button class="tools__tab" data-tab="edit">
-              Edit
+              {{ 'builder.tabs.edit' | t }}
             </button>
 
             <div class="tools__tabs-pagination" data-tabs-pagination>
@@ -207,7 +252,7 @@
                     name="query"
                     id="query"
                     data-search-query
-                    placeholder="Search"
+                    placeholder="{{ 'builder.products.search_placeholder' | t }}"
                   >
                 </label>
 
@@ -249,9 +294,8 @@
                 >
                   <div class="radio__toggler" data-toggler></div>
 
-                  <span>Hide used photos</span>
+                  <span>{{ 'builder.images.hide_used_photos' | t }}</span>
                 </custom-radio>
-
                 
                 <button
                   class="button button--primary-action"
@@ -287,7 +331,7 @@
                     </defs>
                   </svg>
 
-                  <span>Magic</span>
+                  <span>{{ 'builder.buttons.magic' | t }}</span>
                 </button>
               </div>
 
@@ -352,10 +396,10 @@
         <div class="button-group" data-button-group>
           <div class="button-group__action">
             <button class="button" data-cancel>
-              Cancel
+              {{ 'builder.image_chooser.cancel' | t }}
             </button>
             <button class="button button--primary" data-validate>
-              Validate
+              {{ 'builder.image_chooser.validate' | t }}
             </button>
           </div>
           </div>
@@ -382,11 +426,11 @@
             <path d="M4.5 14.0801L14.0806 4.49943" stroke="#FF0079" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
 
-          <span>Exit</span>
+          <span>{{ 'builder.related_product.exit' | t }}</span>
         </button>
 
         <span class="related-products__title">
-          Choose your options
+          {{ 'builder.related_product.choose' | t }}s
         </span>
       </div>
 
@@ -408,7 +452,7 @@
         class="related-products__checkout-btn button button--primary"
         data-checkout
       >
-        Continue to Checkout
+      {{ 'builder.related_product.continue' | t }}
       </button>
     </related-products>
   </body>

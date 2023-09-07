@@ -1,6 +1,7 @@
 const { customerID, shop } = window.cartChecker;
 
-const baseURL = 'https://product-builder.dev-test.pro';
+const baseURL = 'https://app.getcocun.com';
+
 
 const getCart = async () => {
   return fetch(Shopify.routes.root + 'cart.js').then(res => res.json());
@@ -25,8 +26,6 @@ const getCustomer = () => {
 
 async function CartCheck() {
   const [cart, userID] = await Promise.all([getCart(), getCustomer()]);
-
-  console.log(cart, userID, shop);
 
   const projectsInCart = cart.items
     .filter(item => item.properties.order_id);
@@ -58,8 +57,6 @@ async function CartCheck() {
     }).then(res => res.text()));
 
   const response = await Promise.all(items);
-
-  console.log(response);
 
   return true;
 }

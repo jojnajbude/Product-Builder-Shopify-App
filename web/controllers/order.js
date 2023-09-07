@@ -22,8 +22,6 @@ export const getCustomer = async (path) => {
 
   if (!(await existsFile(draftPath))) {
     const response = await createDir(join(path, 'projects'));
-
-    console.log('response', response);
   }
 
   return uploads;
@@ -139,8 +137,6 @@ export const updateProjectStatus = async (req, res, next) => {
 
   if (status) {
     const project = await Project.findOne({ projectId });
-
-    console.log(project, projectId)
 
     if (!project) {
       res.status(404).send({
