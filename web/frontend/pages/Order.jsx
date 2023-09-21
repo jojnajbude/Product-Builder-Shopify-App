@@ -9,9 +9,9 @@ import { authenticatedFetch } from "@shopify/app-bridge-utils";
 const DownloadsState = {
   default: 'Download Order',
   composing: [
-    'Waiting to project compose',
-    'Waiting to project compose.',
-    'Waiting to project compose..',
+    'Waiting to project compose   ',
+    'Waiting to project compose.  ',
+    'Waiting to project compose.. ',
     'Waiting to project compose...',
   ],
   downloading: (loaded, toload) => `Loading: ${loaded}Mb from ${toload}Mb`

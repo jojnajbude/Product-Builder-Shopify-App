@@ -385,8 +385,6 @@ app.get('/api/instagram/oauth', async (req, res) => {
     customerId: undefined
   };
 
-  console.log('here', code?.slice(0, 5));
-
   if (code) {
     const { client_id, client_secret } = metaKeys.instagram;
     

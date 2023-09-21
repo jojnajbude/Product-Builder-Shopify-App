@@ -281,81 +281,88 @@ async function UploadImagesFromBlock(state, uploadPath) {
     .map(block => {
       const { backgroundColor = { value: 'rgb(255,255,255)' }, layout } = block.settings;
 
+      const images = block.childBlocks
+        .filter(child => child.imageUrl)
+        .map(child => ({
+          url: child.imageUrl,
+          settings: child.settings,
+          resolution: child.resolution
+        }))
+        .map(image => {
+          const { crop, rotate } = image.settings;
+
+          const cropValue = 1 + (Math.round((crop.value / 50) * 100) / 100);
+
+          const { width, height } = image.resolution || {
+            width: 10,
+            height: 10
+          };
+
+          const resize = width && height
+            ? [width, height]
+            : null; 
+
+          let editedUrl;
+
+          switch(block.type) {
+            case 'polaroid':
+              const textBlock = block.childBlocks.find(child => child.type === 'text');
+
+              const textSettings = Object.assign({
+                align: 'center',
+                font: 'Times New Roman',
+                fontStyle: {
+                  bold: false,
+                  italic: false,
+                  underline: false
+                },
+                text: ''
+              }, textBlock.settings);
+
+              const { align, font, fontStyle: { bold, italic, underline }, text} = textSettings;
+
+              const textQuery = `align=${align}&font=${font}&bold=${bold}&italic=${italic}&underline=${underline}&text=${text.split('\n').join('0x0A')}`;
+
+              editedUrl = image.url + `?${
+                resize
+                  ? `resize=${JSON.stringify(resize)}&`
+                  : ''
+                }crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}
+                &type=polaroid&${textQuery}
+              `;
+              break;
+            case 'tiles':
+              editedUrl = image.url + `?${
+                resize
+                  ? `resize=${JSON.stringify(resize)}&`
+                  : ''
+                }crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}
+                &type=${layout.layout}&layout=tile
+              `
+              break;
+            default:
+              editedUrl = image.url + `?${
+                resize
+                  ? `resize=${JSON.stringify(resize)}&`
+                  : ''
+                }crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}`
+              break;
+          }
+
+          return { 
+            original: image.url,
+            edited: editedUrl
+          }
+        });
+
+      const imagesReady = Array(block.count)
+        .fill(images)
+        .map((images, idx) => images.map(image => ({ ...image, id: idx + 1 })))
+        .flat(1);
+
       return ({
         id: block.id,
-        images: block.childBlocks
-          .filter(child => child.imageUrl)
-          .map(child => ({
-            url: child.imageUrl,
-            settings: child.settings,
-            resolution: child.resolution
-          }))
-          .map(image => {
-            const { crop, rotate } = image.settings;
-  
-            const cropValue = 1 + (Math.round((crop.value / 50) * 100) / 100);
-  
-            const { width, height } = image.resolution || {
-              width: 10,
-              height: 10
-            };
-  
-            const resize = width && height
-              ? [width, height]
-              : null; 
-  
-            let editedUrl;
-  
-            switch(block.type) {
-              case 'polaroid':
-                const textBlock = block.childBlocks.find(child => child.type === 'text');
-    
-                const textSettings = Object.assign({
-                  align: 'center',
-                  font: 'Times New Roman',
-                  fontStyle: {
-                    bold: false,
-                    italic: false,
-                    underline: false
-                  },
-                  text: ''
-                }, textBlock.settings);
-  
-                const { align, font, fontStyle: { bold, italic, underline }, text} = textSettings;
-  
-                const textQuery = `align=${align}&font=${font}&bold=${bold}&italic=${italic}&underline=${underline}&text=${text.split('\n').join('0x0A')}`;
-  
-                editedUrl = image.url + `?${
-                  resize
-                    ? `resize=${JSON.stringify(resize)}&`
-                    : ''
-                  }crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}
-                  &type=polaroid&${textQuery}
-                `;
-                break;
-              case 'tiles':
-                editedUrl = image.url + `?${
-                  resize
-                    ? `resize=${JSON.stringify(resize)}&`
-                    : ''
-                  }crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}
-                  &type=${layout.layout}&layout=tile
-                `
-                break;
-              default:
-                editedUrl = image.url + `?${
-                  resize
-                    ? `resize=${JSON.stringify(resize)}&`
-                    : ''
-                  }crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}`
-                break;
-            }
-
-            return { 
-              original: image.url,
-              edited: editedUrl
-            }
-          })
+        images: imagesReady
       })
     });
  
@@ -368,15 +375,17 @@ async function UploadImagesFromBlock(state, uploadPath) {
       // ])
 
       res({
-        edited
+        edited,
+        id: image.id
       });
     }));
 
     const imagesBuffers = await Promise.all(images); 
 
     const imagesDownloads = imagesBuffers.map((image, imageIdx) => {
+      console.log(image.id);
       // const originalName = `block-${idx + 1}-image-${imageIdx + 1}-original.jpg`;
-      const editedName = `block-${idx + 1}.jpg`;
+      const editedName = `block-${idx + 1}${image.id && image.id !== 1 ? `--${image.id}` : ''}.jpg`;
 
       return Promise.all([
         // uploadFile(uploadPath, originalName, Buffer.from(image.original)),
@@ -628,7 +637,7 @@ export const composeOrder = async (req, res) => {
     const projectComposeName = `${project.product.title.split('/').join('-')} - ${
       customer.name && customer.lastName
         ? `${customer.name} ${customer.lastName}(${customer.email})`
-        : `${customer.email || customer.id}`
+        : `${customer.email || customer.id} - ${project.projectId.split('-').slice(1).join('-')}`
     }`;
 
     const projectZip = orderZip.folder(projectComposeName);

@@ -119,6 +119,20 @@ const userEmptyState = () => {
 
 const orderItem = (draft) => {
   return new Promise(async (res, rej) => {
+    const { root, primary } = localization.language;
+    console.log(root, primary);
+
+    if (!primary) {
+      const shopifyProduct = await fetch(`${root}/products/${draft.product.handle}.json`)
+          .then(res => res.json())
+          .then(res => res.product);
+
+      draft.product = {
+        ...draft.product,
+        title: shopifyProduct.title,
+      }
+    }
+
     const { projectId: id, product: draftProduct = {}, updatedAt, status } = draft;
 
     const li = document.createElement('li');
@@ -160,11 +174,20 @@ const orderItem = (draft) => {
     const secondsAgo = Math.floor((Date.now() - updatedAt) / 1000);
     const minutesAgo = Math.floor(secondsAgo / 60);
     const hoursAgo = Math.floor(minutesAgo / 60);
+    const daysAgo = Math.floor(hoursAgo / 24);
 
-    const showTime = secondsAgo < 60 ? 'less than minute ago' : minutesAgo < 60 ? minutesAgo : hoursAgo;
-    const showTimeTitle = secondsAgo < 60 ? '' : minutesAgo < 60 ? 'minutes ago' : 'hours ago'
+    const diffDaysHours = hoursAgo - daysAgo * 24;
+    const diffHoursString = ` ${diffDaysHours} ${diffDaysHours === 1 ? 'hour' : 'hours'} ago`;
 
-    lastUpdated.textContent = `Saved ${showTime} ${showTimeTitle}`;
+    const showTime = secondsAgo < 60
+        ? `less than minute ago`
+        : minutesAgo < 60
+            ? `${minutesAgo} ${minutesAgo === 1 ? 'minute' : 'minutes'} ago`
+            : hoursAgo < 24
+                ? `${hoursAgo} ${hoursAgo === 1 ? 'hour' : 'hours'} ago`
+                : `${daysAgo} ${daysAgo === 1 ? 'day' : 'days'}${diffDaysHours ? diffHoursString : ' ago'}`;
+
+    lastUpdated.textContent = `Saved ${showTime}`;
     lastUpdated.classList.add('text');
 
     const orderSubInfo = document.createElement('div');
@@ -178,7 +201,7 @@ const orderItem = (draft) => {
     orderInfo.append(picture, orderSubInfo);
 
     const editBtn = document.createElement('a');
-    editBtn.textContent = 'Edit';
+    editBtn.textContent = localization.drafts.edit;
     editBtn.classList.add('button', 'button--primary');
     editBtn.href = location.origin + `${Shopify.routes.root}apps/product-builder?project-id=${id}`;
     editBtn.disabled = status !== 'draft' && status !== 'active';
@@ -223,7 +246,7 @@ const orderItem = (draft) => {
 
     deleteBtn.classList.add('button', 'button--delete');
     const deleteContent = document.createElement('span');
-    deleteContent.textContent = 'Delete';
+    deleteContent.textContent = localization.drafts.delete;
 
     deleteBtn.innerHTML = deleteIcon;
     deleteBtn.append(deleteContent);

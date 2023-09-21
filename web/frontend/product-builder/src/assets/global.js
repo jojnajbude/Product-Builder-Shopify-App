@@ -7,6 +7,8 @@ const cookiesTime = {
   anonimUser: 10
 }
 
+window.oauthInstagram = JSON.parse(localStorage.getItem('oauthInstagram'));
+
 function moneyFormat(price, currency) {
   const formatter = new Intl.NumberFormat(undefined, {
     style: 'currency',
@@ -60,27 +62,26 @@ const checkoutButton = (function checkoutButtonInit() {
       return;
     }
 
-    const blocksCount = Studio.studioView.getBlocksCount(Studio.state.view.blocks);
-    const blocksWithImage = Studio.state.view.blocks
-      .filter(block => block.childBlocks
-        .filter(child => child.type === 'editable-picture')
-        .every(child => child.imageUrl)
-      );
+    const { 
+      isEnough,
+      current,
+      required
+    } = Studio.panel.productInfo.checkDoneProduct();
 
     const minimum = Studio.product.quantity.minimum;
 
-    const blockDiff = minimum - blocksCount;
+    const blockDiff = required - current;
 
     if (
       Studio.product.quantity.type === 'multiply'
-      && blocksCount < minimum) {
+      && current < minimum) {
       Studio.errorToast.error({
         text: `Not enough products quantity. Add ${blockDiff} more ${blockDiff === 1 ? 'block' : 'blocks' } to add project to the cart`
       });
       button.enable();
       return;
     } else if (
-      blocksWithImage.length < Studio.state.view.blocks.length
+      current < minimum
     ) {
       Studio.errorToast.error({
         text: `To checkout project - each picture must have an image`
@@ -89,24 +90,38 @@ const checkoutButton = (function checkoutButtonInit() {
       return;
     }
 
+    const newBlocks = Studio.state.view.blocks
+      .filter(block => {
+        const pictures = block.childBlocks
+          .filter(child => child.type === 'editable-picture');
+    
+        return pictures.every(picture => picture.imageUrl)
+      });
+
+    Studio.utils.change({ view: { blocks: newBlocks } }, 'view - clear empty blocks');
+
+
     const relatedProduct = await Studio.relatedProducts.getRelatedProducts();
 
     if (relatedProduct.rejected) {
+
       button.enable();
       return;
     }
 
     if (projectId) {
       const shopifyProduct = await fetch(location.origin + `/products/${Studio.product.handle}.js`)
-        .then(res => res.json());
+        .then(res => {
+          if (res.ok) {
+            return res.json();
+          }
+
+          return null;
+        });
 
       const { product } = Studio.state;
 
       let currVariant = shopifyProduct.variants[0];
-
-      // if (shopifyProduct.variants.length > 1) {
-      //   currVariant = shopifyProduct.variants.find(variant => variant.options.includes('Set of 3')) || currVariant;
-      // }
 
       let quantityToAdd;
 
@@ -167,7 +182,7 @@ const checkoutButton = (function checkoutButtonInit() {
           });
         return;
       } else {
-        console.log(addedToCart);
+        //console.log(addedToCart);
         Studio.errorToast.error({
           text: addedToCart.description,
           type: addedToCart.message
@@ -657,7 +672,7 @@ const layouts = {
 }
 
 window.ImageLimits = {
-  size: 10 * 1048576,
+  size: 25 * 1024 * 1024,
   resolution: {
     width: 200,
     height: 200
@@ -701,7 +716,7 @@ const globalState = {
   },
 }
 
-console.log(localization);
+// console.log(localization);
 
 const compareObjects = (obj1, obj2) => {
   return JSON.stringify(obj1) === JSON.stringify(obj2);
@@ -953,7 +968,6 @@ class ProductBuilder extends HTMLElement {
                       const { settings } = child;
   
                       let newSettings = {};
-  
 
                       if (child.type === 'text') {
                         newSettings = tools.text.value;
@@ -967,6 +981,16 @@ class ProductBuilder extends HTMLElement {
                             } else {
                               newSettings[tool] = tools[tool].value;
                             }
+                          } else if (tool === 'move') {
+                            newSettings[tool] = settings[tool];
+                          }
+                        }
+
+                        if (settings.crop.value !== newSettings.crop.value
+                            || settings.rotate.value !== newSettings.rotate.value) {
+                          newSettings.move = {
+                            x: 0,
+                            y: 0
                           }
                         }
                       }
@@ -992,6 +1016,16 @@ class ProductBuilder extends HTMLElement {
                             } else {
                               newSettings[tool] = tools[tool].value;
                             }
+                          } else if (tool === 'move') {
+                            newSettings[tool] = settings[tool];
+                          }
+                        }
+
+                        if (settings.crop.value !== newSettings.crop.value
+                            || settings.rotate.value !== newSettings.rotate.value) {
+                          newSettings.move = {
+                            x: 0,
+                            y: 0
                           }
                         }
                       }
@@ -1066,6 +1100,16 @@ class ProductBuilder extends HTMLElement {
                           } else {
                             newChildSettings[tool] = tools[tool].value;
                           }
+                        } else if (tool === 'move') {
+                          newChildSettings[tool] = childSettings[tool];
+                        }
+                      }
+
+                      if (settings.crop && settings.crop.value !== newChildSettings.crop.value
+                          || settings.rotate && settings.rotate.value !== newChildSettings.rotate.value) {
+                        newChildSettings.move = {
+                          x: 0,
+                          y: 0
                         }
                       }
                     }
@@ -1088,55 +1132,7 @@ class ProductBuilder extends HTMLElement {
             })
 
           this.studioView.setState({ blocks: newSelectedBlocks });
-        };
-      // } else {
-      //   const newBlocks = blocks.map(block => {
-      //     if (!block.selected) {
-      //       return block;
-      //     }
-
-      //     const { settings } = block;
-  
-      //     const newSettings = {};
-
-      //     for (const tool in settings) {
-      //       newSettings[tool] = tools[tool].value;
-      //     }
-
-      //     const newChildren = block.childBlocks
-      //       .map(child => {
-      //           const { settings } = child;
-
-      //           const newChildSettings = {};
-
-      //           for (const tool in settings) {
-      //             if (tools[tool]) {
-      //               if (tool === 'backgroundColor' && block.settings.backgroundColor) {
-      //                 newChildSettings[tool] = {
-      //                   value: newSettings.backgroundColor.value
-      //                 };
-      //               } else {
-      //                 newChildSettings[tool] = tools[tool].value;
-      //               }
-      //             }
-      //           }
-
-      //           return {
-      //             ...child,
-      //             settings: newChildSettings
-      //           }
-
-      //       });
-
-      //     return {
-      //       ...block,
-      //       childBlocks: newChildren,
-      //       settings: newSettings
-      //     };
-      //   });
-        
-      //   this.studioView.setState({ blocks: newBlocks });
-      // }
+        }
     }
 
     this.asyncExpectants = this.asyncExpectants.filter(callback => {
@@ -1397,7 +1393,7 @@ class ProductBuilder extends HTMLElement {
         ...JSON.parse(Studio.panel.getAttribute('state')),
         tools: updatedTools
       }
-    }, 'produt builder - set tools for block');
+    }, 'product builder - set tools for block');
   }
 
   downloadFacebookAPI() {
@@ -1534,9 +1530,7 @@ class ProductBuilder extends HTMLElement {
       }
     }
 
-    window.oauthInstagram = JSON.parse(localStorage.getItem('oauthInstagram'));
-
-    this.addEventListener('image:check', this.checkImages.bind(this));
+    // this.addEventListener('image:check', this.checkImages.bind(this));
 
     await this.getCart();
 
@@ -1786,7 +1780,6 @@ const utils = {
       localStorage.setItem('product-builder-history', JSON.stringify(history));
 
       if (((Studio.customer && !Studio.anonimCustomerId) || (!Studio.customer && Studio.anonimCustomerId)) && Studio.projectId && Studio.inited && history.length > 1) {
-        console.log('update order');
         Studio.updateOrder(Studio.projectId);
       }
     },
@@ -1883,7 +1876,7 @@ class ErrorToast extends HTMLElement {
     errorsContainer: '[data-errors]'
   }
 
-  static timeOut = 10000;
+  static timeOut = () => window.bodySize === 'mobile' ? 3000 : 10000;
 
   constructor() {
     super();
@@ -1928,7 +1921,7 @@ class ErrorToast extends HTMLElement {
       this.toggleAttribute('show');
 
       this.errorContainer.innerHTML = '';
-    }, ErrorToast.timeOut);
+    }, ErrorToast.timeOut());
   }
 
   createError(text) {
@@ -2399,7 +2392,11 @@ class ProductInfo extends AdaptiveContent {
       this.elements.image.src = product.imageUrl + '&height=100';
     }
 
-    this.elements.title.textContent = product.title;
+    const id = product.shopify_id.split('/').pop();
+
+    const { title } = allProducts[id];
+
+    this.elements.title.textContent = title;
 
     const sizeOptions = product.options.find(option => option.name === 'Size');
 
@@ -2473,15 +2470,15 @@ class ProductInfo extends AdaptiveContent {
 
     this.elements.quantity.current.textContent = count;
 
-    if (allCount !== this.elements.quantity.request.textContent && allCount !== 0) {
-      this.elements.quantity.request.textContent = allCount;
-    }
+    // if (allCount !== this.elements.quantity.request.textContent && allCount !== 0) {
+    //   this.elements.quantity.request.textContent = allCount;
+    // }
 
     this.checkDoneProduct();
 
     if (
       +this.elements.quantity.current.textContent
-      && +this.elements.quantity.current.textContent === +this.elements.quantity.request.textContent) {
+      && +this.elements.quantity.current.textContent >= +this.elements.quantity.request.textContent) {
       checkoutButton.disabled = false;
     } else {
       checkoutButton.disabled = true
@@ -2492,11 +2489,11 @@ class ProductInfo extends AdaptiveContent {
     const current = +this.elements.quantity.current.textContent;
     const required = +this.elements.quantity.request.textContent;
 
-    if (current > required) {
-      this.elements.quantity.current.textContent = required;
-      this.checkDoneProduct();
-      return;
-    }
+    // if (current > required) {
+    //   // this.elements.quantity.current.textContent = required;
+    //   this.checkDoneProduct();
+    //   return;
+    // }
 
     const { product } = Studio.state;
 
@@ -2510,11 +2507,17 @@ class ProductInfo extends AdaptiveContent {
       isEnough = true;
     }
 
-    if (current === required && isEnough) {
+    if (current >= required && isEnough) {
       this.elements.quantity.wrapper.classList.remove('is-not-enough');
     } else {
       this.elements.quantity.wrapper.classList.add('is-not-enough');
     }
+
+    return {
+      isEnough,
+      current,
+      required
+    };
   }
 
   setQuantity(quantity) {
@@ -3057,14 +3060,14 @@ class TextTool extends Tool {
     const header = document.createElement('div');
     header.classList.add('text-tool__header');
 
-    const selectType = this.selectorTemplate({ options: [
-      'Paragraph',
-      'Line'
-    ]});
+    // const selectType = this.selectorTemplate({ options: [
+    //   'Paragraph',
+    //   'Line'
+    // ]});
 
-    selectType.disable();
+    // selectType.disable();
 
-    this.selectType = selectType;
+    // this.selectType = selectType;
 
     const selectFont = this.selectorTemplate({ options: [
       'Times New Roman',
@@ -3074,7 +3077,7 @@ class TextTool extends Tool {
 
     this.selectFont = selectFont;
 
-    header.append(selectType.wrapper, selectFont.wrapper);
+    header.append(selectFont.wrapper);
 
     selectFont.onChange(this.onFontChange);
 
@@ -3361,11 +3364,11 @@ class TextTool extends Tool {
 
     this.maxSize = Math.min(...textAreas);
 
-    if (isLine) {
-      this.selectType.setValue('Line');
-    } else {
-      this.selectType.setValue('Paragraph');
-    }
+    // if (isLine) {
+    //   this.selectType.setValue('Line');
+    // } else {
+    //   this.selectType.setValue('Paragraph');
+    // }
 
     const { text, fontStyle, align, font } = value;
 
@@ -4159,7 +4162,9 @@ class Tools extends HTMLElement {
       const toolToExpand = this.querySelector(Tools.selectors.pages.edit.tool);
 
       if (toolToExpand && Studio.classList.contains('mobile')) {
-        this.edit.tools[toolToExpand.getAttribute('data-tool').toLowerCase()].open();
+        if (this.edit.tools[toolToExpand.getAttribute('data-tool').toLowerCase()]) {
+          this.edit.tools[toolToExpand.getAttribute('data-tool').toLowerCase()].open();
+        }
       }
     }, 300);
 
@@ -4228,8 +4233,8 @@ class Tools extends HTMLElement {
       .then(res => res.json());
 
     const products = productsData
-      .map(item => {
-        const productElement = this.productTemplate.call(this, item);
+      .map(async item => {
+        const productElement = await this.productTemplate.call(this, item);
 
         productsContainer.appendChild(productElement);
 
@@ -4261,7 +4266,7 @@ class Tools extends HTMLElement {
     })();
 
     openProductBtn.addEventListener('click', () => {
-      if (this.pages.products.selected) {     
+      if (this.pages.products.selected && Studio.state.productId !== this.pages.products.selected.dataset.id) {
         Studio.defaultBuilderPath();
 
         productParams = new URLSearchParams(location.search);
@@ -4271,6 +4276,10 @@ class Tools extends HTMLElement {
           product: null,
           view: globalState.view
         }, 'product change');
+      } else {
+        Studio.errorToast.error({
+          text: 'You already have this product in builder'
+        })
       }
     })
 
@@ -4297,15 +4306,29 @@ class Tools extends HTMLElement {
       });
   }
 
-  productTemplate(product) {
+  async productTemplate(builderProduct) {
+    if (typeof builderProduct !== 'object') {
+      return;
+    }
+
+    const { root, primary } = localization.language;
+
+    const product = allProducts[builderProduct.shopify_id.split('/').pop()];
+
+    const { imageUrl, title, price, id } = product;
+
     const container = document.createElement('div');
     container.classList.add('page__product');
-    container.dataset.id = product.shopify_id.split('/').pop();
+    container.dataset.id = id;
+
+    const completePrice = price !== undefined
+      ? moneyFormat(price.split(',').join('.'))
+      : 'not priced';
 
     const productInner = `
       <img
-        src="${product.imageUrl
-          ? product.imageUrl + '&width=250&height=250'
+        src="${imageUrl
+          ? imageUrl + '&width=250&height=250'
           : 'https://cdn.shopify.com/shopifycloud/web/assets/v1/833d5270ee5c71c0.svg'}"
         width="140"
         height="140"
@@ -4315,16 +4338,16 @@ class Tools extends HTMLElement {
       >
 
       <div class="page__product-info">
-        <div class="page__product-title">${product.title}</div>
+        <div class="page__product-title">${title}</div>
 
-        <div class="page__product-price">${product.price !== undefined ? moneyFormat(product.price) : 'not priced'}</div>
+        <div class="page__product-price">${completePrice}</div>
       </div>
     `;
 
     container.innerHTML = productInner;
     container.addEventListener('click', this.selectProduct.bind(this));
 
-    container.title = product.title;
+    container.title = title;
 
     return container;
   }
@@ -4455,14 +4478,12 @@ class Tools extends HTMLElement {
 
     uploadButton.addEventListener('click', (event) => {
       uploadSelector.classList.toggle('is-open');
-      console.log(event);
 
       if (uploadSelector.classList.contains('is-open')) {
         subscribeToActionController({
           target: uploadSelector,
           opener: uploadButton,
           callback: () => {
-            console.log('close');
             uploadSelector.classList.remove('is-open');
             uploadSelector.style.height = null;
           }
@@ -4596,13 +4617,17 @@ class Tools extends HTMLElement {
           });
         }
       }
-  
+
       if (imageFile.size >= ImageLimits.size) {
         this.errorToast.dispatchEvent(new CustomEvent('error:show', {
           detail: {
             type: 'size',
             imageWrapper,
-            text: `Some files have too big size. File: ${imageFile.name}`
+            text: `
+              Some files have too big size.\n
+              File: ${imageFile.name}.\n
+              Max size: ${ImageLimits.size / 1024 / 1024} MB\n
+              File size: ${(imageFile.size / 1024 / 1024).toFixed(2)} MB`
           }
         }));
         return;
@@ -4663,7 +4688,7 @@ class Tools extends HTMLElement {
 
             const isExist = Studio.uploaded.some(upload => upload.thumbnail === imageName);
   
-            if (!isExist && response.ok) {
+            if (response.ok) {
               setImage(imageName);
             } else {
               this.errorToast.dispatchEvent(new CustomEvent('error:show', {
@@ -4903,7 +4928,7 @@ class Panel extends HTMLElement {
 
       
     if (prevState.blockCount !== currState.blockCount) {
-      this.productInfo.setQuantity(currState.blockCount);
+      // this.productInfo.setQuantity(currState.blockCount);
 
       Studio.utils.change({
         view: {
@@ -5121,6 +5146,10 @@ class Panel extends HTMLElement {
 customElements.define('customization-panel', Panel);
 
 class EditablePicture extends HTMLElement {
+  static hovered = [];
+
+  static emptyPixel = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+
   static emptyState = (bigSize) => {
     const empty = document.createElement('div');
     empty.classList.add('editable-picture__empty-state');
@@ -5154,10 +5183,14 @@ class EditablePicture extends HTMLElement {
     rotate: RotateTool.defaultValue,
     backgroundColor: {
       value: BackgroundColorTool.defaultValue.value
+    },
+    move: {
+      x: 0,
+      y: 0
     }
   }
 
-  static ToolsList = ['rotate', 'crop', 'filter'];
+  static ToolsList = ['rotate', 'crop', 'filter', 'move'];
 
   static selectors = {
     emptyState: '[data-empty-state]'
@@ -5169,6 +5202,22 @@ class EditablePicture extends HTMLElement {
 
   constructor() {
     super();
+
+    this.addEventListener('mouseover', () => {
+      EditablePicture.hovered.push(this);
+    });
+
+    this.addEventListener('mouseleave', () => {
+      EditablePicture.hovered = EditablePicture.hovered.filter(item => item !== this);
+    });
+
+    this.addEventListener('touchstart', () => {
+      EditablePicture.hovered.push(this);
+    });
+
+    this.addEventListener('touchend', () => {
+      EditablePicture.hovered = EditablePicture.hovered.filter(item => item !== this);
+    })
 
     this.addEventListener('dragenter', () => {
       this.classList.add('is-dragover');
@@ -5323,8 +5372,225 @@ class EditablePicture extends HTMLElement {
 
     return mask;
   }
-  
+
+  initMove() {
+    if (this.move) {
+      this.removeEventListener('mousedown', this.move.mouseDown);
+      window.removeEventListener('mouseup', this.move.mouseUp);
+      this.removeEventListener('mousemove', this.move.onMove);
+
+      this.removeEventListener('touchstart', this.move.mouseDown);
+      window.removeEventListener('touchend', this.move.mouseUp);
+      this.removeEventListener('touchmove', this.move.onMove);
+    }
+
+    this.xPosition = 0;
+    this.yPosition = 0;
+
+
+
+    this.resetMove = () => {
+      this.xPosition = 0;
+      this.yPosition = 0;
+
+      this.move.x = 0;
+      this.move.y = 0;
+
+      this.previewImage.style.transform = `translate .3s`;
+
+      this.previewImage.style.translate = `0% 0%`;
+
+      setTimeout(() => {
+        this.previewImage.style.translate = null;
+        this.previewImage.style.transform = null;
+      }, 300);
+    }
+
+    function onMove(event) {
+      const diffX = event.touches
+        ? event.touches[0].clientX - this.move.prevX
+        : event.clientX - this.move.prevX;
+
+      const diffY = event.touches
+        ? event.touches[0].clientY - this.move.prevY
+        : event.clientY - this.move.prevY;
+
+      if (diffX > 0) {
+        this.xPosition = Math.min(
+            ((this.xPosition * -1) - diffX) * -1,
+            this.move.paddings.x.min * -1
+        );
+      } else if (diffX < 0) {
+        this.xPosition = Math.max(
+            ((this.xPosition * -1) - diffX) * -1,
+            this.move.paddings.x.max * -1
+        )
+      }
+
+      if (diffY > 0) {
+        this.yPosition = Math.min(
+            ((this.yPosition * -1) - diffY) * -1,
+            this.move.paddings.y.min * -1
+        )
+      } else if (diffY < 0) {
+        this.yPosition = Math.max(
+            ((this.yPosition * -1) - diffY) * -1,
+            this.move.paddings.y.max * -1
+        )
+      }
+
+      const persentX= (this.xPosition * 100 / this.move.frame.width);
+      const persentY= (this.yPosition * 100 / this.move.frame.height);
+
+      this.move.x = this.xPosition > 0
+        ? Number(((this.xPosition * -100) / this.move.paddings.x.max).toFixed(2))
+        : Number(((this.xPosition * 100) / this.move.paddings.x.min).toFixed(2));
+
+      this.move.y = this.yPosition > 0
+        ? Number(((this.yPosition * -100) / this.move.paddings.y.max).toFixed(2))
+        : Number(((this.yPosition * 100) / this.move.paddings.y.min).toFixed(2));
+
+      this.previewImage.style.translate = `${persentX}% ${persentY}%`;
+
+      this.move.prevX = event.touches
+        ? event.touches[0].clientX
+        : event.clientX;
+      this.move.prevY = event.touches
+        ? event.touches[0].clientY
+        : event.clientY;
+    }
+
+    this.move = {
+      prevX: null,
+      prevY: null,
+      onMove: onMove.bind(this),
+    };
+
+    this.move.mouseDown = ((event) => {
+      this.move.prevX = event.touches
+        ? event.touches[0].clientX
+        : event.clientX;
+      this.move.prevY = event.touches
+        ? event.touches[0].clientY
+        : event.clientY;
+
+      if (event.touches) {
+        Studio.studioView.elements.playground.style.overflow = 'hidden';
+      }
+
+      this.image.style.opacity = '0';
+      this.previewImage.style.opacity = '1';
+
+      if (event.touches) {
+        this.addEventListener('touchmove', this.move.onMove);
+      } else {
+        this.addEventListener('mousemove', this.move.onMove);
+      }
+    }).bind(this);
+
+    this.move.mouseUp = (() => {
+      this.removeEventListener('mousemove', this.move.onMove);
+      this.removeEventListener('touchmove', this.move.onMove);
+
+      Studio.studioView.elements.playground.style.overflow = null;
+
+      const newBlocks = Studio.state.view.blocks.map(block => {
+        const childBlock = block.childBlocks.find(child => child.id === this.getAttribute('child-block'));
+
+        if (childBlock) {
+          const newChildBlocks = block.childBlocks.map(child => {
+            if (child.id === this.getAttribute('child-block')) {
+              const { settings } = { ...child };
+
+              if (this.move.x) {
+                settings.move.x = this.move.x;
+              }
+
+              if (this.move.y) {
+                settings.move.y = this.move.y;
+              }
+
+              return {
+                ...child,
+                settings
+              }
+            }
+
+            return child;
+          });
+
+          return {
+            ...block,
+            childBlocks: newChildBlocks
+          }
+        }
+
+        return block;
+      });
+
+      Studio.utils.change({
+            view: { ...Studio.state.view, blocks: newBlocks }
+      }, 'move - id:' + this.getAttribute('child-block'));
+    }).bind(this);
+
+    this.setMoveParams = () => {
+      this.move.preview = this.previewImage.getBoundingClientRect();
+      this.move.frame = this.getBoundingClientRect();
+
+      this.move.paddings = {
+        x: {
+          min: this.move.preview.left - this.move.frame.left,
+          max: this.move.preview.right - this.move.frame.right
+        },
+        y: {
+          min: this.move.preview.top - this.move.frame.top,
+          max: this.move.preview.bottom - this.move.frame.bottom
+        }
+      }
+    }
+
+    this.setMoveParams();
+
+    this.addEventListener('mousedown', this.move.mouseDown);
+    this.addEventListener('touchstart', this.move.mouseDown);
+
+    window.addEventListener('mouseup', this.move.mouseUp);
+    window.addEventListener('touchend', this.move.mouseUp);
+
+    if (this.previewImage) {
+      const child = Studio.state.view.blocks
+        .reduce((children, block) => [...children, ...block.childBlocks], [])
+        .find(child => child.id === this.getAttribute('child-block'));
+
+      if (child) {
+        const { x, y } = child.settings.move;
+
+        if (x && y) {
+          const xPosition = x > 0
+            ? Number((this.move.paddings.x.min * x / 100).toFixed(2))
+            : Number((this.move.paddings.x.max * x / 100).toFixed(2));
+
+          const yPosition = y > 0
+            ? Number((this.move.paddings.y.min * y / 100).toFixed(2))
+            : Number((this.move.paddings.y.max * y / 100).toFixed(2));
+
+          const xPercent = Number((xPosition * 100 / this.move.frame.width).toFixed(2));
+          const yPercent = Number((yPosition * 100 / this.move.frame.height).toFixed(2));
+
+            this.previewImage.style.translate = `${xPercent}% ${yPercent}%`;
+
+            this.xPosition = this.move.frame.width * xPercent / 100;
+            this.yPosition = this.move.frame.height * yPercent / 100;
+        }
+      }
+    }
+  }
+
   setImage(imageUrl) {
+    if (!Studio.product) {
+      return;
+    }
+
     if (this.image) {
       this.oldImage = this.image;
       this.oldImage.remove();
@@ -5382,6 +5648,8 @@ class EditablePicture extends HTMLElement {
       } else {
         this.classList.remove('is-loading');
       }
+
+      this.initMove();
     });
 
     const getParams = () => {
@@ -5520,7 +5788,9 @@ class EditablePicture extends HTMLElement {
 
   removeImage() {
     this.image.remove();
+    // this.image.removeAttribute('src');
     this.previewImage.remove();
+    // this.previewImage.removeAttribute('src');
 
     this.mask && this.mask.remove();
 
@@ -5532,7 +5802,7 @@ class EditablePicture extends HTMLElement {
   }
 
   hasImage() {
-    return this.image && this.image.hasAttribute('src');
+    return this.image && this.image.hasAttribute('src') && this.image.src !== EditablePicture.emptyPixel;
   }
 
   setValue(settings) {
@@ -5550,7 +5820,7 @@ class EditablePicture extends HTMLElement {
       this.image ? this.image.src : null
      ];
 
-     const { crop, rotate, backgroundColor } = settings;
+     const { crop, rotate, backgroundColor, move } = settings;
 
      const notTransparent = prevCrop === crop.value
       && prevRotate === rotate.value
@@ -5559,6 +5829,39 @@ class EditablePicture extends HTMLElement {
       && prevSource === this.image.src
       && this.image.complete
       && this.prevType === this.getAttribute('picture-type');
+
+     const rotatePreview = () => {
+       if (!this.previewImage) {
+         return 1;
+       }
+       const diagonal = Math.sqrt(Math.pow(this.offsetWidth, 2) + Math.pow(this.offsetHeight, 2));
+
+       const calculateAngle = () => {
+         const { value: rotateValue } = rotate;
+
+         if (rotateValue < 90) {
+           return rotateValue;
+         } else if (rotateValue >= 90 && rotateValue < 180) {
+           return 180 - rotateValue;
+         } else if (rotateValue >= 180 && rotateValue < 270) {
+            return 270 - rotateValue;
+         } else if (rotateValue >= 270 && rotateValue < 360) {
+           return 360 - rotateValue;
+         }
+
+         return rotateValue;
+       }
+
+       const newAngle = Math.atan(this.offsetHeight / this.offsetWidth) * 180 / Math.PI
+
+       const newAngle2 = newAngle - calculateAngle();
+
+       const newWidth = Math.cos(newAngle2 * Math.PI / 180) * diagonal;
+
+       const { offsetWidth } = this.previewImage;
+
+       return Number((offsetWidth / newWidth).toFixed(2));
+     }
 
     const toChange = this.classList.contains('is-selected')
       || (
@@ -5582,8 +5885,18 @@ class EditablePicture extends HTMLElement {
       this.setAttribute('background-color', backgroundColor.value);
     }
 
-    if (!this.image) {
+    if (!this.image || !this.image.src) {
       return;
+    }
+
+    if (prevCrop !== crop.value || prevRotate !== rotate.value) {
+      this.cropTimeout && clearTimeout(this.cropTimeout);
+
+      this.resetMove();
+
+      this.cropTimeout = setTimeout(() => {
+        this.setMoveParams();
+      }, 100);
     }
 
     const imageUrl = new URL(this.image.src);
@@ -5593,7 +5906,8 @@ class EditablePicture extends HTMLElement {
       this.image.style.opacity = notTransparent ? 1 : 0;
       this.previewImage.style.opacity = null;
 
-      this.previewImage.style.transform = `rotate(${rotate.value}deg) scale(${1 + (crop.value / 50)})`;
+      this.previewImage.style.rotate = `${rotate.value}deg`;
+      this.previewImage.style.scale = rotatePreview() * (1 + (crop.value / 50));
     }
 
     if (backgroundColor && this.image) {
@@ -5606,10 +5920,12 @@ class EditablePicture extends HTMLElement {
 
     if (this.image && rotate && toChange || (this.image && backgroundColor)) {
       this.image.onload = () => {
+        if (this.timer) {
+          return;
+        }
+
         this.image.style.opacity = 1;
-        setTimeout(() => {
-          this.previewImage.style.opacity = 0;
-        }, 300);
+        this.previewImage.style.opacity = 0;
       }
 
       this.timer = setTimeout(() => {
@@ -5618,6 +5934,8 @@ class EditablePicture extends HTMLElement {
         imageUrl.searchParams.set('rotate', rotate.value);
         imageUrl.searchParams.set('crop', cropValue);
         imageUrl.searchParams.set('background', backgroundColor.value);
+        imageUrl.searchParams.set('x', move.x);
+        imageUrl.searchParams.set('y', move.y);
 
         imageUrl.searchParams.set('type', this.getAttribute('picture-type'));
 
@@ -5626,6 +5944,7 @@ class EditablePicture extends HTMLElement {
         }
 
         this.image.src = imageUrl.href;
+        this.timer = null;
       }, 600);
     }
   }
@@ -7591,6 +7910,10 @@ class ViewControls extends HTMLElement {
   }
 
   studioDrag(event) {
+    if (EditablePicture.hovered.length) {
+      return;
+    }
+
     this.zoom.studioContainer.classList.add('on-drag');
 
     const scale = this.zoom.studioPlayground.style.scale
@@ -7610,6 +7933,10 @@ class ViewControls extends HTMLElement {
   }
 
   studioTouchDrag(event) {
+    if (EditablePicture.hovered.length) {
+      return;
+    }
+
     this.zoom.studioContainer.classList.add('on-drag');
 
     const scale = this.zoom.studioPlayground.style.scale
@@ -7790,6 +8117,7 @@ customElements.define('view-controls', ViewControls);
 class StudioView extends HTMLElement {
   static selectors = {
     studio: 'studio-view',
+    playground: '[data-playground]',
     sizeSelector: '[data-product-option-selector]',
     container: '[data-studio-view-container]',
     productElement: '[product-element]',
@@ -7861,6 +8189,14 @@ class StudioView extends HTMLElement {
 
       createdBlocks = this.setProductElements(currState.blockCount, currState.blocks);
     }
+    
+    if (currState.imagesToDownload && !compareObjects(currState.imagesToDownload, prevState.imagesToDownload)) {      
+      this.setImages(currState);
+
+      Studio.utils.change({
+        imagesToDownload: null
+      }, 'reset images to download')
+    }
 
     if (!compareObjects(prevState.blocks, currState.blocks)) {
       const prevCounts = this.getBlocksCount(prevState.blocks);
@@ -7898,18 +8234,11 @@ class StudioView extends HTMLElement {
       }
     }
 
-    if (currState.imagesToDownload && !compareObjects(currState.imagesToDownload, prevState.imagesToDownload)) {      
-      this.setImages(currState);
-
-      Studio.utils.change({
-        imagesToDownload: null
-      }, 'reset images to download')
-    }
-
     if (createdBlocks) {
       Studio.utils.change({ view: {
         ...JSON.parse(this.getAttribute('state')),
-        blocks: createdBlocks
+        blocks: createdBlocks,
+        imagesToDownload: null
       }}, 'set product elements(created blocks)');
     }
   }
@@ -7988,7 +8317,7 @@ class StudioView extends HTMLElement {
 
   setState(state) {
     const newState = {
-      ...JSON.parse(this.getAttribute('state')),
+      ...Studio.state.view,
       ...state
     };
 
@@ -8009,6 +8338,7 @@ class StudioView extends HTMLElement {
     this.elements = {
       sizeSelector: sizeSelector,
       container,
+      playground: this.querySelector(StudioView.selectors.playground),
       productInfo: document.querySelector(StudioView.selectors.productInfo)
     }
 
@@ -9486,6 +9816,8 @@ class ImageChooser extends HTMLElement {
       facebook: '[data-from-facebook]',
     },
     image: '[data-image]',
+    folder: '[data-folder]',
+    element: '[data-element]',
     selectedImage: '[data-image].is-selected .image',
     tools: 'customization-tools',
     buttonsGroup: '[data-button-group]'
@@ -9644,10 +9976,13 @@ class ImageChooser extends HTMLElement {
     this.close();
   }
 
-  imageTemplate(source) {
+  imageTemplate(photo) {
+    const { image: source, id } = photo;
     const container = document.createElement('div');
     container.classList.add('image-container', 'load-container','is-loading');
-    container.toggleAttribute('data-image');
+    container.setAttribute('data-image', id);
+    container.toggleAttribute('data-element');
+
 
     const selectTag = document.createElement('span');
     selectTag.classList.add('select-tag');
@@ -9666,12 +10001,80 @@ class ImageChooser extends HTMLElement {
     };
 
     container.addEventListener('click', () => {
+      this.photos = this.photos.map(photo => {
+        if (photo.id === id) {
+          photo.selected = !photo.selected;
+        }
+
+        return photo;
+      });
+
+      console.log(this.photos);
       container.classList.toggle('is-selected');
     });
 
     image.src = source;
 
     container.append(image);
+
+    return container;
+  }
+
+  imageFolder(folder) {
+    const { children } = folder;
+
+    const container = document.createElement('div');
+    container.classList.add('image-container', 'load-container','is-loading', 'folder');
+    container.setAttribute('data-folder', folder.id);
+    container.toggleAttribute('data-element');
+
+    const previewChildren = children.slice(0,4);
+
+    const images = previewChildren.map(child => {
+      const image = new Image();
+      image.style.opacity = 0;
+      image.classList.add('image');
+      image.draggable = false;
+
+      container.append(image);
+
+      image.src = child.media_url;
+
+      return new Promise(res => {
+        image.onload = () => {
+          res(image);
+        }
+      })
+    });
+
+    Promise.all(images).then(images => {
+      container.classList.remove('is-loading');
+
+      images.forEach(image => {
+        image.style.opacity = null;
+      })
+    })
+
+    const image = new Image();
+    image.style.opacity = 0;
+    image.classList.add('image');
+    image.draggable = false;
+
+    image.onload = () => {
+      image.style.opacity = null;
+      container.classList.remove('is-loading');
+    };
+
+    container.addEventListener('click', () => {
+      const currFolder = this.photos.find(media => media.id === folder.id);
+
+      this.clearImages()
+
+      if (currFolder) {
+        currFolder.children.forEach(child => this.imageList.append(this.imageTemplate(child)));
+      }
+
+    });
 
     return container;
   }
@@ -9743,6 +10146,8 @@ class ImageChooser extends HTMLElement {
   }
 
   async loginInst() {
+    productParams = new URLSearchParams(location.search);
+
     const instToRedirect = {
       id: productParams.get('id'),
       size: productParams.get('size'),
@@ -9771,8 +10176,8 @@ class ImageChooser extends HTMLElement {
   }
 
   clearImages() {
-    this.imageList.querySelectorAll(ImageChooser.selectors.image)
-      .forEach(image => image.remove());
+    this.imageList.querySelectorAll(ImageChooser.selectors.element)
+      .forEach(media => media.remove());
   }
 
   initLogoutButton() {
@@ -9858,7 +10263,7 @@ class ImageChooser extends HTMLElement {
       return;
     }
 
-    const photos = await fetch(`https://graph.instagram.com/${user_id}/media?fields=media_url,id,name,craeted_time&access_token=${access_token}`)
+    const photos = await fetch(`https://graph.instagram.com/${user_id}/media?fields=media_url,id,media_type,children,thumbnail_url&access_token=${access_token}`)
       .then(res => {
         if (!res.ok) {
           this.instLogin.create();
@@ -9870,13 +10275,27 @@ class ImageChooser extends HTMLElement {
       })
       .then(res => {
         if (res && res.data) {
-          return res.data.map(photo => {
+          return Promise.all(res.data.map(async photo => {
+            // if (photo.media_type === 'CAROUSEL_ALBUM') {
+            //   const photosChildren = await Promise.all(photo.children.data
+            //     .map(async child => {
+            //       return fetch(`https://graph.instagram.com/${child.id}?fields=media_url,id,media_type&access_token=${access_token}`)
+            //         .then(res => res.json())
+            //     }))
+            //
+            //   return {
+            //     id: photo.id,
+            //     type: photo.media_type,
+            //     children: photosChildren,
+            //   }
+            // }
+
             return {
               id: photo.id,
               image: photo.media_url,
-              name: photo.name ? photo.name : photo.create_time
+              type: photo.media_type,
             }
-          })
+          }))
         }
       });
 
@@ -9884,10 +10303,34 @@ class ImageChooser extends HTMLElement {
 
       if (photos) {
         photos
-          .map(photo => photo.image)
           .forEach(photo => {
-            this.imageList.append(this.imageTemplate(photo))
+            // if (photo.type === 'CAROUSEL_ALBUM') {
+            //   this.imageList.append(this.imageFolder(photo));
+            //   return;
+            // }
+            this.imageList.append(this.imageTemplate(photo));
           });
+
+        this.photos = photos.map(media => {
+          // if (media.type === 'CAROUSEL_ALBUM') {
+          //   const children = media.children.map(child => ({
+          //     id: child.id,
+          //     image: child.media_url,
+          //     type: child.media_type,
+          //     folder: media.id,
+          //     selected: false
+          //   }))
+          //
+          //   return {
+          //     ...media,
+          //     children
+          //   };
+          // }
+
+          return media;
+        });
+
+        console.log(this.photos);
       }
   }
 }
@@ -9907,6 +10350,8 @@ class RelatedProducts extends HTMLElement {
 
   constructor() {
     super();
+
+    this.inited = false;
 
     this.elements = {
       exitBtn: this.querySelector(RelatedProducts.selectors.exitBtn),
@@ -9949,7 +10394,11 @@ class RelatedProducts extends HTMLElement {
 
   }
 
-  open(toSubscribe = true) {
+  async open(toSubscribe = true) {
+    if (this.waitForInit) {
+      await this.waitForInit;
+    }
+
     this.setAttribute('state', 'open');
 
     this.gradient.show();
@@ -9958,7 +10407,9 @@ class RelatedProducts extends HTMLElement {
 
     setTimeout(() => {
       this.style.opacity = 1;
-      this.relatedProductsElems.forEach(elem => elem.setButtonWidth());
+      if (this.relatedProductsElems) {
+        this.relatedProductsElems.forEach(elem => elem.setButtonWidth());
+      }
     }, 10);
 
     setTimeout(() => {
@@ -9987,26 +10438,37 @@ class RelatedProducts extends HTMLElement {
   }
 
   async init() {
-    const { product } = Studio.state;
+    this.waitForInit = new Promise(async (res, rej) => {
+      const { product } = Studio.state;
 
-    if (this.relatedProductsElems) {
-      this.relatedProductsElems.forEach(elem => elem.remove());
-    }
+      if (this.relatedProductsElems) {
+        this.relatedProductsElems.forEach(elem => elem.remove());
+      }
 
-    this.relatedProducts = product.relatedProducts;
+      this.relatedProducts = product.relatedProducts;
 
-    this.length = this.relatedProducts.length;
+      this.length = this.relatedProducts.length;
 
-    this.initRelatedProducts();
+      await this.initRelatedProducts();
+
+      this.inited = true;
+      res();
+    });
   }
 
-  initRelatedProducts() {
-    this.relatedProductsElems = this.relatedProducts
-      .map(product => this.productTemplate(product));
+  async initRelatedProducts() {
+    const elems = this.relatedProducts
+      .map(async product => await this.productTemplate(product));
+
+    this.relatedProductsElems = await Promise.all(elems);
   }
 
-  productTemplate(product) {
+  async productTemplate(product) {
     const { handle, id, image, options, priceRangeV2, title } = product;
+
+    const { root, primary } = localization.language;
+
+    const { title: localeTitle } = allProducts[id.split('/').pop()] || {};
 
     const added = 'Added!';
 
@@ -10020,7 +10482,7 @@ class RelatedProducts extends HTMLElement {
 
     check.innerHTML = `
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M3 9.23438L7.24264 13.477L15.7279 4.99173" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        <path d="M3 9.23438L7.24264 13.477L15.7279 4.99173" stroke="white" stroke-width="2" stroke-linecap="round"/>
       </svg>
     `;
 
@@ -10043,7 +10505,7 @@ class RelatedProducts extends HTMLElement {
 
     const titleElem = document.createElement('div');
     titleElem.classList.add('related-product__title');
-    titleElem.textContent = title;
+    titleElem.textContent = localeTitle ? localeTitle : title;
 
     const description = document.createElement('div');
     description.classList.add('text', 'related-product__description');
@@ -10147,6 +10609,7 @@ class RelatedProducts extends HTMLElement {
 
   getRelatedProducts() {
     return new Promise((resolve, reject) => {
+
       if (!this.relatedProducts.length) {
         resolve([]);
         return;
@@ -10158,7 +10621,7 @@ class RelatedProducts extends HTMLElement {
         target: this,
         opener: checkoutButton,
         callback: () => {
-          reject({ rejected: true });
+          resolve({ rejected: true });
           this.close();
         }
       })

@@ -23,13 +23,46 @@
 
   <script>
     window.customerId = {% if customer %} {{ customer.id }} {% else %} null {% endif %};
-    window.shop = {{ shop.permanent_domain | json }};
+    window.shop = "{{ shop.permanent_domain }}";
 
-    window.money_format = {{ shop.money_format | json }};
-    window.currency = {{ shop.currency | json }};
+    window.money_format = "{{ shop.money_format }}";
+    window.currency = "{{ shop.currency }}";
+
+    window.allProducts = {
+      {% for product in collections['all'].products %}
+        {{ product.id }}: {
+          id: {{ product.id }},
+          title: "{{ product.title }}",
+          handle: "{{ product.handle }}",
+          imageUrl: "{{ product.featured_image | img_url: 'master' }}",
+          price: {{ product.price | money_without_currency | strip_html | strip_newlines | json }},
+          variants: [
+            {% for variant in product.variants %}
+              {
+                id: {{ variant.id }},
+                title: "{{ variant.title }}",
+                price: {{ variant.price | money_without_currency | strip_html | strip_newlines | json }},
+                available: {{ variant.available }},
+                image: "{{ variant.image | img_url: 'master' }}",
+                options: [
+                  {% for option in variant.options %}
+                    "{{ option }}"{% unless forloop.last %},{% endunless %}
+                  {% endfor %}
+                ]
+              }{% unless forloop.last %},{% endunless %}
+            {% endfor %}
+          ]
+        }{% unless forloop.last %},{% endunless %}
+      {% endfor %}
+    };
 
     window.localization = {
       fallbackURL: "{{ routes.root_url }}",
+      language: {
+        root: "{{ localization.language.root_url }}",
+        primary: {{ localization.language.primary }},
+        code: "{{ localization.language.code }}",
+      },
       tabs: {
         products: {
           openProduct: "{{ 'builder.buttons.open_product' | t }}",
