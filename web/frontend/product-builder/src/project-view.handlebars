@@ -42,6 +42,7 @@
             rotate="0"
             background-color="rgb(0,255,133)"
             editable-picture=""
+            style="background-color: {{ block.settings.backgroundColor.value }};"
           >
             <div class="editable-picture__empty-state" data-empty-state="">
               <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -56,7 +57,7 @@
               <img
                 class="editable-picture__image"
                 draggable="false"
-                crossorigin=""
+                 
                 src="{{@root.image.imageUrl }}?resize=[921,897]&amp;container=[210,210]&amp;rotate={{@root.image.settings.rotate.value}}&crop={{ imageCrop @root.image.settings.crop.value }}&background={{ block.settings.backgroundColor.value }}"
                 style="opacity: 1;"
               >
@@ -104,6 +105,7 @@
             rotate="0"
             background-color="rgb(255,255,255)"
             editable-picture=""
+            style="background-color: {{ block.settings.backgroundColor.value }};"
           >
             <div class="editable-picture__empty-state {{#unless block.childBlocks.0.imageUrl }}is-empty{{/unless}}" data-empty-state="">
               <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -118,7 +120,7 @@
               <img
                 class="editable-picture__image"
                 draggable="false"
-                crossorigin=""
+                 
                 src="{{ block.childBlocks.0.imageUrl }}?resize=[1062,1535]&rotate={{ block.childBlocks.0.settings.rotate.value}}&crop={{ imageCrop block.childBlocks.0.settings.crop.value}}background=rgb(255,255,255)"
                 style="opacity: 1;"
               >
@@ -154,6 +156,7 @@
             rotate="0"
             background-color="{{ block.settings.backgroundColor.value }}"
             editable-picture=""
+            style="background-color: {{ block.settings.backgroundColor.value }};"
           >
             <div class="editable-picture__empty-state" data-empty-state="">
               <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -169,7 +172,7 @@
             <img
               class="editable-picture__image"
               draggable="false"
-              crossorigin=""
+               
               src="{{ block.childBlocks.0.imageUrl }}?resize=[2362,3543]&rotate={{ block.childBlocks.0.settings.rotate.value }}&crop={{ imageCrop block.childBlocks.0.settings.crop.value }}&background={{ block.settings.backgroundColor.value }}" 
               style="opacity: 1;"
             >
@@ -211,6 +214,7 @@
             rotate="0"
             background-color="rgb(255,255,255)"
             editable-picture=""
+            style="background-color: {{ block.settings.backgroundColor.value }};"
           >
             <div class="editable-picture__empty-state" data-empty-state="">
               <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -225,7 +229,7 @@
               <img
                 class="editable-picture__image"
                 draggable="false"
-                crossorigin=""
+                 
                 src="{{ block.childBlocks.0.imageUrl }}?resize=[1181,1181]&rotate={{ block.childBlocks.0.settings.rotate.value }}&crop={{ imageCrop block.childBlocks.0.settings.crop.value }}&background=rgb(255,255,255)" style="opacity: 1;"
               >
             {{/if}}
@@ -246,6 +250,7 @@
             child-block="childBlock-0"
             background-color="rgb(255,255,255)"
             editable-picture=""
+            style="background-color: {{ block.settings.backgroundColor.value }};"
           >
             <div class="editable-picture__empty-state" data-empty-state="">
               <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -260,7 +265,7 @@
               <img
                 class="editable-picture__image"
                 draggable="false"
-                crossorigin=""
+                 
                 src="{{ block.childBlocks.0.imageUrl }}?resize=[3543,3543]&rotate={{ block.childBlocks.0.settings.rotate.value }}&crop={{ imageCrop block.childBlocks.0.settings.crop.value }}&background=rgb(255,255,255)"
                 style="opacity: 1;"
               >
@@ -284,6 +289,7 @@
             rotate="0"
             background-color="rgb(255,255,255)"
             editable-picture=""
+            style="background-color: {{ block.settings.backgroundColor.value }};"
           >
             <div class="editable-picture__empty-state" data-empty-state="">
               <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -298,7 +304,7 @@
               <img 
                 class="editable-picture__image"
                 draggable="false"
-                crossorigin=""
+                 
                 src="{{ block.childBlocks.0.imageUrl }}?resize=[2362,2362]&rotate={{ block.childBlocks.0.settings.rotate.value }}&crop={{ imageCrop block.childBlocks.0.settings.crop.value }}&background=rgb(255,255,255)&type={{ block.settings.layout.layout }}"
                 style="opacity: 1;"
               >

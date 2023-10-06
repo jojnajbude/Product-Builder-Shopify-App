@@ -1,8 +1,6 @@
-import fs from 'fs';
 import { join } from 'path';
 
-import sharp from 'sharp';
-import { deleteFile, downloadFile, existsFile, readDirectory } from '../utils/cdnApi.js';
+import { deleteFile, existsFile, readDirectory } from '../utils/cdnApi.js';
 
 export const getUploadPath = (params) => {
   if (!params) {

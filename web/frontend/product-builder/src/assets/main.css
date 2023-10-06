@@ -1674,11 +1674,14 @@ editable-picture {
   background-color: #fff;
 }
 
-.editable-picture:hover,
+.editable-picture.is-empty:hover,
 .editable-picture.is-selected,
 .editable-picture.is-empty.is-dragover {
-  cursor: pointer;
   background-color: var(--product-element-hover-background);
+}
+
+.editable-picture:hover {
+  cursor: pointer;
 }
 
 .editable-picture:not(.is-empty).is-dragover {
@@ -1739,15 +1742,26 @@ editable-picture {
   /* aspect-ratio: 1; */
 }
 
-.editable-picture .editable-picture__image {
+.editable-picture .editable-picture__mover {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 1;
+  transform-origin: center;
+}
+
+.editable-picture .editable-picture__image {
   transition: opacity .3s;
+  transform-origin: center;
+  opacity: 1;
+  max-width: 100%;
+  max-height: 100%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .editable-picture .editable-picture__mask {
@@ -1774,7 +1788,7 @@ editable-picture {
 } */
 
 .editable-picture:not(.is-empty).is-selected .editable-picture__preview-image {
-  opacity: 0.85;
+  /*opacity: 0.85;*/
 }
 
 .editable-picture__image.editable-picture__preview-image {
@@ -2363,17 +2377,17 @@ editable-text.is-selected .textarea {
   text-decoration: underline;
 }
 
-.textarea-container[font="Times New Roman"] .textarea {
-  font-family: 'Times New Roman', Times, serif;
-}
+/*.textarea-container[font="Times New Roman"] .textarea {*/
+/*  font-family: 'Times New Roman', Times, serif;*/
+/*}*/
 
-.textarea-container[font="Arial"] .textarea {
-  font-family: Arial, Helvetica, sans-serif;
-}
+/*.textarea-container[font="Arial"] .textarea {*/
+/*  font-family: Arial, Helvetica, sans-serif;*/
+/*}*/
 
-.textarea-container[font="Calibri"] .textarea {
-  font-family: Calibri, 'Trebuchet MS', sans-serif;
-}
+/*.textarea-container[font="Calibri"] .textarea {*/
+/*  font-family: Calibri, 'Trebuchet MS', sans-serif;*/
+/*}*/
 
 /* Slider */
 .slider {

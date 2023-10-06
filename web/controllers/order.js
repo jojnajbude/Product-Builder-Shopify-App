@@ -283,11 +283,19 @@ async function UploadImagesFromBlock(state, uploadPath) {
 
       const images = block.childBlocks
         .filter(child => child.imageUrl)
-        .map(child => ({
-          url: child.imageUrl,
-          settings: child.settings,
-          resolution: child.resolution
-        }))
+        .map(child => {
+          const pathName = new URL(child.imageUrl).pathname;
+          const imageURL = process.env.CDN_HOST + '/' + pathName.split('/shops/').pop();
+
+          console.log(imageURL);
+
+
+          return ({
+            url: imageURL,
+            settings: child.settings,
+            resolution: child.resolution
+          })
+        })
         .map(image => {
           const { crop, rotate } = image.settings;
 

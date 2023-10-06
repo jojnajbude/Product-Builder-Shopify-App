@@ -108,6 +108,10 @@ const onImageLoad = async (picture, src) => {
       res();
     }
 
+    picture.onerror = () => {
+      res(new Error('no image'));
+    }
+
     picture.src = src;
   })
 }
@@ -120,17 +124,23 @@ const userEmptyState = () => {
 const orderItem = (draft) => {
   return new Promise(async (res, rej) => {
     const { root, primary } = localization.language;
-    console.log(root, primary);
 
-    if (!primary) {
-      const shopifyProduct = await fetch(`${root}/products/${draft.product.handle}.json`)
-          .then(res => res.json())
-          .then(res => res.product);
+    const shopifyProduct = await fetch(`${primary ? root : root + '/'}products/${draft.product.handle}.json`)
+      .then(res => {
+        if (res.ok) {
+          return res.json()
+        };
 
-      draft.product = {
-        ...draft.product,
-        title: shopifyProduct.title,
-      }
+        return {
+          error: 'No file'
+        }
+      })
+      .then(res => res.product);
+
+    draft.product = {
+      ...draft.product,
+      title: shopifyProduct ? shopifyProduct.title : draft.product.title,
+      imageUrl: shopifyProduct && shopifyProduct.image ? shopifyProduct.image.src : draft.product.imageUrl
     }
 
     const { projectId: id, product: draftProduct = {}, updatedAt, status } = draft;
@@ -145,7 +155,10 @@ const orderItem = (draft) => {
     picture.classList.add('order__image');
 
     if (draftProduct.imageUrl) {
-      await onImageLoad(picture, draftProduct.imageUrl);
+      const response = await onImageLoad(picture, draftProduct.imageUrl);
+      if (response instanceof Error) {
+        picture.alt = response.message;
+      }
     }
 
     const title = document.createElement('div');

@@ -1,5 +1,3 @@
-import sharp from "sharp";
-
 const getImageUrl = (picture, resolution = {}) => {
   if (!picture || !picture.imageUrl) {
     return null;

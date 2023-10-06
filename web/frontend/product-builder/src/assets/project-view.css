@@ -18,7 +18,7 @@ body > .studio-view {
   position: relative;
 }
 
-.studio-view > .studio-view__container {
+.studio-view__container {
   position: absolute;
   inset: 25px;
   display: flex;
@@ -26,7 +26,7 @@ body > .studio-view {
   gap: 20px;
   justify-items: center;
   flex-wrap: wrap;
-  overflow: visible
+  overflow: auto;
 }
 
 .studio-view__container:has(.tile) {

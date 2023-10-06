@@ -3,6 +3,8 @@
 const baseURL = 'https://product-builder.dev-test.pro';
 const cdnBaseURL = 'https://product-builder-cdn.dev-test.pro';
 
+const cdnPublicURL = 'https://getcocun-dev.b-cdn.net/shops';
+
 const cookiesTime = {
   anonimUser: 10
 }
@@ -1524,7 +1526,7 @@ class ProductBuilder extends HTMLElement {
         this.projectId = await this.createOrder();
 
         
-        this.orderInfo = await this.getOrderInfo(id);
+        this.orderInfo = await this.getOrderInfo(this.projectId);
 
         this.setOrderPath();
       }
@@ -1702,8 +1704,8 @@ class ProductBuilder extends HTMLElement {
       .then(res => res.json())
       .then(data => {
         return Array.isArray(data) ? data.map(imageURL => ({
-          original: cdnBaseURL + '/' + imageURL,
-          thumbnail: imageURL + `?resize=[${devicePixelRatio * 125},${devicePixelRatio * 125}]&thumbnail=true`
+          original: cdnPublicURL + '/' + imageURL,
+          thumbnail: imageURL + `?width=${devicePixelRatio * 125}&thumbnail=true`
         })) : []
       });
   }
@@ -2944,9 +2946,19 @@ class TextTool extends Tool {
     `
   }
 
+  static fonts = [
+    'Roboto',
+    'Mooli',
+    'Inter',
+    'Skranji',
+    'Quicksand',
+    'Lobster Two',
+    'DM Sans'
+  ];
+
   static defaultValue = {
     align: 'center',
-    font: 'Times New Roman',
+    font: TextTool.fonts[0],
     fontStyle: {
       bold: false,
       italic: false,
@@ -3069,11 +3081,7 @@ class TextTool extends Tool {
 
     // this.selectType = selectType;
 
-    const selectFont = this.selectorTemplate({ options: [
-      'Times New Roman',
-      'Arial',
-      'Calibri'
-    ]});
+    const selectFont = this.selectorTemplate({ options: TextTool.fonts});
 
     this.selectFont = selectFont;
 
@@ -4471,7 +4479,7 @@ class Tools extends HTMLElement {
         [...this.querySelectorAll(Tools.selectors.pages.images.image + '.is-selected')]
           .forEach(item => item.style.display = 'none');
       } else {
-        [...this.querySelectorAll(Tools.selectors.pages.images.image + '.is-selected')]
+        [...this.querySelectorAll(Tools.selectors.pages.images.image)]
           .forEach(item => item.style.display = null);
       }
     });
@@ -4598,7 +4606,7 @@ class Tools extends HTMLElement {
 
     if (typeof imageFile === 'object') {
       const setImage = (imageName) => {
-        image.src = cdnBaseURL + '/product-builder/' + imageName;
+        image.src = cdnPublicURL + '/product-builder/' + imageName;
   
         image.onload = () => {
           imageWrapper.classList.remove('is-loading');
@@ -4606,7 +4614,7 @@ class Tools extends HTMLElement {
 
         const url = new URL(image.src);
 
-        const original = cdnBaseURL + url.pathname;
+        const original = cdnPublicURL + url.pathname;
 
         const isExist = Studio.uploaded.some(upload => upload.thumbnail === imageName);
 
@@ -4709,7 +4717,7 @@ class Tools extends HTMLElement {
   
       image.style.opacity = 0;
     } else if (typeof imageFile === 'string') {
-      image.src = cdnBaseURL + "/" + imageFile;
+      image.src = cdnPublicURL + "/" + imageFile;
 
       image.onload = () => {
         imageWrapper.classList.remove('is-loading');
@@ -5387,8 +5395,6 @@ class EditablePicture extends HTMLElement {
     this.xPosition = 0;
     this.yPosition = 0;
 
-
-
     this.resetMove = () => {
       this.xPosition = 0;
       this.yPosition = 0;
@@ -5396,13 +5402,13 @@ class EditablePicture extends HTMLElement {
       this.move.x = 0;
       this.move.y = 0;
 
-      this.previewImage.style.transform = `translate .3s`;
+      this.mover.style.transform = `translate .3s`;
 
-      this.previewImage.style.translate = `0% 0%`;
+      this.mover.style.translate = `0% 0%`;
 
       setTimeout(() => {
-        this.previewImage.style.translate = null;
-        this.previewImage.style.transform = null;
+        this.mover.style.translate = null;
+        this.mover.style.transform = null;
       }, 300);
     }
 
@@ -5439,6 +5445,14 @@ class EditablePicture extends HTMLElement {
         )
       }
 
+      if (this.offsetHeight > this.move.preview.height) {
+        this.yPosition = 0;
+      }
+
+      if (this.offsetWidth > this.move.preview.width) {
+        this.xPosition = 0;
+      }
+
       const persentX= (this.xPosition * 100 / this.move.frame.width);
       const persentY= (this.yPosition * 100 / this.move.frame.height);
 
@@ -5450,7 +5464,8 @@ class EditablePicture extends HTMLElement {
         ? Number(((this.yPosition * -100) / this.move.paddings.y.max).toFixed(2))
         : Number(((this.yPosition * 100) / this.move.paddings.y.min).toFixed(2));
 
-      this.previewImage.style.translate = `${persentX}% ${persentY}%`;
+
+      this.mover.style.translate = `${persentX}% ${persentY}%`;
 
       this.move.prevX = event.touches
         ? event.touches[0].clientX
@@ -5477,9 +5492,6 @@ class EditablePicture extends HTMLElement {
       if (event.touches) {
         Studio.studioView.elements.playground.style.overflow = 'hidden';
       }
-
-      this.image.style.opacity = '0';
-      this.previewImage.style.opacity = '1';
 
       if (event.touches) {
         this.addEventListener('touchmove', this.move.onMove);
@@ -5577,7 +5589,7 @@ class EditablePicture extends HTMLElement {
           const xPercent = Number((xPosition * 100 / this.move.frame.width).toFixed(2));
           const yPercent = Number((yPosition * 100 / this.move.frame.height).toFixed(2));
 
-            this.previewImage.style.translate = `${xPercent}% ${yPercent}%`;
+            this.mover.style.translate = `${xPercent}% ${yPercent}%`;
 
             this.xPosition = this.move.frame.width * xPercent / 100;
             this.yPosition = this.move.frame.height * yPercent / 100;
@@ -5590,6 +5602,11 @@ class EditablePicture extends HTMLElement {
     if (!Studio.product) {
       return;
     }
+
+    this.mover && this.mover.remove();
+
+    this.mover = document.createElement('div');
+    this.mover.classList.add('editable-picture__mover');
 
     if (this.image) {
       this.oldImage = this.image;
@@ -5604,9 +5621,9 @@ class EditablePicture extends HTMLElement {
     this.defaultImageUrl = imageUrl;
 
     this.previewImage = new Image();
-    this.previewImage.toggleAttribute('crossOrigin');
+    // this.previewImage.toggleAttribute('crossOrigin');
     this.previewImage.classList.add('editable-picture__image', 'editable-picture__preview-image');
-    this.previewImage.style.opacity = 0;
+    // this.previewImage.style.opacity = 0;
     this.previewImage.draggable = false;
 
     const findedImage = Studio.uploaded
@@ -5633,7 +5650,7 @@ class EditablePicture extends HTMLElement {
     this.classList.add('is-loading');
 
     Promise.all([
-      new Promise(res => this.image.addEventListener('load', () => res())),
+      // new Promise(res => this.image.addEventListener('load', () => res())),
       new Promise(res => this.previewImage.addEventListener('load', res())),
     ]).then(async _ => {
 
@@ -5671,22 +5688,31 @@ class EditablePicture extends HTMLElement {
 
 
     const [width, height] = this.pageConfig ? getParams() : [this.offsetWidth, this.offsetHeight];
-    const [containerWidth, containerHeight] = [Math.ceil(this.offsetWidth * 1.5), Math.ceil(this.offsetHeight * 1.5)]
+    const [containerWidth, containerHeight] = [Math.ceil(this.offsetWidth * 4 * 2), Math.ceil(this.offsetHeight * 4 * 2)];
 
-    this.defaultImageUrl = imageOriginalURL + `?resize=[${width},${height}]&container=[${containerWidth},${containerHeight}]`;
+    this.defaultImageUrl = imageOriginalURL + `?width=${containerWidth}`;
 
     this.previewImage.src = this.defaultImageUrl;
 
-    this.image.src = this.defaultImageUrl;
+    // this.image.src = this.defaultImageUrl;
 
     this.classList.remove('is-empty');
 
     this.mask = this.createMask(this.getAttribute('picture-type'));
 
+    this.append(this.mover);
+
     if (this.mask) {
-      this.append(this.previewImage, this.mask, this.image);
+      this.mover.append(
+        this.previewImage,
+        this.mask,
+        // this.image
+      );
     } else {
-      this.append(this.previewImage, this.image);
+      this.mover.append(
+        this.previewImage,
+        // this.image
+      );
     }
   }
 
@@ -5802,7 +5828,7 @@ class EditablePicture extends HTMLElement {
   }
 
   hasImage() {
-    return this.image && this.image.hasAttribute('src') && this.image.src !== EditablePicture.emptyPixel;
+    return this.previewImage && this.previewImage.hasAttribute('src') && this.previewImage.src !== EditablePicture.emptyPixel;
   }
 
   setValue(settings) {
@@ -5858,17 +5884,21 @@ class EditablePicture extends HTMLElement {
 
        const newWidth = Math.cos(newAngle2 * Math.PI / 180) * diagonal;
 
-       const { offsetWidth } = this.previewImage;
+       const { offsetWidth } = this.mover;
 
-       return Number((offsetWidth / newWidth).toFixed(2));
+       const returnedValue = Number((offsetWidth / newWidth).toFixed(2));
+
+       return returnedValue;
      }
 
-    const toChange = this.classList.contains('is-selected')
-      || (
-        !compareObjects(this.crop, crop)
-          || !compareObjects(this.rotate, rotate)
-      ) || !compareObjects(this.previousBackground, backgroundColor)
-      || this.prevType === this.getAttribute('picture-type');
+    // const toChange = this.classList.contains('is-selected')
+    //   || (
+    //     !compareObjects(this.crop, crop)
+    //       || !compareObjects(this.rotate, rotate)
+    //   ) || !compareObjects(this.previousBackground, backgroundColor)
+    //   || this.prevType === this.getAttribute('picture-type');
+
+    const toChange = true;
 
     this.crop = crop;
     this.rotate = rotate;
@@ -5885,29 +5915,29 @@ class EditablePicture extends HTMLElement {
       this.setAttribute('background-color', backgroundColor.value);
     }
 
-    if (!this.image || !this.image.src) {
+    if (!this.previewImage || !this.previewImage.src) {
       return;
     }
 
     if (prevCrop !== crop.value || prevRotate !== rotate.value) {
       this.cropTimeout && clearTimeout(this.cropTimeout);
 
-      this.resetMove();
+      this.resetMove && this.resetMove();
 
       this.cropTimeout = setTimeout(() => {
-        this.setMoveParams();
+        this.setMoveParams && this.setMoveParams();
       }, 100);
     }
 
-    const imageUrl = new URL(this.image.src);
+    const imageUrl = new URL(this.previewImage.src);
     const previewImageUrl = new URL(this.previewImage.src);
 
-    if (this.image && crop && rotate && toChange) {
-      this.image.style.opacity = notTransparent ? 1 : 0;
-      this.previewImage.style.opacity = null;
+    if (crop && rotate && toChange) {
+      // this.image.style.opacity = notTransparent ? 1 : 0;
+      // this.previewImage.style.opacity = null;
 
-      this.previewImage.style.rotate = `${rotate.value}deg`;
-      this.previewImage.style.scale = rotatePreview() * (1 + (crop.value / 50));
+      this.mover.style.rotate = `${rotate.value}deg`;
+      this.mover.style.scale = rotatePreview() * (1 + (crop.value / 50));
     }
 
     if (backgroundColor && this.image) {
@@ -5915,7 +5945,9 @@ class EditablePicture extends HTMLElement {
 
       previewImageUrl.searchParams.set('background', backgroundColor.value);
 
-      this.previewImage.src = previewImageUrl.href;
+      this.style.backgroundColor = backgroundColor.value;
+
+      // this.previewImage.src = previewImageUrl.href;
     }
 
     if (this.image && rotate && toChange || (this.image && backgroundColor)) {
@@ -5925,7 +5957,7 @@ class EditablePicture extends HTMLElement {
         }
 
         this.image.style.opacity = 1;
-        this.previewImage.style.opacity = 0;
+        // this.previewImage.style.opacity = 0;
       }
 
       this.timer = setTimeout(() => {
@@ -5943,7 +5975,7 @@ class EditablePicture extends HTMLElement {
           this.mask.set(this.getAttribute('picture-type'));
         }
 
-        this.image.src = imageUrl.href;
+        // this.image.src = imageUrl.href;
         this.timer = null;
       }, 600);
     }
@@ -5970,6 +6002,10 @@ class EditableText extends HTMLElement {
 
   static ToolList = ['text'];
 
+  static get observedAttributes() {
+    return ['font'];
+  }
+
   constructor() {
     super();
 
@@ -5977,6 +6013,14 @@ class EditableText extends HTMLElement {
     this.editableArea.classList.add('textarea');
 
     this.editableArea.innerHTML = 'Add your description here';
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    switch (name) {
+      case 'font':
+        this.style.fontFamily = `${newValue}, serif`;
+        break;
+    }
   }
 
   connectedCallback() {
@@ -6541,11 +6585,13 @@ class ProductControls extends HTMLElement {
   }
 
   setStateRemoveBtn(isDisable) {
-    if (isDisable && !this.elements.decreaseQuantity.hasAttribute('disabled')) {
-      this.elements.remove.toggleAttribute('disabled');
-    } else if (!isDisable && this.elements.decreaseQuantity.hasAttribute('disabled')) {
-      this.elements.remove.toggleAttribute('disabled');
-    }
+    // when remove button should delete entire block, not clear just image
+
+    // if (isDisable && !this.elements.decreaseQuantity.hasAttribute('disabled')) {
+    //   this.elements.remove.toggleAttribute('disabled');
+    // } else if (!isDisable && this.elements.decreaseQuantity.hasAttribute('disabled')) {
+    //   this.elements.remove.toggleAttribute('disabled');
+    // }
   }
 
   setStateIncreaseBtn(isDisable) {
@@ -6565,6 +6611,24 @@ class ProductControls extends HTMLElement {
   }
 }
 customElements.define('product-controls', ProductControls);
+
+class StudioBlock extends HTMLElement {
+  constructor() {
+    super();
+
+
+  }
+
+  connectedCallback() {
+    this.style.opacity = 0;
+    this.classList.add('studio-view__block');
+
+    setTimeout(() => {
+      this.style.opacity = null;
+    }, 10);
+  }
+}
+customElements.define('studio-block', StudioBlock);
 
 class ProductElement extends HTMLElement {
   static selectors = {
@@ -9031,10 +9095,7 @@ class StudioView extends HTMLElement {
   }
 
   createStudioBlock(type, id) {
-    const block = document.createElement('div');
-    block.style.opacity = 0;
-
-    block.classList.add('studio-view__block');
+    const block = document.createElement('studio-block');
 
     if (id) {
       block.setAttribute('data-studio-block', id);
@@ -9047,12 +9108,6 @@ class StudioView extends HTMLElement {
         block.classList.add('block__photobook-page');
         break;
     }
-
-    block.addEventListener('DOMNodeInserted', () => {
-      setTimeout(() => {
-        block.style.opacity = null;
-      }, 10);
-    }, false);
 
     return block
   }
