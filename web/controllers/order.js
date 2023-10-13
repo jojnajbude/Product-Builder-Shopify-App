@@ -184,7 +184,12 @@ export const updateProject = async (req, res) => {
 
   await uploadFile(projectPath, 'state.json', Buffer.from(JSON.stringify(state)));
 
-  res.sendStatus(200); 
+  res.status(200).send({
+    status: 200,
+    updated: true,
+    message: 'Project updated successfully',
+    state
+  });
 };
  
 export const getProjectInfo = async (req, res) => {
@@ -287,9 +292,6 @@ async function UploadImagesFromBlock(state, uploadPath) {
           const pathName = new URL(child.imageUrl).pathname;
           const imageURL = process.env.CDN_HOST + '/' + pathName.split('/shops/').pop();
 
-          console.log(imageURL);
-
-
           return ({
             url: imageURL,
             settings: child.settings,
@@ -297,7 +299,7 @@ async function UploadImagesFromBlock(state, uploadPath) {
           })
         })
         .map(image => {
-          const { crop, rotate } = image.settings;
+          const { crop, rotate, move} = image.settings;
 
           const cropValue = 1 + (Math.round((crop.value / 50) * 100) / 100);
 
@@ -331,33 +333,21 @@ async function UploadImagesFromBlock(state, uploadPath) {
 
               const textQuery = `align=${align}&font=${font}&bold=${bold}&italic=${italic}&underline=${underline}&text=${text.split('\n').join('0x0A')}`;
 
-              editedUrl = image.url + `?${
-                resize
-                  ? `resize=${JSON.stringify(resize)}&`
-                  : ''
-                }crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}
-                &type=polaroid&${textQuery}
-              `;
+              editedUrl = image.url + `?crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}&type=polaroid&${textQuery}&x=${move.x}&y=${move.y}`;
               break;
             case 'tiles':
-              editedUrl = image.url + `?${
-                resize
-                  ? `resize=${JSON.stringify(resize)}&`
-                  : ''
-                }crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}
-                &type=${layout.layout}&layout=tile
-              `
+              editedUrl = image.url + `?crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}&type=${layout.layout}&layout=tile&x=${move.x}&y=${move.y}`
               break;
             default:
               editedUrl = image.url + `?${
                 resize
                   ? `resize=${JSON.stringify(resize)}&`
                   : ''
-                }crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}`
+                }crop=${cropValue}&rotate=${rotate.value}&background=${backgroundColor.value}&x=${move.x}&y=${move.y}`
               break;
           }
 
-          return { 
+          return {
             original: image.url,
             edited: editedUrl
           }
@@ -391,7 +381,6 @@ async function UploadImagesFromBlock(state, uploadPath) {
     const imagesBuffers = await Promise.all(images); 
 
     const imagesDownloads = imagesBuffers.map((image, imageIdx) => {
-      console.log(image.id);
       // const originalName = `block-${idx + 1}-image-${imageIdx + 1}-original.jpg`;
       const editedName = `block-${idx + 1}${image.id && image.id !== 1 ? `--${image.id}` : ''}.jpg`;
 
@@ -693,8 +682,6 @@ export const composeOrder = async (req, res) => {
   });
 
   await Promise.all(projectsZips);
-
-  console.log(orderName);
 
   const zipFolder = await zip.generateAsync({ type: 'blob' });
 

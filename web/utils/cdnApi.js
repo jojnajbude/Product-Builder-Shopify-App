@@ -49,14 +49,23 @@ export async function uploadFile(path, fileName, file) {
 
   const fileUrl = join(path, fileName);
 
-  const response = await fetch(url, {
-    method: 'PUT',
-    headers,
-    body: file ? file : ''
-  }).then(res => res.json());
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers,
+      body: file ? file : ''
+    }).then(res => res.json());
 
-  if (response.HttpCode === 201) {
-    return fileUrl;
+    if (response.HttpCode === 201) {
+      return fileUrl;
+    }
+
+    return;
+  } catch(e) {
+    return {
+      error: e,
+      status: 500
+    }
   }
 
   return;
@@ -153,14 +162,10 @@ export async function deleteFile(path, {
 } = defaultDeleteConfig) {
   const url = bunnyHost + '/' + path + (isDirectory ? '/' : '');
 
-  console.log(url);
-
   const response = await fetch(url, {
     method: 'DELETE',
     headers
   }).then(res => res.json());
-
-  console.log(response);
 
   return response;
 }

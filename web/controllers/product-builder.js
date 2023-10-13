@@ -21,9 +21,7 @@ export const removeImage = async (req, res) => {
 
   const urlPath = new URL(imageURL).pathname;
 
-  const filePath = join('shops', urlPath.split('/product-builder/').pop());
-
-  const response = await deleteFile(filePath);
+  const response = await deleteFile(urlPath);
 
   if (response.HttpCode === 200) {
     res.sendStatus(200);

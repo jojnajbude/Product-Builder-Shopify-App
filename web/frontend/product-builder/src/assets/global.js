@@ -1,9 +1,10 @@
 'use strict';
 
-const baseURL = 'https://product-builder.dev-test.pro';
-const cdnBaseURL = 'https://product-builder-cdn.dev-test.pro';
+const baseURL = 'https://app.getcocun.com';
+const cdnBaseURL = 'https://cdn.getcocun.com';
+const pullzone = 'stage';
 
-const cdnPublicURL = 'https://getcocun-dev.b-cdn.net/shops';
+const cdnPublicURL = `https://getcocun-${pullzone}.b-cdn.net/shops`;
 
 const cookiesTime = {
   anonimUser: 10
@@ -1677,7 +1678,7 @@ class ProductBuilder extends HTMLElement {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(stateToSave)
-    });
+    }).then(res => res.json());
   }
 
   getCustomer() {
@@ -1743,7 +1744,7 @@ const utils = {
   history: {
     undoButton: document.querySelector('[data-undo]'),
     redoButton: document.querySelector('[data-redo]'),
-    save: () => {
+    save: async () => {
       if (!utils.history.allowSave) {
         return;
       }
@@ -1782,7 +1783,7 @@ const utils = {
       localStorage.setItem('product-builder-history', JSON.stringify(history));
 
       if (((Studio.customer && !Studio.anonimCustomerId) || (!Studio.customer && Studio.anonimCustomerId)) && Studio.projectId && Studio.inited && history.length > 1) {
-        Studio.updateOrder(Studio.projectId);
+        await Studio.updateOrder(Studio.projectId);
       }
     },
     allowSave: true,
@@ -4244,6 +4245,10 @@ class Tools extends HTMLElement {
       .map(async item => {
         const productElement = await this.productTemplate.call(this, item);
 
+        if (!productElement) {
+          return;
+        }
+
         productsContainer.appendChild(productElement);
 
         productElements.push(productElement);
@@ -4322,6 +4327,10 @@ class Tools extends HTMLElement {
     const { root, primary } = localization.language;
 
     const product = allProducts[builderProduct.shopify_id.split('/').pop()];
+
+    if (!product) {
+      return;
+    }
 
     const { imageUrl, title, price, id } = product;
 
@@ -4606,7 +4615,7 @@ class Tools extends HTMLElement {
 
     if (typeof imageFile === 'object') {
       const setImage = (imageName) => {
-        image.src = cdnPublicURL + '/product-builder/' + imageName;
+        image.src = cdnPublicURL + "/" + imageName;
   
         image.onload = () => {
           imageWrapper.classList.remove('is-loading');
@@ -4614,7 +4623,7 @@ class Tools extends HTMLElement {
 
         const url = new URL(image.src);
 
-        const original = cdnPublicURL + url.pathname;
+        const original = cdnPublicURL + url.pathname.split('/shops').join('');
 
         const isExist = Studio.uploaded.some(upload => upload.thumbnail === imageName);
 
@@ -5456,6 +5465,8 @@ class EditablePicture extends HTMLElement {
       const persentX= (this.xPosition * 100 / this.move.frame.width);
       const persentY= (this.yPosition * 100 / this.move.frame.height);
 
+      const rotateValue = Number(this.getAttribute('rotate'));
+
       this.move.x = this.xPosition > 0
         ? Number(((this.xPosition * -100) / this.move.paddings.x.max).toFixed(2))
         : Number(((this.xPosition * 100) / this.move.paddings.x.min).toFixed(2));
@@ -5463,7 +5474,6 @@ class EditablePicture extends HTMLElement {
       this.move.y = this.yPosition > 0
         ? Number(((this.yPosition * -100) / this.move.paddings.y.max).toFixed(2))
         : Number(((this.yPosition * 100) / this.move.paddings.y.min).toFixed(2));
-
 
       this.mover.style.translate = `${persentX}% ${persentY}%`;
 
@@ -5547,16 +5557,17 @@ class EditablePicture extends HTMLElement {
 
     this.setMoveParams = () => {
       this.move.preview = this.previewImage.getBoundingClientRect();
+      this.move.mover = this.mover.getBoundingClientRect();
       this.move.frame = this.getBoundingClientRect();
 
       this.move.paddings = {
         x: {
-          min: this.move.preview.left - this.move.frame.left,
-          max: this.move.preview.right - this.move.frame.right
+          min: this.move.mover.left - this.move.frame.left,
+          max: this.move.mover.right - this.move.frame.right
         },
         y: {
-          min: this.move.preview.top - this.move.frame.top,
-          max: this.move.preview.bottom - this.move.frame.bottom
+          min: this.move.mover.top - this.move.frame.top,
+          max: this.move.mover.bottom - this.move.frame.bottom
         }
       }
     }
@@ -5574,17 +5585,18 @@ class EditablePicture extends HTMLElement {
         .reduce((children, block) => [...children, ...block.childBlocks], [])
         .find(child => child.id === this.getAttribute('child-block'));
 
+
       if (child) {
         const { x, y } = child.settings.move;
 
-        if (x && y) {
+        if (typeof x === 'number' && typeof y === 'number') {
           const xPosition = x > 0
             ? Number((this.move.paddings.x.min * x / 100).toFixed(2))
-            : Number((this.move.paddings.x.max * x / 100).toFixed(2));
+            : Number((this.move.paddings.x.max * x / -100).toFixed(2));
 
           const yPosition = y > 0
             ? Number((this.move.paddings.y.min * y / 100).toFixed(2))
-            : Number((this.move.paddings.y.max * y / 100).toFixed(2));
+            : Number((this.move.paddings.y.max * y / -100).toFixed(2));
 
           const xPercent = Number((xPosition * 100 / this.move.frame.width).toFixed(2));
           const yPercent = Number((yPosition * 100 / this.move.frame.height).toFixed(2));
@@ -5692,6 +5704,13 @@ class EditablePicture extends HTMLElement {
 
     this.defaultImageUrl = imageOriginalURL + `?width=${containerWidth}`;
 
+    this.previewImage.onload = () => {
+
+      if (this.previewImage.naturalWidth < containerWidth) {
+        this.previewImage.style.width = (this.previewImage.naturalWidth * this.offsetWidth / containerWidth) + 'px';
+      }
+    }
+
     this.previewImage.src = this.defaultImageUrl;
 
     // this.image.src = this.defaultImageUrl;
@@ -5705,9 +5724,10 @@ class EditablePicture extends HTMLElement {
     if (this.mask) {
       this.mover.append(
         this.previewImage,
-        this.mask,
         // this.image
       );
+
+      this.append(this.mask);
     } else {
       this.mover.append(
         this.previewImage,
@@ -5771,12 +5791,7 @@ class EditablePicture extends HTMLElement {
         blocks: newBlocks
       }}, 'fit image - set image');
 
-      const onLoad = () => {
-        res();
-        this.image.removeEventListener('load', onLoad);
-      }
-
-      this.image.addEventListener('load', onLoad);
+      res();
     });
   }
 
@@ -5799,17 +5814,10 @@ class EditablePicture extends HTMLElement {
 
     this.image.addEventListener('load', onLoad);
 
-    const imageUrl = new URL(this.image.src);
-
-    imageUrl.searchParams.set('type', type);
 
     if (this.mask) {
       this.mask.set(this.getAttribute('picture-type'));
     }
-
-    this.classList.add('is-loading');
-
-    this.image.src = imageUrl.href;
   }
 
   removeImage() {
@@ -5860,7 +5868,7 @@ class EditablePicture extends HTMLElement {
        if (!this.previewImage) {
          return 1;
        }
-       const diagonal = Math.sqrt(Math.pow(this.offsetWidth, 2) + Math.pow(this.offsetHeight, 2));
+       const diagonal = Math.sqrt(Math.pow(this.previewImage.offsetWidth, 2) + Math.pow(this.previewImage.offsetHeight, 2));
 
        const calculateAngle = () => {
          const { value: rotateValue } = rotate;
@@ -5868,23 +5876,23 @@ class EditablePicture extends HTMLElement {
          if (rotateValue < 90) {
            return rotateValue;
          } else if (rotateValue >= 90 && rotateValue < 180) {
-           return 180 - rotateValue;
+           return rotateValue - 90;
          } else if (rotateValue >= 180 && rotateValue < 270) {
-            return 270 - rotateValue;
+            return rotateValue - 180;
          } else if (rotateValue >= 270 && rotateValue < 360) {
-           return 360 - rotateValue;
+           return rotateValue - 270;
          }
 
          return rotateValue;
        }
 
-       const newAngle = Math.atan(this.offsetHeight / this.offsetWidth) * 180 / Math.PI
+       const newAngle = Math.atan(this.previewImage.offsetHeight / this.previewImage.offsetWidth) * 180 / Math.PI;
 
-       const newAngle2 = newAngle - calculateAngle();
+       const newAngle2 = Math.abs(newAngle - calculateAngle());
 
-       const newWidth = Math.cos(newAngle2 * Math.PI / 180) * diagonal;
+       const { offsetWidth, offsetHeight } = this.previewImage;
 
-       const { offsetWidth } = this.mover;
+       const newWidth = Math.abs(Math.cos(newAngle2 * Math.PI / 180) * diagonal);
 
        const returnedValue = Number((offsetWidth / newWidth).toFixed(2));
 
@@ -5937,7 +5945,7 @@ class EditablePicture extends HTMLElement {
       // this.previewImage.style.opacity = null;
 
       this.mover.style.rotate = `${rotate.value}deg`;
-      this.mover.style.scale = rotatePreview() * (1 + (crop.value / 50));
+      this.mover.style.scale = (rotatePreview() * 1 + (crop.value / 50));
     }
 
     if (backgroundColor && this.image) {
@@ -10064,7 +10072,6 @@ class ImageChooser extends HTMLElement {
         return photo;
       });
 
-      console.log(this.photos);
       container.classList.toggle('is-selected');
     });
 
@@ -10385,7 +10392,6 @@ class ImageChooser extends HTMLElement {
           return media;
         });
 
-        console.log(this.photos);
       }
   }
 }

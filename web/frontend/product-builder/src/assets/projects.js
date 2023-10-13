@@ -125,23 +125,28 @@ const orderItem = (draft) => {
   return new Promise(async (res, rej) => {
     const { root, primary } = localization.language;
 
-    const shopifyProduct = await fetch(`${primary ? root : root + '/'}products/${draft.product.handle}.json`)
-      .then(res => {
-        if (res.ok) {
-          return res.json()
-        };
+    console.log(draft.product);
 
-        return {
-          error: 'No file'
-        }
-      })
-      .then(res => res.product);
+    if (draft.product) {
+      const shopifyProduct = await fetch(`${primary ? root : root + '/'}products/${draft.product.handle}.json`)
+        .then(res => {
+          if (res.ok) {
+            return res.json()
+          };
 
-    draft.product = {
-      ...draft.product,
-      title: shopifyProduct ? shopifyProduct.title : draft.product.title,
-      imageUrl: shopifyProduct && shopifyProduct.image ? shopifyProduct.image.src : draft.product.imageUrl
+          return {
+            error: 'No file'
+          }
+        })
+        .then(res => res.product);
+
+      draft.product = {
+        ...draft.product,
+        title: shopifyProduct ? shopifyProduct.title : draft.product.title,
+        imageUrl: shopifyProduct && shopifyProduct.image ? shopifyProduct.image.src : draft.product.imageUrl
+      }
     }
+
 
     const { projectId: id, product: draftProduct = {}, updatedAt, status } = draft;
 
