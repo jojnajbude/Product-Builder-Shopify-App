@@ -1724,6 +1724,8 @@ editable-picture {
   color: #ff0079;
   font-size: 14px;
   border-radius: 50px;
+  max-width: 220px;
+  text-align: center;
 }
 
 .editable-picture:not(.is-empty) .editable-picture__empty-state {
@@ -2546,6 +2548,11 @@ view-controls {
     top: 80px;
     right: 10px;
   }
+
+  .view-controls__button[data-zoom-in],
+  .view-controls__button[data-zoom-out] {
+    display: none;
+  }
 }
 
 /* Prints */
@@ -2801,15 +2808,11 @@ product-tile {
 }
 
 .tile {
-  width: 90%;
+  width: 70%;
   padding: 0px;
   aspect-ratio: 1;
   background-color: #fff;
   margin: 5% 0;
-}
-
-.studio-view__block:has(.tile) {
-  gap: 35px;
 }
 
 .tile__frame {

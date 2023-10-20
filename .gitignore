@@ -26,6 +26,3 @@ extensions/*/build
 
 # Node library SQLite database
 web/database.sqlite
-
-# Uploads CDN
-web/frontend/product-builder/src/uploads

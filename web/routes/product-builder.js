@@ -10,7 +10,7 @@ import { getCustomerUploads, removeImage } from '../controllers/product-builder.
 import Shop from '../models/Shop.js';
 import shopify from '../shopify.js';
 
-const PROXY_PATH = `${process.cwd()}/frontend/product-builder/src`;
+const PROXY_PATH = `${process.cwd()}/product-builder`;
 
 const productBuilder = express.Router();
 
@@ -163,7 +163,7 @@ productBuilder.get('/cart/checkProduct', async (req, res) => {
 productBuilder.get('/cart', (req, res) => {
   res.setHeader('Content-Type', 'application/liquid');
 
-  res.sendFile(join(process.cwd(), 'frontend', 'product-builder/src', 'cart.liquid'));
+  res.sendFile(join(process.cwd(), 'product-builder', 'cart.liquid'));
 });
  
 productBuilder.use('/orders', projects);

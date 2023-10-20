@@ -1,10 +1,9 @@
 'use strict';
 
-const baseURL = 'https://app.getcocun.com';
-const cdnBaseURL = 'https://cdn.getcocun.com';
-const pullzone = 'stage';
+const baseURL = 'https://product-builder.dev-test.pro';
+const pullZone = 'dev';
 
-const cdnPublicURL = `https://getcocun-${pullzone}.b-cdn.net/shops`;
+const cdnPublicURL = `https://getcocun-${pullZone}.b-cdn.net/shops`;
 
 const cookiesTime = {
   anonimUser: 10
@@ -4874,7 +4873,7 @@ class Panel extends HTMLElement {
     this.productInfo = document.querySelector(Panel.selectors.productInfo);
     this.tools = this.querySelector(Panel.selectors.tools);
 
-    this.mobileTrigger = this.querySelector(Panel.selectors.mobileTrigger);
+    this.mobileTriggers = this.querySelectorAll(Panel.selectors.mobileTrigger);
 
     this.style.translate = `0px 0px`;
 
@@ -4899,12 +4898,16 @@ class Panel extends HTMLElement {
       prevTranslateY: 0
     };
 
-    this.mobileTrigger.addEventListener('mousedown', this.event.mobileMouseDown);
-    this.mobileTrigger.addEventListener('mouseup', this.event.mobileMouseUp);
+    this.mobileTriggers
+      .forEach(trigger => {
+        trigger.addEventListener('mousedown', this.event.mobileMouseDown);
+        trigger.addEventListener('mouseup', this.event.mobileMouseUp);
+
+        trigger.addEventListener('touchstart', this.event.mobileTouchStart);
+        trigger.addEventListener('touchend', this.event.mobileTouchEnd);
+      });
+
     window.addEventListener('mouseup', this.event.windowMouseUp);
-    
-    this.mobileTrigger.addEventListener('touchstart', this.event.mobileTouchStart);
-    this.mobileTrigger.addEventListener('touchend', this.event.mobileTouchEnd);
     window.addEventListener('touchend', this.event.windowTouchUp);
 
     this.setAttribute('state', JSON.stringify(globalState.panel));
@@ -5187,7 +5190,9 @@ class EditablePicture extends HTMLElement {
       empty.classList.add('empty-state--big');
 
       const text = document.createElement('span');
-      text.textContent = 'Drag & Drop pictures here';
+      text.textContent = window.bodySize === 'desktop'
+        ? 'Drag & Drop pictures here'
+        : 'Click on the picture to add it here';
 
       empty.append(text);
     }

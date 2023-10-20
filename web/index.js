@@ -95,12 +95,12 @@ const hbs = create({
       return 1 + (Math.round((value / 50) * 100) / 100);
     }
   },
-  partialsDir: './frontend/product-builder/src/partials'
+  partialsDir: './product-builder/partials'
 });
 
 app.engine('handlebars', hbs.engine);
 app.set('view engine', 'handlebars');
-app.set('views', './frontend/product-builder/src');
+app.set('views', '.product-builder');
 
 app.use(cors()); 
   

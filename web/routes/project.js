@@ -292,7 +292,7 @@ projects.post('/uploads', imageUpload.single('images'), async (req, res) => {
 projects.get('/*', (req, res) => {
   res.setHeader('Content-Type', 'application/liquid');
 
-  res.sendFile(join(process.cwd(), 'frontend', 'product-builder/src', 'projects.liquid'));
+  res.sendFile(join(process.cwd(), 'product-builder', 'projects.liquid'));
 });
 
 export default projects; 
