@@ -16,7 +16,8 @@
 }
 
 .orders__heading p {
-  margin: 0;
+  margin: 0 auto;
+  max-width: 500px;
   font-weight: 200;
   letter-spacing: 0.03em;
 }

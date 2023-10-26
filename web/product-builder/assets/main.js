@@ -708,9 +708,17 @@ const globalState = {
     product: null,
     blockCount: 0,
     tools: {
+      layout: {
+        show: true,
+      },
+      text: {
+        show: false
+      }
     }
   },
 }
+
+// console.log(localization);
 
 const compareObjects = (obj1, obj2) => {
   return JSON.stringify(obj1) === JSON.stringify(obj2);
@@ -4115,8 +4123,9 @@ class Tools extends HTMLElement {
     if (tabName === 'edit') {
       this.parentElement.openOnTab(20);
     } else {
-      this.parentElement.openOnTab(20);
+      this.parentElement.openOnTab(40);
     }
+
   }
 
   initTabs() {
@@ -4596,9 +4605,6 @@ class Tools extends HTMLElement {
         })
       });
 
-      Studio.uploaded = Studio.uploaded
-        .filter(upload => upload.original !== image.src.split('?').shift());
-
       imageWrapper.remove();
     }
 
@@ -4925,7 +4931,6 @@ class Panel extends HTMLElement {
       });
 
       // this.tools.resetTools();
-      this.openOnTab(20, true);
     }
 
     if (!compareObjects(prevState.tools, currState.tools)) {
@@ -5023,8 +5028,8 @@ class Panel extends HTMLElement {
     };
   }
 
-  openOnTab(percent, hard = false) {
-    if (window.bodySize === 'mobile' && ((this.event.prevTranslateY * -1) < this.offsetHeight / 2 || hard)) {
+  openOnTab(percent) {
+    if (window.bodySize === 'mobile' && (this.event.prevTranslateY * -1) < this.offsetHeight / 2) {
       this.event.prevTranslateY = (this.offsetHeight * (percent / 100)) * -1;
 
       this.style.translate = `0px ${this.event.prevTranslateY}px`;
@@ -5227,10 +5232,6 @@ class EditablePicture extends HTMLElement {
           y: touch.clientY
         }));
 
-        if (this.TouchEvents.touches.length < 2) {
-          return;
-        }
-
         const distance = Math.sqrt(
           (this.TouchEvents.touches[0].x - this.TouchEvents.touches[1].x) ** 2
            + (this.TouchEvents.touches[0].y - this.TouchEvents.touches[1].y) ** 2
@@ -5245,48 +5246,6 @@ class EditablePicture extends HTMLElement {
 
         this.removeEventListener('touchmove', this.TouchEvents.move);
         this.TouchEvents.startDistance = null;
-
-        const newBlocks = Studio.state.view.blocks.map(block => {
-          const picture = block.childBlocks
-            .find(child => child.id === this.getAttribute('child-block'));
-          
-          const newChildren = block.childBlocks.map(child => {
-            if (child.id === this.getAttribute('child-block')) {
-              return {
-                ...child,
-                selected: true
-              };
-            }
-
-            return {
-              ...child,
-              selected: false
-            }
-          })
-
-          if (picture) {
-            return {
-              ...block,
-              selected: false,
-              activeChild: true,
-              childBlocks: newChildren
-            }
-          }
-
-          return {
-            ...block,
-            selected: false,
-            activeChild: false,
-            childBlocks: newChildren
-          }
-        });
-
-        Studio.utils.change({
-          view: {
-            ...Studio.state.view,
-            blocks: newBlocks
-          }
-        })
       }).bind(this),
     };
 
@@ -5318,6 +5277,8 @@ class EditablePicture extends HTMLElement {
       }
 
       EditablePicture.hovered.push(this);
+
+      console.log(event.touches);
     });
 
     this.addEventListener('touchend', () => {
@@ -9941,7 +9902,6 @@ class StudioView extends HTMLElement {
           break;
         case 'set-of':
           container.show();
-          break;
         case 'single':
           if (type.id === 'photobook') {
             container.show();

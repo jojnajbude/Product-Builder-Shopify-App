@@ -113,11 +113,13 @@
     window.host = '<%= host %>';
   </script>
 
+  {% comment %} <script src="./product-builder/assets/main.js.mjs" defer></script> {% endcomment %}
   <script src="./product-builder/assets/global.js" defer></script>
 </head>
   <body>
     <header class="header">
-      <button class="button button--primary-action back-button" data-back-button>
+      <div data-header-group>
+        <button class="button button--primary-action back-button" data-back-button>
         <svg class="button__icon" width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M7.28796 3.75L2.25016 9L7.28796 14.25" stroke="#FF0079" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           <line x1="1" y1="-1" x2="12.2998" y2="-1" transform="matrix(1 0 0 -1 2.45032 8.27344)" stroke="#FF0079" stroke-width="2" stroke-linecap="round"/>
@@ -127,10 +129,11 @@
 
         <svg class="mobile" width="18" height="19" viewBox="0 0 18 19" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M7.28906 4.25L2.25126 9.5L7.28906 14.75" stroke="#FF0079" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <line x1="1" y1="-1" x2="12.2998" y2="-1" transform="matrix(1 0 0 -1 2.45312 8.77344)" stroke="#FF0079" stroke-width="2" stroke-linecap="round"/>
+          {% comment %} <line x1="1" y1="-1" x2="12.2998" y2="-1" transform="matrix(1 0 0 -1 2.45312 8.77344)" stroke="#FF0079" stroke-width="2" stroke-linecap="round"/> {% endcomment %}
         </svg>
 
-      </button>
+        </button>
+      </div>
 
       <a href="{{ routes.root_url }}" class="header__logo">
         <svg width="115" height="30" viewBox="0 0 115 30" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -177,11 +180,11 @@
           <line x1="1" y1="-1" x2="12.2998" y2="-1" transform="matrix(-1 -8.74228e-08 -8.74228e-08 1 15.5497 9.72656)" stroke="#FF811A" stroke-width="2" stroke-linecap="round"/>
         </svg>
 
-        <svg class="mobile" width="24" height="25" viewBox="0 0 24 25" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {% comment %} <svg class="mobile" width="24" height="25" viewBox="0 0 24 25" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M1 2.5H3.39566C4.33305 2.5 5.14468 3.15106 5.34803 4.06614L6 7M6 7L7.10424 13.0733C7.62296 15.9263 10.1077 18 13.0075 18H15.7106C18.512 18 20.9406 16.0615 21.5614 13.3297L22.5835 8.83243C22.7969 7.89379 22.0834 7 21.1208 7H6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           <circle cx="8.5" cy="21.5" r="1" stroke="currentColor" stroke-width="2"/>
           <circle cx="20.5" cy="21.5" r="1" stroke="currentColor" stroke-width="2"/>
-        </svg>
+        </svg> {% endcomment %}
 
       </button>
     </header>
@@ -235,7 +238,8 @@
             data-product-quantity
           >
             <span data-product-curr-quantity>0</span>
-            <span>{{ 'builder.out_of' | t }}</span>
+            <span class="desktop">{{ 'builder.out_of' | t }}</span>
+            <span class="mobile">/</span>
             <span data-product-req-quantity>
               0
             </span>
