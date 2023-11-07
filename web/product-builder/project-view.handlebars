@@ -1,3 +1,13 @@
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Tomorrow:ital,wght@1,200&display=swap" rel="stylesheet">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;0,1000;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900;1,1000&family=Inter:wght@400;700&family=Lobster+Two:ital,wght@0,400;0,700;1,400;1,700&family=Mooli&family=Quicksand:wght@400;700&family=Roboto&family=Skranji:wght@400;700&display=swap" rel="stylesheet">
+
+  
   <style>
     {{{ mainCss }}}
     {{{ viewCss }}}
@@ -6,6 +16,41 @@
       position: relative;
     }
   </style>
+
+  <script>
+    function rotatePreview(image, rotate) {
+       if (!image) {
+         return 1;
+       }
+       const diagonal = Math.sqrt(Math.pow(image.offsetWidth, 2) + Math.pow(image.offsetHeight, 2));
+
+       const calculateAngle = () => {
+         if (rotate < 90) {
+           return rotate;
+         } else if (rotate >= 90 && rotate < 180) {
+           return rotate - 90;
+         } else if (rotate >= 180 && rotate < 270) {
+            return rotate - 180;
+         } else if (rotate >= 270 && rotate < 360) {
+           return rotate - 270;
+         }
+
+         return rotate;
+       }
+
+       const newAngle = Math.atan(image.offsetHeight / image.offsetWidth) * 180 / Math.PI;
+
+       const newAngle2 = Math.abs(newAngle - calculateAngle());
+
+       const { offsetWidth, offsetHeight } = image;
+
+       const newWidth = Math.abs(Math.cos(newAngle2 * Math.PI / 180) * diagonal);
+
+       const returnedValue = Number((offsetWidth / newWidth).toFixed(2));
+
+       return returnedValue;
+     }
+  </script>
 
 {{#unless pdf }}<div class="studio-view">{{/unless}}
   <div class="studio-view__container {{#if pdf }}pdf{{/if}}">
@@ -21,6 +66,7 @@
           print-type="polaroid"
           class="prints product-element prints__polaroid polaroid is-selected {{ block.settings.backgroundColor.label}}" 
           style="background-color: {{ block.settings.backgroundColor.value }};"
+          data-block="{{ json block }}"
         >
 
           {{#each block.childBlocks as | child |}}
@@ -54,38 +100,45 @@
             </div>
 
             {{#if @root.image.imageUrl }}
-              <img
-                class="editable-picture__image"
-                draggable="false"
-                 
-                src="{{@root.image.imageUrl }}?resize=[921,897]&amp;container=[210,210]&amp;rotate={{@root.image.settings.rotate.value}}&crop={{ imageCrop @root.image.settings.crop.value }}&background={{ block.settings.backgroundColor.value }}"
-                style="opacity: 1;"
-              >
+              <div class="editable-picture__mover" style="
+                  rotate: {{ @root.image.settings.rotate.value }}deg;
+                ">
+                <img
+                  class="editable-picture__image"
+                  draggable="false"
+                  
+                  src="{{@root.image.imageUrl }}"
+                  style="opacity: 0;"
+                >
+              </div>
             {{/if}}            
 
           </div>
           
-          <div
-            line=""
-            max-size="20"
-            child-block="childBlock-1"
-            text-align="{{ @root.text.settings.align }}"
-            is-bold="{{ @root.text.settings.fontStyle.bold }}"
-            is-italic="{{ @root.text.settings.fontStyle.italic }}"
-            is-underline="{{ @root.text.settings.fontStyle.underline }}"
-            font="{{ @root.text.settings.font }}"
-            class="product-element__text textarea-container"
-            editable-text=""
-          >
-            <span
-              class="textarea line"
+          <div class="textarea-wrapper">
+            <div
+              line=""
+              max-size="20"
+              child-block="childBlock-1"
+              text-align="{{ @root.text.settings.align }}"
+              is-bold="{{ @root.text.settings.fontStyle.bold }}"
+              is-italic="{{ @root.text.settings.fontStyle.italic }}"
+              is-underline="{{ @root.text.settings.fontStyle.underline }}"
+              font="{{ @root.text.settings.font }}"
+              class="product-element__text textarea-container"
+              editable-text=""
+              style="
+                font-family: {{ @root.text.settings.font }};
+              "
             >
-              {{#if @root.text.settings.text }}
-                {{ @root.text.settings.text }}
-              {{else}}
-                Add text here
-              {{/if}}
-            </span>
+              <span
+                class="textarea line"
+              >
+                {{#if @root.text.settings.text }}
+                  {{ @root.text.settings.text }}
+                {{/if}}
+              </span>
+            </div>
           </div>
         </div>
       {{/case}}
@@ -97,6 +150,7 @@
           block-type="prints"
           class="prints product-element"
           background-color="#fff"
+          data-block="{{ json block }}"
         >
           <div
             class="product-element__picture editable-picture"
@@ -117,13 +171,16 @@
             </div>
 
             {{#if block.childBlocks.0.imageUrl }}
-              <img
-                class="editable-picture__image"
-                draggable="false"
-                 
-                src="{{ block.childBlocks.0.imageUrl }}?resize=[1062,1535]&rotate={{ block.childBlocks.0.settings.rotate.value}}&crop={{ imageCrop block.childBlocks.0.settings.crop.value}}background=rgb(255,255,255)"
-                style="opacity: 1;"
-              >
+              <div class="editable-picture__mover" style="
+              rotate: {{ block.childBlocks.0.settings.rotate.value }}deg;
+              ">
+                <img
+                  class="editable-picture__image"
+                  draggable="false"
+                  src="{{ block.childBlocks.0.imageUrl }}"
+                  style="opacity: 0;"
+                >     
+              </div>
             {{/if}}
           </div>
         </div>
@@ -149,6 +206,7 @@
           is-white="false"
           class="puzzle product-element is-selected"
           style="background-color: {{ block.settings.backgroundColor.value }};"
+          data-block="{{ json block }}"
         >
           <div
             class="product-element__picture editable-picture is-selected" child-block="childBlock-0"
@@ -169,13 +227,16 @@
 
             {{> puzzleMask }}
   
-            <img
-              class="editable-picture__image"
-              draggable="false"
-               
-              src="{{ block.childBlocks.0.imageUrl }}?resize=[2362,3543]&rotate={{ block.childBlocks.0.settings.rotate.value }}&crop={{ imageCrop block.childBlocks.0.settings.crop.value }}&background={{ block.settings.backgroundColor.value }}" 
-              style="opacity: 1;"
+            <div class="editable-picture__mover"
+              style=" rotate: {{ block.childBlocks.0.settings.rotate.value }}deg;"
             >
+              <img
+                class="editable-picture__image"
+                draggable="false"
+                src="/" 
+                style="opacity: 0;"
+              >
+            </div>
           </div>
         </div>
       {{/case}}
@@ -206,6 +267,7 @@
           {{#includes 'heart' @root.product.handle }}
             {{> heartMask }}
           {{/includes}}
+          data-block="{{ json block }}"
         >
           <div
             class="product-element__picture editable-picture {{#unless block.childBlocks.0.imageUrl }}is-empty{{/unless}}"
@@ -226,12 +288,16 @@
             </div>
 
             {{#if block.childBlocks.0.imageUrl }}
-              <img
-                class="editable-picture__image"
-                draggable="false"
-                 
-                src="{{ block.childBlocks.0.imageUrl }}?resize=[1181,1181]&rotate={{ block.childBlocks.0.settings.rotate.value }}&crop={{ imageCrop block.childBlocks.0.settings.crop.value }}&background=rgb(255,255,255)" style="opacity: 1;"
-              >
+              <div class="editable-picture__mover" style="
+                rotate: {{ block.childBlocks.0.settings.rotate.value }}deg;
+              ">
+                <img
+                  class="editable-picture__image"
+                  draggable="false"
+                  src="{{ block.childBlocks.0.imageUrl }}"
+                  style="opacity: 0;"
+                >
+              </div>
             {{/if}}
           </div>
         </div>
@@ -244,6 +310,7 @@
           block-type="canvas"
           class="canvas product-element {{#unless block.childBlocks.0.imageUrl}}is-empty{{/unless}}"
           background-color="#fff"
+          data-block="{{ json block }}"
         >
           <div
             class="product-element__picture editable-picture is-selected"
@@ -262,13 +329,17 @@
             </div>
 
             {{#if block.childBlocks.0.imageUrl}}
-              <img
-                class="editable-picture__image"
-                draggable="false"
-                 
-                src="{{ block.childBlocks.0.imageUrl }}?resize=[3543,3543]&rotate={{ block.childBlocks.0.settings.rotate.value }}&crop={{ imageCrop block.childBlocks.0.settings.crop.value }}&background=rgb(255,255,255)"
-                style="opacity: 1;"
-              >
+              <div class="editable-picture__mover" style="
+                rotate: {{ block.childBlocks.0.settings.rotate.value }}deg;
+              ">
+                <img
+                  class="editable-picture__image"
+                  draggable="false"
+                  
+                  src="{{ block.childBlocks.0.imageUrl }}"
+                  style="opacity: 0;"
+                >
+              </div>
             {{/if}}
           </div>
         </div>
@@ -280,7 +351,7 @@
           block-type="tiles"
           frame="black"
           class="tile product-element in-view"
-
+          data-block="{{ json block}}"
         >
           <div
             class="product-element__picture editable-picture {{#unless block.childBlocks.0.imageUrl}}is-empty{{/unless}}"
@@ -301,13 +372,39 @@
             </div>
 
             {{#if block.childBlocks.0.imageUrl }}
-              <img 
-                class="editable-picture__image"
-                draggable="false"
-                 
-                src="{{ block.childBlocks.0.imageUrl }}?resize=[2362,2362]&rotate={{ block.childBlocks.0.settings.rotate.value }}&crop={{ imageCrop block.childBlocks.0.settings.crop.value }}&background=rgb(255,255,255)&type={{ block.settings.layout.layout }}"
-                style="opacity: 1;"
-              >
+                {{#switch block.settings.layout.layout }}
+                  {{#case 'squareTile' }}
+                    <div class="editable-picture__mask">
+                      <svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M160 0H0V160H160V0ZM19 14C16.2383 14 14 16.2383 14 19V141C14 143.762 16.2383 146 19 146H141C143.762 146 146 143.762 146 141V19C146 16.2383 143.762 14 141 14H19Z" fill="white"></path>
+                      </svg>
+                    </div>
+                  {{/case}}
+
+                  {{#case 'roundTile'}}
+                    <div class="editable-picture__mask">
+                      <svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M160 0H0V160H160V0ZM80 14C43.5508 14 14 43.5488 14 80C14 116.451 43.5508 146 80 146C116.449 146 146 116.451 146 80C146 43.5488 116.449 14 80 14Z" fill="white"></path>
+                      </svg>
+                    </div>
+                  {{/case}}
+                {{/switch}}
+              
+
+              <div class="editable-picture__mover" style="
+                rotate: {{ block.childBlocks.0.settings.rotate.value }}deg;
+              ">
+                <img 
+                  class="editable-picture__image"
+                  draggable="false"
+                  src=""
+                  style="
+                    opacity: 0;
+                    
+                  "
+                  data-image-block="{{ block.childBlocks.0.id }}"
+                >
+              </div>
             {{/if}}
           </div>
 
@@ -325,4 +422,92 @@
     {{/switch}}
   {{/each}} 
   </div>
+
+  <script>
+    const images = document.querySelectorAll('.editable-picture__image');
+
+    console.log(images);
+
+    function imageProcessing(image) {
+
+      const product = image.closest('.product-element');
+
+      if (!product) {
+        return;
+      }
+
+      const block = JSON.parse(product.dataset.block);
+      console.log(block);
+
+      this.editable = image.closest('.editable-picture');
+
+      const containerWidth = this.editable.offsetWidth * 4 * 2;
+
+      this.moverContainer = image.closest('.editable-picture__mover');
+
+      const x = Number(block.childBlocks[0].settings.move.x);
+      const y = Number(block.childBlocks[0].settings.move.y);
+
+      const setMoveParams = () => {
+        this.mover = this.moverContainer.getBoundingClientRect();
+        this.frame = this.editable.getBoundingClientRect();
+
+        this.paddings = {
+          x: {
+            min: this.mover.left - this.frame.left,
+            max: this.mover.right - this.frame.right
+          },
+          y: {
+            min: this.mover.top - this.frame.top,
+            max: this.mover.bottom - this.frame.bottom
+          }
+        }
+      }
+
+      image.onload = () => {
+        if (!image.src) {
+          return;
+        }
+
+        image.style.opacity = 1;
+
+        if (image.naturalWidth < containerWidth) {
+          image.style.width = (image.naturalWidth * this.editable.offsetWidth / containerWidth) + 'px';
+        }
+
+        const rotateScale = rotatePreview(image, Number(block.childBlocks[0].settings.rotate.value));
+        const cropValue = 1 + (Math.round((Number(block.childBlocks[0].settings.crop.value) / 50) * 100) / 100);
+
+        console.log(rotateScale, cropValue, this.moverContainer)
+
+        this.moverContainer.style.scale = (rotateScale * cropValue).toFixed(2);
+
+        setMoveParams();
+
+        const xPosition = x > 0
+          ? Number((this.paddings.x.min * x / 100).toFixed(2))
+          : Number((this.paddings.x.max * x / -100).toFixed(2));
+
+        const yPosition = y > 0
+          ? Number((this.paddings.y.min * y / 100).toFixed(2))
+          : Number((this.paddings.y.max * y / -100).toFixed(2));
+
+        const xPercent = Number((xPosition * 100 / this.frame.width).toFixed(2));
+        const yPercent = Number((yPosition * 100 / this.frame.height).toFixed(2));
+
+        console.log(xPercent, yPercent)
+
+        this.moverContainer.style.translate = `${xPercent}% ${yPercent}%`;
+
+        this.xPosition = this.frame.width * xPercent / 100;
+        this.yPosition = this.frame.height * yPercent / 100;
+
+        console.log(this);
+      }
+
+      image.src = `${block.childBlocks[0].imageUrl}?width=${containerWidth}`;
+    };
+
+    images.forEach(image => imageProcessing.call({}, image));
+  </script>
 {{#unless pdf }}</div>{{/unless}}

@@ -1,4 +1,3 @@
-// @ts-check
 import { LATEST_API_VERSION } from "@shopify/shopify-api";
 import { join } from "path";
 import { readFileSync } from "fs";
@@ -72,9 +71,9 @@ const hbs = create({
   helpers: {
     switch(value, options) {
       this.switch_value = value; 
-      return options.fn(this);
+      return options.fn(this); 
     },
-    case(value, options) {
+    case(value, options) { 
       if (value == this.switch_value) {
         return options.fn(this);
       }
@@ -93,6 +92,9 @@ const hbs = create({
     },
     imageCrop(value) {
       return 1 + (Math.round((value / 50) * 100) / 100);
+    },
+    json(value) {
+      return JSON.stringify(value);
     }
   },
   partialsDir: './product-builder/partials'
@@ -100,7 +102,7 @@ const hbs = create({
 
 app.engine('handlebars', hbs.engine);
 app.set('view engine', 'handlebars');
-app.set('views', '.product-builder');
+app.set('views', 'product-builder');
 
 app.use(cors()); 
   
@@ -542,8 +544,6 @@ app.get('/api/shop', async (req, res) => {
 
   const [shop] = await shopify.api.rest.Shop.all({ session });
 
-  console.log(shop)
-
   if (shop && shop.currency) {
     res.send({
       currency: shop.currency
@@ -860,5 +860,6 @@ app.use("/*", shopify.ensureInstalledOnShop(), async (_req, res, _next) => {
     .set("Content-Type", "text/html")
     .send(readFileSync(join(STATIC_PATH, "index.html")));
 });
+
 
 app.listen(PORT);

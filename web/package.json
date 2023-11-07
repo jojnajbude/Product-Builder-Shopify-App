@@ -5,7 +5,7 @@
   "scripts": {
     "debug": "node --inspect-brk index.js",
     "dev": "cross-env NODE_ENV=development nodemon index.js --ignore ./frontend",
-    "dev-static": "npm run dev -- --tunnel-url https://product-builder.dev-test.pro:3005",
+    "dev-static": "npm run dev -- --tunnel-url https://andrii.ngrok.app:3005",
     "serve": "cross-env NODE_ENV=production node index.js"
   },
   "type": "module",

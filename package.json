@@ -7,7 +7,7 @@
     "shopify": "shopify",
     "build": "shopify app build",
     "dev": "shopify app dev",
-    "dev-tunnel": "npm run dev -- --tunnel-url https://andrii.ngrok.app:3005",
+    "dev-tunnel": "shopify app dev --tunnel-url=https://andrii.ngrok.app:3005",
     "info": "shopify app info",
     "generate": "shopify app generate",
     "deploy": "shopify app deploy",

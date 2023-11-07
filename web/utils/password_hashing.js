@@ -1,6 +1,10 @@
-import CryptoJS from "crypto-js"
+import CryptoJS from "crypto-js";
 
 export const encryptPassword = (password, secret) => {
+  if (!password || !secret) {
+    return '';
+  }
+
   const code = CryptoJS.AES
     .encrypt(password, secret)
     .toString()
@@ -12,6 +16,8 @@ export const encryptPassword = (password, secret) => {
 }
 
 export const decryptPassword = (hash, secret) => {
+  if (!hash) return '';
+
   const code = hash
     .replace(/p1L2u3S/g, '+' )
     .replace(/s1L2a3S4h/g, '/')

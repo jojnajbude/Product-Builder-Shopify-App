@@ -84,8 +84,21 @@ body > .studio-view {
   color: #fff;
 }
 
+.puzzle {
+  width: 500px;
+}
+
+.textarea-wrapper {
+  display: flex;
+  flex-grow: 1;
+  width: 100%;
+  justify-content: center;
+  align-items: center;
+}
+
 .textarea-container[text-align="center"] {
   text-align: center;
+  font-size: 24px;
 }
 
 .textarea-container[text-align="left"] {
@@ -98,4 +111,12 @@ body > .studio-view {
 
 .tile.in-view .tile__frame {
   inset: -11px -9px -9px -11px;
+}
+
+.tile.in-view .editable-picture .editable-picture__mask svg {
+  z-index: 1;
+}
+
+.tile.in-view .editable-picture .editable-picture__mask {
+  inset: 3%;
 }

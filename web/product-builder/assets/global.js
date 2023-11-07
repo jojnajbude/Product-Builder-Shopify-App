@@ -1,7 +1,7 @@
 'use strict';
 
-const baseURL = 'https://product-builder.dev-test.pro';
-const pullZone = 'dev';
+const baseURL = 'https://app.getcocun.com';
+const pullZone = 'stage';
 
 const cdnPublicURL = `https://getcocun-${pullZone}.b-cdn.net/shops`;
 

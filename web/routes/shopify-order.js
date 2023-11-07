@@ -8,10 +8,10 @@ import { composeOrder } from '../controllers/order.js';
 const shopifyOrders = Router();
 
 shopifyOrders.post('/order/create', json(), async (req, res) => {
+  
   const shopifyOrder = req.body;
-  res.sendStatus(200);
 
-  console.log(shopifyOrder);
+  res.sendStatus(200);
 
   if (!shopifyOrder) {
     return;

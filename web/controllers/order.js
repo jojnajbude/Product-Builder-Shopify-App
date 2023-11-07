@@ -11,7 +11,7 @@ import Project from '../models/Projects.js';
 import { decryptPassword, encryptPassword } from '../utils/password_hashing.js';
 import { createDir, deleteFile, downloadFile, existsFile, readDirectory, uploadFile } from '../utils/cdnApi.js';
 
-const frontPath = join(process.cwd(), 'frontend', 'product-builder', 'src');
+const frontPath = join(process.cwd(), 'product-builder');
 
 const cdnPath = 'shops';
 
