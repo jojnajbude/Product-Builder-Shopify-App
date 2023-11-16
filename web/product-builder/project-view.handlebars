@@ -18,6 +18,11 @@
   </style>
 
   <script>
+    function getPixels(cm, dpi = 300) {
+      const pixels = Math.floor(cm / 2.54 * dpi);
+      return pixels % 2 === 0 ? pixels : pixels + 1;
+    }
+
     function rotatePreview(image, rotate) {
        if (!image) {
          return 1;
@@ -426,7 +431,10 @@
   <script>
     const images = document.querySelectorAll('.editable-picture__image');
 
-    console.log(images);
+    const productResolution = {
+      width: {{ product.resolution.width }},
+      height: {{ product.resolution.height }}
+    };
 
     function imageProcessing(image) {
 
@@ -437,7 +445,6 @@
       }
 
       const block = JSON.parse(product.dataset.block);
-      console.log(block);
 
       this.editable = image.closest('.editable-picture');
 
@@ -472,13 +479,12 @@
         image.style.opacity = 1;
 
         if (image.naturalWidth < containerWidth) {
-          image.style.width = (image.naturalWidth * this.editable.offsetWidth / containerWidth) + 'px';
+          console.log(image.naturalWidth, this.editable.offsetWidth, containerWidth)
+          image.style.width = (image.naturalWidth * 100 / getPixels(productResolution.width)) + '%';
         }
 
         const rotateScale = rotatePreview(image, Number(block.childBlocks[0].settings.rotate.value));
         const cropValue = 1 + (Math.round((Number(block.childBlocks[0].settings.crop.value) / 50) * 100) / 100);
-
-        console.log(rotateScale, cropValue, this.moverContainer)
 
         this.moverContainer.style.scale = (rotateScale * cropValue).toFixed(2);
 
@@ -495,14 +501,11 @@
         const xPercent = Number((xPosition * 100 / this.frame.width).toFixed(2));
         const yPercent = Number((yPosition * 100 / this.frame.height).toFixed(2));
 
-        console.log(xPercent, yPercent)
-
         this.moverContainer.style.translate = `${xPercent}% ${yPercent}%`;
 
         this.xPosition = this.frame.width * xPercent / 100;
         this.yPosition = this.frame.height * yPercent / 100;
 
-        console.log(this);
       }
 
       image.src = `${block.childBlocks[0].imageUrl}?width=${containerWidth}`;

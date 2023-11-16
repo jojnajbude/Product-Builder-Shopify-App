@@ -1972,6 +1972,8 @@ class RangeSlider {
     const slider = this.container = document.createElement('div');
     slider.classList.add('slider');
 
+    this.position = {};
+
     const rangeSlider = document.createElement('div');
     rangeSlider.classList.add('slider__range');
 
@@ -1988,7 +1990,11 @@ class RangeSlider {
     const valueBar = this.valueBar = document.createElement('div');
     valueBar.classList.add('slider__value-bar');
 
+    const area = document.createElement('div');
+    area.classList.add('slider__area');
+
     fullBar.append(valueBar);
+    rangeSlider.append(area);
 
     const input = this.input = document.createElement('input');
     input.classList.add('slider__input');
@@ -2001,20 +2007,154 @@ class RangeSlider {
     this.max = max;
     this.default = defValue;
 
-    rangeSlider.append(bullet, fullBar, input);
-
+    rangeSlider.append(bullet, fullBar);
+    
     slider.append(rangeSlider);
 
     const showSliderValue = () => {
+      valueBar.style.width = bullet.offsetLeft + 'px';
+    }
+
+    const setSliderValue = this.setSliderValue = () => {
       const inputValue = ((+input.value) * 100) / this.max;
 
-      const bulletPosition = (inputValue / 100);
-      const space = input.offsetWidth - bullet.offsetWidth;
+      if (!this.position.max) {
+        this.position.max = fullBar.offsetWidth - bullet.offsetWidth / 2;
+      }
 
-      bullet.style.left = (bulletPosition * space) + 'px';
-      bullet.style.transform = `translateY(-50%)`;
-      valueBar.style.width = (inputValue) + '%';
+      if (!this.position.min) {
+        this.position.min = bullet.offsetWidth / 2;
+      }
+
+      const bulletPos = ((this.position.max - this.position.min) * (inputValue / 100)) + this.position.min;
+
+      console.log(bulletPos, this.position);
+
+      bullet.style.left = (bulletPos) + 'px';
+      
+      valueBar.style.width = bulletPos + 'px'
     }
+
+    const calculateInputValue = (diff) => {
+      const percentOfInput = Math.round((diff - this.position.min) * 100 / (this.position.max - this.position.min));
+      const inputValue = Math.round((this.max * percentOfInput) / 100);
+
+      if (inputValue < this.min) {
+        return this.min;
+      }
+
+      if (inputValue > this.max) {
+        return this.max;
+      }
+
+      return Math.round(Number(String(inputValue)));
+    }
+
+    const bulletMove = ((event) => {
+
+      const clientX = event.clientX || event.touches[0].clientX;
+
+      const diff = bullet.offsetLeft + (clientX - this.position.prevX);
+      
+      if (diff >= this.position.min && diff <= this.position.max) {
+        bullet.style.left = (diff) + 'px';
+      }
+
+      this.position.prevX = clientX;
+
+      const inputValue = calculateInputValue(diff);
+
+      input.value = inputValue;
+      this.input.dispatchEvent(new Event('input'));
+    }).bind(this);
+
+    area.addEventListener('mousedown', (event) => {
+      const diff = event.clientX - area.getBoundingClientRect().left;
+
+      let bulletPos = diff;
+
+      if (diff > this.position.max) {
+        bulletPos = this.position.max;
+      }
+
+      if (diff < this.position.min) {
+        bulletPos = this.position.min;
+      }
+
+      bullet.style.left = bulletPos + 'px';
+
+      bullet.dispatchEvent(new Event('mousedown'));
+
+      input.value = calculateInputValue(diff);
+      input.dispatchEvent(new Event('input'));
+    });
+
+    area.addEventListener('touchstart', (event) => {
+      const diff = event.touches[0].clientX - area.getBoundingClientRect().left;
+
+      let bulletPos = diff;
+
+      if (diff > this.position.max) {
+        bulletPos = this.position.max;
+      }
+
+      if (diff < this.position.min) {
+        bulletPos = this.position.min;
+      }
+
+      bullet.style.left = diff + 'px';
+
+      bullet.dispatchEvent(new Event('touchstart'));
+
+      input.value = calculateInputValue(diff);
+      input.dispatchEvent(new Event('input'));
+    });
+
+    bullet.addEventListener('mousedown', (event) => {
+      utils.history.allowSave = false;
+      Studio.utils.rangeActivated = true;
+
+      this.position.bar = fullBar.getBoundingClientRect();
+      this.position.prevX = event.clientX;
+
+      this.position.max = fullBar.offsetWidth - bullet.offsetWidth / 2;
+      this.position.min = bullet.offsetWidth / 2;
+
+      window.addEventListener('mousemove', bulletMove);
+    });
+
+    bullet.addEventListener('touchstart', (event) => {
+      utils.history.allowSave = false;
+      Studio.utils.rangeActivated = true;
+
+      this.position.bar = fullBar.getBoundingClientRect();
+      this.position.prevX = event.clientX;
+
+      this.position.max = fullBar.offsetWidth - bullet.offsetWidth / 2;
+      this.position.min = bullet.offsetWidth / 2;
+
+      window.addEventListener('touchmove', bulletMove);
+    });
+
+    window.addEventListener('mouseup', () => {
+      window.removeEventListener('mousemove', bulletMove);
+      utils.history.allowSave = true;
+
+      Studio.utils.history.save();
+
+      Studio.utils.rangeActivated = false;
+      window.dispatchEvent(new CustomEvent('range:mouseup'));
+    })
+
+    window.addEventListener('touchend', () => {
+      window.removeEventListener('touchmove', bulletMove);
+      utils.history.allowSave = true;
+
+      Studio.utils.history.save();
+
+      Studio.utils.rangeActivated = false;
+      window.dispatchEvent(new CustomEvent('range:mouseup'));
+    })
 
     input.addEventListener('input', showSliderValue, false);
 
@@ -2024,30 +2164,19 @@ class RangeSlider {
       contains: this.container.classList.contains.bind(this.container.classList)
     }
 
-    this.container.addEventListener('mousedown', () => {
-      utils.history.allowSave = false;
-      Studio.utils.rangeActivated = true;
-    })
-
-    this.container.addEventListener('mouseup', () => {
-      utils.history.allowSave = true;
-      Studio.utils.history.save();
-
-      Studio.utils.rangeActivated = false;
-      window.dispatchEvent(new CustomEvent('range:mouseup'));
-    });
-
     Studio.addEventListener('tab:change', (event) => {
       const { selected: tab } = event.detail.tabs;
       if (tab.dataset.tab === 'edit') {
-        showSliderValue();
+        setSliderValue();
       }
     })
   }
 
   setValue(value) {
-    if (typeof value === 'number' && value >= this.min && value <= this.max) {
+    if (typeof value === 'number' && value >= this.min && value <= this.max && value !== this.getValue()) {
       this.input.value = value;
+
+      this.setSliderValue();
       this.input.dispatchEvent(new Event('input'));
     }
   };
@@ -5797,7 +5926,8 @@ class EditablePicture extends HTMLElement {
     this.previewImage.onload = () => {
 
       if (this.previewImage.naturalWidth < containerWidth) {
-        this.previewImage.style.width = (this.previewImage.naturalWidth * this.offsetWidth / containerWidth) + 'px';
+        console.log(this.previewImage.naturalWidth, this.offsetWidth, containerWidth);
+        this.previewImage.style.width = this.previewImage.naturalWidth * 100 / getPixels(Studio.state.product.resolution.width) + '%';
       }
     }
 
@@ -7873,9 +8003,9 @@ class Tiles extends ProductElement {
   }
 
   static printSizes = {
-    squareTile: getPixels(17),
+    squareTile: getPixels(19),
     squareFramelessTile: getPixels(19),
-    roundTile: getPixels(17)
+    roundTile: getPixels(19)
   }
 
   static get observedAttributes() {

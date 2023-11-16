@@ -277,10 +277,16 @@ export const getImageFromUrl = async (url) => {
     return new Promise(rej => rej());
   }
 
-  return fetch(url).then(res => res.arrayBuffer());
+  return fetch(url).then(res => {
+    if (res.ok) {
+      return res.arrayBuffer()
+    }
+
+    return Promise.resolve(new ArrayBuffer(0));
+  });
 };
 
-async function UploadImagesFromBlock(state, uploadPath) {
+async function UploadImagesFromBlock(state, uploadPath, project) {
   const blocks = state.view.blocks
     .filter(block => block.childBlocks.some(child => child.imageUrl))
     .map(block => {
@@ -289,8 +295,14 @@ async function UploadImagesFromBlock(state, uploadPath) {
       const images = block.childBlocks
         .filter(child => child.imageUrl)
         .map(child => {
+          const { shop, customerID, projectId } = project;
+
           const pathName = new URL(child.imageUrl).pathname;
-          const imageURL = process.env.CDN_HOST + '/' + pathName.split('/shops/').pop();
+          const name = pathName.split('/').pop();
+
+          const imageURL = join(process.env.CDN_HOST, shop, (customerID.split('-').length === 2 ? 'anonims' : ''), customerID, 'projects', projectId, 'resources', name);
+
+          console.log(imageURL);
 
           return ({
             url: imageURL,
@@ -366,6 +378,9 @@ async function UploadImagesFromBlock(state, uploadPath) {
  
   const blocksReady = blocks.map((block, idx) => new Promise(async (res, rej) => {
     const images = block.images.map(image => new Promise(async res => {
+      if (idx === 0) {
+        console.log(image.edited);
+      }
       const edited = await getImageFromUrl(image.edited);
       // const [original, edited] = await Promise.all([
       //   getImageFromUrl(image.original),
@@ -545,7 +560,7 @@ export const composeProject = async (req ,res) => {
 
   const state = JSON.parse(await downloadFile(join(projectPath, 'state.json')));
 
-  await UploadImagesFromBlock(state, composePath);
+  await UploadImagesFromBlock(state, composePath, project);
 
   const projectZip = zip.folder(zipName);
 
@@ -663,7 +678,7 @@ export const composeOrder = async (req, res) => {
       }
       
 
-      await UploadImagesFromBlock(state, join(projectPath, projectComposeName));
+      await UploadImagesFromBlock(state, join(projectPath, projectComposeName), project);
 
       const projectComposeContent = (await readDirectory(join(projectPath, projectComposeName)))
         .filter(file => !file.IsDirectory)

@@ -56,6 +56,8 @@ export async function uploadFile(path, fileName, file) {
       body: file ? file : ''
     }).then(res => res.json());
 
+    console.log(response);
+
     if (response.HttpCode === 201) {
       return fileUrl;
     }
@@ -67,8 +69,6 @@ export async function uploadFile(path, fileName, file) {
       status: 500
     }
   }
-
-  return;
 }
 
 export async function uploadImage(path, fileName, image) {
