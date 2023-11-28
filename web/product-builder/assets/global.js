@@ -1,9 +1,9 @@
 'use strict';
 
-const baseURL = 'https://app.getcocun.com';
-const pullZone = 'stage';
+const baseURL = 'my-url';
+const pullZone = 'dev';
 
-const cdnPublicURL = `https://getcocun-${pullZone}.b-cdn.net/shops`;
+const cdnPublicURL = `https://cdn-public-url`;
 
 const cookiesTime = {
   anonimUser: 10

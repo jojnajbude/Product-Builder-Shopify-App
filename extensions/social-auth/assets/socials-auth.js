@@ -37,7 +37,7 @@ class SocialAuth extends HTMLElement {
     }
   }
 
-  static baseUrl = 'https://app.getcocun.com';
+  static baseUrl = 'base-url';
 
   static API = {
     getCredentials: SocialAuth.baseUrl + '/api/social/credentials',

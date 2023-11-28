@@ -1,6 +1,6 @@
 const { customerID, shop } = window.cartChecker;
 
-const baseURL = 'https://app.getcocun.com';
+const baseURL = 'base-url';
 
 
 const getCart = async () => {
